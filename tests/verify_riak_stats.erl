@@ -207,20 +207,20 @@ get_console_stats(Node) ->
     %% Temporary workaround: use os:cmd/1 when in 'rtdev' (needs some cheats
     %% in order to find the right path etc.)
     try
-	Stats =
-	    case rt_config:get(rt_harness) of
-		rtdev ->
-		    N = rtdev:node_id(Node),
-		    Path = rtdev:relpath(rtdev:node_version(N)),
-		    Cmd = rtdev:riak_admin_cmd(Path, N, ["status"]),
-		    lager:info("Cmd = ~p~n", [Cmd]),
-		    os:cmd(Cmd);
-		_ ->
-		    rt:admin(Node, "status")
-	    end,
-	[S || {_,_} = S <-
-		  [list_to_tuple(re:split(L, " : ", []))
-		   || L <- tl(tl(string:tokens(Stats, "\n")))]]
+    Stats =
+        case rt_config:get(rt_harness) of
+        rtdev ->
+            N = rtdev:node_id(Node),
+            Path = rtdev:relpath(rtdev:node_version(N)),
+            Cmd = rtdev:riak_admin_cmd(Path, N, ["status"]),
+            lager:info("Cmd = ~p~n", [lists:flatten(Cmd)]),
+            os:cmd(Cmd);
+        _ ->
+            rt:admin(Node, "status")
+        end,
+    [S || {_,_} = S <-
+          [list_to_tuple(re:split(L, " : ", []))
+           || L <- tl(tl(string:tokens(Stats, "\n")))]]
     catch
 	    ?_exception_(Error, Reason, StackToken) ->
 	    lager:info("riak admin status ~p: ~p~n~p~n",
@@ -230,7 +230,7 @@ get_console_stats(Node) ->
 
 compare_http_and_console_stats(Stats1, Stats2) ->
     OnlyInHttp = [S || {K,_} = S <- Stats1,
-		       not lists:keymember(K, 1, Stats2)],
+               not lists:keymember(K, 1, Stats2)],
     OnlyInAdmin = [S || {K,_} = S <- Stats2,
 			not lists:keymember(K, 1, Stats1)],
     maybe_log_stats_keys(OnlyInHttp, "Keys missing from riak admin"),
@@ -437,7 +437,23 @@ get_and_update(Pid, map) ->
           || I <- lists:seq(1, 10) ].
 
 all_stats(Node) ->
-    common_stats() ++ product_stats(rt:product(Node)).
+    common_stats() ++ product_stats(rt:product(Node)) ++ maybe_ts_stats(binary:match(rtdev:get_version(current),<<"ts">>)).
+
+maybe_ts_stats(nomatch) ->
+    [
+        <<"chronos_version">>,
+        <<"gproc_version">>,
+        <<"vnode_reap_object_ttl_expired">>,
+        <<"vnode_reap_object_ttl_expired_total">>,
+        <<"vnode_reap_tombstone">>,
+        <<"vnode_reap_tombstone_total">>
+    ];
+
+maybe_ts_stats(_) ->
+    [
+        <<"riak_ql_version">>,
+        <<"riak_shell_version">>
+    ].
 
 common_stats() ->
     [

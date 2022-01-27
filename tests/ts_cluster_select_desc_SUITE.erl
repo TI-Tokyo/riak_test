@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 
 -module(ts_cluster_select_desc_SUITE).
--compile(export_all).
+-compile([nowarn_export_all, export_all]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -36,7 +36,7 @@ init_per_suite(Config) ->
     proc_lib:spawn(
         fun() ->
             register(random_num_proc, self()),
-            random:seed(),
+            rand:seed(),
             random_num_proc()
         end),
     [{cluster, Cluster} | Config].
@@ -61,14 +61,14 @@ end_per_testcase(_TestCase, _Config) ->
 
 groups() ->
     [
-     {use_ttb_true, [sequence], rt:grep_test_functions(?MODULE)}
-     ,{use_ttb_false, [sequence], rt:grep_test_functions(?MODULE)}
+     {use_ttb_true, [sequence], rt:grep_test_functions(?MODULE)},
+     {use_ttb_false, [sequence], rt:grep_test_functions(?MODULE)}
     ].
 
-all() -> 
+all() ->
     [
-     {group, use_ttb_true}
-     ,{group, use_ttb_false}
+     {group, use_ttb_true},
+     {group, use_ttb_false}
     ].
 
 %%--------------------------------------------------------------------
@@ -83,7 +83,7 @@ random_num_proc() ->
     receive
         {get_random_number, Pid} ->
             {_, Reds} = erlang:process_info(self(), reductions),
-            Pid ! {return_random_number, random:uniform(Reds * 1000)},
+            Pid ! {return_random_number, rand:uniform(Reds * 1000)},
             random_num_proc()
     end.
 

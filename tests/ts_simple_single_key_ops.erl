@@ -20,7 +20,6 @@
 
 -module(ts_simple_single_key_ops).
 -behavior(riak_test).
--compile([export_all]).
 -export([confirm/0]).
 -include_lib("eunit/include/eunit.hrl").
 

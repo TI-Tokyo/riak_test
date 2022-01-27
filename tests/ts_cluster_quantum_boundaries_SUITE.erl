@@ -21,7 +21,7 @@
 %% -------------------------------------------------------------------
 -module(ts_cluster_quantum_boundaries_SUITE).
 
--compile(export_all).
+-compile([export_all, nowarn_export_all]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -56,7 +56,7 @@ end_per_testcase(_TestCase, _Config) ->
 groups() ->
     [].
 
-all() -> 
+all() ->
     rt:grep_test_functions(?MODULE).
 
 %%%

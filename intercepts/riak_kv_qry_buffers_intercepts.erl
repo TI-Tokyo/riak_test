@@ -19,14 +19,17 @@
 %%-------------------------------------------------------------------
 
 -module(riak_kv_qry_buffers_intercepts).
--compile(export_all).
+-export([can_afford_inmem_random/1,
+         can_afford_inmem_yes/1,
+         can_afford_inmem_no/1
+        ]).
 -include("intercept.hrl").
 
 -define(M, riak_kv_qry_buffers_orig).
 
 %% @doc simulate memory shortage to force inmem->ldb transition
 can_afford_inmem_random(_) ->
-    random:uniform(10) > 5.
+    rand:uniform(10) > 5.
 
 can_afford_inmem_yes(_) ->
     true.

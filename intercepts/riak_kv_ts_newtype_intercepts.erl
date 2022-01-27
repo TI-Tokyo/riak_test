@@ -18,7 +18,10 @@
 %%
 %% -------------------------------------------------------------------
 -module(riak_kv_ts_newtype_intercepts).
--compile(export_all).
+-export([delayed_new_type/1,
+         really_delayed_new_type/1,
+         intercepted_new_type/3
+        ]).
 -include("intercept.hrl").
 
 -define(M, riak_kv_ts_newtype_orig).

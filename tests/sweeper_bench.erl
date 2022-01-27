@@ -11,7 +11,6 @@
 %% Sweeper AAE tree rebuild and Sweeper reaper
 -behavior(riak_test).
 -include_lib("eunit/include/eunit.hrl").
--compile(export_all).
 
 -export([confirm/0]).
 
@@ -20,7 +19,7 @@
 -define(HARNESS, (rt_config:get(rt_harness))).
 
 confirm() ->
-    
+
     Tests = [
              {"50%_ttl_sweep", [{put_ttl, 5}, {put, 5}], true},
              {"70%_ttl_sweep", [{put_ttl, 7}, {put, 3}], true},
@@ -28,14 +27,14 @@ confirm() ->
              {"no_ttl_no_sweep", [{put, 1}], false},
              {"no_ttl_sweep", [{put, 1}], true},
              {"10%_ttl_sweep", [{put_ttl, 1}, {put, 9}], true}],
-    
-    
+
+
     [bench(Name, BenchAction, Sweep) || {Name, BenchAction, Sweep } <- Tests],
     pass.
 
 bench(Name, BenchAction, Sweep) ->
     Config = [
-              {riak_core, 
+              {riak_core,
                [{ring_creation_size, 8}
                ]},
               {riak_kv,
@@ -56,14 +55,14 @@ bench(Name, BenchAction, Sweep) ->
     disable_sweep_scheduling(Nodes),
     lager:info("Start ttl loading bench"),
     start_basho_bench(Nodes, "putttl", BenchAction),
-    
+
     BenchDuration =
         rt_config:get(basho_bench_duration, ?DEFAULT_BENCH_DURATION),
     timer:sleep(timer:minutes(trunc(BenchDuration) + 2)),
     lager:info("Start normal bench"),
-    
-     start_basho_bench(Nodes, Name, [{put, 1}, 
-                                     {update, 1}, 
+
+     start_basho_bench(Nodes, Name, [{put, 1},
+                                     {update, 1},
                                      {delete, 1}]),
 
     timer:sleep(timer:minutes(trunc(BenchDuration/2))),
@@ -73,13 +72,10 @@ bench(Name, BenchAction, Sweep) ->
         false ->
             ok
     end,
-    
-    timer:sleep(timer:minutes(trunc(BenchDuration/2) + 2)),
-    
-    rt:clean_cluster(Nodes).
 
-get_status(Node) ->
-    rpc:call(Node, riak_kv_console, sweep_status, [[]]).
+    timer:sleep(timer:minutes(trunc(BenchDuration/2) + 2)),
+
+    rt:clean_cluster(Nodes).
 
 
 start_basho_bench(Nodes, Name, Operations) ->

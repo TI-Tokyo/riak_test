@@ -11,7 +11,6 @@
 %% Sweeper AAE tree rebuild and Sweeper reaper
 -behavior(riak_test).
 -include_lib("eunit/include/eunit.hrl").
--compile(export_all).
 -export([confirm/0]).
 
 -record(state, {a_up = [], a_down = [], a_left = [], b_up= [], b_down= [], b_left =[]}).
@@ -56,7 +55,7 @@ confirm() ->
     State0 = #state{ a_up = ANodes, b_up = BNodes},
     lager:info("Start bench"),
     start_basho_bench(ANodes, "putttl", [{put, 1}, {put_ttl, 1}, {delete, 1}]),
-    put(test_start, now()),
+    put(test_start, os:timestamp()),
     timer:sleep(timer:minutes(1)),
 
     timer:sleep(timer:minutes(1)),
@@ -159,7 +158,7 @@ random_action(State) ->
            add_actions(ValidBUp, fun node_b_down/2),
            add_actions(State#state.a_down, fun node_a_up/2),
            add_actions(State#state.b_down, fun node_b_up/2)]),
-    {Node, Action} = lists:nth(random:uniform(length(NodeActionList)), NodeActionList),
+    {Node, Action} = lists:nth(rand:uniform(length(NodeActionList)), NodeActionList),
     Action(State, Node).
 
 add_actions(Nodes, Action) ->
@@ -286,10 +285,10 @@ time_stamp_action(Action, MetaData) ->
 lager:info("repl_test ~p ~p ~p", [time_since_test_start(), Action, MetaData]).
 
 time_since_test_start() ->
-    timer:now_diff(now(), get(test_start)) div 1000000.
+    timer:now_diff(os:timestamp(), get(test_start)) div 1000000.
 
 random_up_down(State, N) ->
-    _ = random:seed(now()),
+    _ = rand:seed(os:timestamp()),
     lists:foldl(fun(_N, StateIn) ->
                                  NewState = random_action(StateIn),
                                  run_full_sync(NewState)

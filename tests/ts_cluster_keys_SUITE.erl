@@ -21,7 +21,7 @@
 %%
 %% -------------------------------------------------------------------
 -module(ts_cluster_keys_SUITE).
--compile(export_all).
+-compile([nowarn_export_all, export_all]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -531,7 +531,7 @@ all_types_1_test(Ctx) ->
         "WHERE a = 'b' AND b = 1 AND c = 3 AND d = true AND e = 0.1 "
         "AND f = 'a' AND g = 2",
     Results =
-        [{<<"b">>,1,3,true,0.1,<<"a">>,2,H,I,J,K,L} || 
+        [{<<"b">>,1,3,true,0.1,<<"a">>,2,H,I,J,K,L} ||
             I <- ts_booleans()
            ,J <- Doubles
         ],
@@ -550,7 +550,7 @@ all_types_or_filter_test(Ctx) ->
         "WHERE a = 'b' AND b = 1 AND c = 3 AND d = true AND e = 0.1 "
         "AND f = 'a' AND g = 2 AND (i = true OR j = 0.2)",
     Results =
-        [{<<"b">>,1,3,true,0.1,<<"a">>,2,H,I,J,K,L} || 
+        [{<<"b">>,1,3,true,0.1,<<"a">>,2,H,I,J,K,L} ||
             I <- ts_booleans(),
             J <- Doubles,
             I == true orelse J == 0.2
@@ -748,7 +748,7 @@ desc_on_quantum_one_subquery_inclusive_across_quanta_boundaries_test(Ctx) ->
 
 table_def_desc_on_additional_local_key_field_create_data(Pid) ->
     ?assertEqual(
-        {ok, {[],[]}}, 
+        {ok, {[],[]}},
         riakc_ts:query(Pid,
             "CREATE TABLE lk_desc_1 ("
             "a SINT64 NOT NULL, "
@@ -756,7 +756,7 @@ table_def_desc_on_additional_local_key_field_create_data(Pid) ->
             "c TIMESTAMP NOT NULL, "
             "d SINT64 NOT NULL, "
             "PRIMARY KEY ((a,b,quantum(c, 1, 's')), a,b,c,d DESC))")),
-    ok = riakc_ts:put(Pid, <<"lk_desc_1">>, 
+    ok = riakc_ts:put(Pid, <<"lk_desc_1">>,
         [{1,1,1,N} || N <- lists:seq(200,200*100,100)]).
 
 

@@ -98,7 +98,7 @@ maybe_setup_slave_for_previous_client(true) ->
     %% set up a separate, slave node for the 'previous' version
     %% client, to talk to downgraded nodes
     _ = application:start(crypto),
-    Suffix = [crypto:rand_uniform($a, $z) || _ <- [x,x,x,i,x,x,x,i]],
+    Suffix = [$a + rand:uniform($z - $a) || _ <- [x,x,x,i,x,x,x,i]],
     PrevRiakcNode = list_to_atom("alsoran_"++Suffix++"@127.0.0.1"),
     ct:pal("Setting up ~p for old client", [PrevRiakcNode]),
     rt_client:set_up_slave_for_previous_client(PrevRiakcNode);

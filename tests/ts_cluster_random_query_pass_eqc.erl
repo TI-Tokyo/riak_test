@@ -20,9 +20,9 @@
 %% @doc A module to test riak_ts basic create bucket/put/select cycle.
 
 -module(ts_cluster_random_query_pass_eqc).
--compile(export_all).
 
 -ifdef(EQC).
+-export([confirm/0]).
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eunit/include/eunit.hrl").
 

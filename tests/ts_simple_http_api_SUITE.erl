@@ -21,7 +21,7 @@
 %% -------------------------------------------------------------------
 -module(ts_simple_http_api_SUITE).
 
--compile(export_all).
+-compile([export_all, nowarn_export_all]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").

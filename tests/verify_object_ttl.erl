@@ -4,7 +4,7 @@
 
 -module(verify_object_ttl).
 
--compile([export_all]).
+-export([confirm/0]).
 
 -include_lib("eunit/include/eunit.hrl").
 -define(BUCKET, <<"obj-ttl">>).
@@ -19,13 +19,12 @@
 %% ====================================================================
 %% API functions
 %% ====================================================================
--export([confirm/0]).
 
 -define(SWEEP_TICK, 1000).
 -define(SHORT_TOMBSTONE_GRACE, 1).
 
 confirm() ->
-    Config = [{riak_core, 
+    Config = [{riak_core,
                [{ring_creation_size, 8}
                ]},
               {riak_kv,
@@ -37,7 +36,7 @@ confirm() ->
 
     Nodes = rt:build_cluster(1, Config),
     ?assertEqual(ok, (rt:wait_until_nodes_ready(Nodes))),
-    
+
     [Client] = create_pb_clients(Nodes),
     stop_all_sweeps(Nodes), %% Disable sweeps so they don't mess with our tests.
     verify_object_ttl(Client),
@@ -136,12 +135,9 @@ put_object_with_ttl(Client, Bucket, KVs, TTL) when is_list(KVs) ->
 
 put_object_with_ttl(Client, Bucket, {Key, Value}, TTL) ->
     Robj0 = riakc_obj:new(Bucket, Key, Value),
-    MD = riakc_obj:get_metadata(Robj0),  
+    MD = riakc_obj:get_metadata(Robj0),
     Robj1 = riakc_obj:update_metadata(Robj0, riakc_obj:set_ttl(MD, TTL)),
     riakc_pb_socket:put(Client, Robj1).
-
-put_object_without_ttl(Client, KV) ->
-    put_object_without_ttl(Client, ?BUCKET, KV).
 
 put_object_without_ttl(Client, Bucket, KVs) when is_list(KVs) ->
     lager:info("Putting ~p object", [length(KVs)]),

@@ -298,7 +298,7 @@ get_long_obj() ->
         get_float()}.
 
 get_varchar() ->
-    Len = random:uniform(?MAXVARCHARLEN),
+    Len = rand:uniform(?MAXVARCHARLEN),
     String = get_string(Len),
     list_to_binary(String).
 
@@ -312,15 +312,15 @@ get_s(0, Acc) ->
     Acc;
 get_s(N, Acc) when is_integer(N) andalso N > 0 ->
     %% make it plain ASCII
-    get_s(N - 1, [crypto:rand_uniform($a, $z) | Acc]).
+    get_s(N - 1, [$a + rand:uniform($z - $a) | Acc]).
 
 get_timestamp() ->
-    random:uniform(?MAXTIMESTAMP).
+    rand:uniform(?MAXTIMESTAMP).
 
 get_float() ->
-    F1 = random:uniform(trunc(?MAXFLOAT)),
-    F2 = random:uniform(trunc(?MAXFLOAT)),
-    F1 - F2 + random:uniform().
+    F1 = rand:uniform(trunc(?MAXFLOAT)),
+    F2 = rand:uniform(trunc(?MAXFLOAT)),
+    F1 - F2 + rand:uniform().
 
 get_bool(N) when N < 5 -> true;
 get_bool(_)            -> false.

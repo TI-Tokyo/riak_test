@@ -241,13 +241,6 @@ percentile_cont(F, Pc, Data_) ->
             (HiRN - RN) * LoVal + (RN - LoRN) * HiVal
     end.
 
-ceil(X) ->
-    T = trunc(X),
-    case X - T == 0 of
-        true -> T;
-        false -> T + 1
-    end.
-
 mode(F, Data_) ->
     Col = remove_nulls(F, Data_),
     Min = lists:nth(1, Col),

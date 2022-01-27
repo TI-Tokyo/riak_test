@@ -81,6 +81,6 @@ get_large_select_data(SeqFun) ->
     [{Family, Series, X, get_large_varchar(), ts_data:get_float()} || X <- Times].
 
 get_large_varchar() ->
-    Len = random:uniform(10000) + ?MAX_OBJECT_SIZE,
+    Len = rand:uniform(10000) + ?MAX_OBJECT_SIZE,
     String = ts_data:get_string(Len),
     list_to_binary(String).

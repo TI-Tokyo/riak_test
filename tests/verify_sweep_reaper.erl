@@ -27,7 +27,7 @@
 
 -module(verify_sweep_reaper).
 -behavior(riak_test).
--compile(export_all).
+-compile([export_all, nowarn_export_all]).
 
 -cover_modules([riak_kv_sweeper]).
 -export([confirm/0,

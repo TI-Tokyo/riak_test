@@ -96,7 +96,7 @@ execute(TestModule, TestType, {Mod, Fun}, TestMetaData) ->
     NewGroupLeader = riak_test_group_leader:new_group_leader(self()),
     group_leader(NewGroupLeader, self()),
 
-    {0, UName} = rt:cmd("uname -a"),
+    UName = os:cmd("uname -a"),
     lager:info("Test Runner `uname -a` : ~s", [UName]),
 
     Pid = case TestType of

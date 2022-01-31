@@ -34,41 +34,24 @@ get_deps() ->
 
 riakcmd(Path, N, Cmd) ->
     ExecName = rt_config:get(exec_name, "riak"),
-    io_lib:format("~s/dev/dev~b/riak/bin/~s ~s", [Path, N, ExecName, Cmd]).
+    io_lib:format("~s/dev/dev~b/riak/bin/~s~s~s", [Path, N, ExecName, maybe_hyphen(Cmd), Cmd]).
+maybe_hyphen("chkconfig") -> "-";
+maybe_hyphen("admin") -> "-";
+maybe_hyphen("debug") -> "-";
+maybe_hyphen("repl") -> "-";
+maybe_hyphen(_) -> " ".
+
 
 riakreplcmd(Path, N, Cmd) ->
-    io_lib:format("~s/dev/dev~b/riak/bin/riak repl ~s", [Path, N, Cmd]).
+    io_lib:format("~s/dev/dev~b/riak/bin/riak-repl ~s", [Path, N, Cmd]).
 
-gitcmd(Path, Cmd) ->
-    io_lib:format("git --git-dir=\"~s/.git\" --work-tree=\"~s/\" ~s",
-                  [Path, Path, Cmd]).
-
-riak_admin_cmd(Path, N, Args) ->
-    Quoted =
-        lists:map(fun(Arg) when is_list(Arg) ->
-                          lists:flatten([$", Arg, $"]);
-                     (_) ->
-                          erlang:error(badarg)
-                  end, Args),
-    ArgStr = string:join(Quoted, " "),
+riak_admin_cmd(Path, N) ->
     ExecName = rt_config:get(exec_name, "riak"),
-    io_lib:format("~s/dev/dev~b/riak/bin/~s admin ~s", [Path, N, ExecName, ArgStr]).
+    lists:flatten(io_lib:format("~s/dev/dev~b/riak/bin/~s-admin", [Path, N, ExecName])).
 
-riak_debug_cmd(Path, N, Args) ->
-    Quoted =
-        lists:map(fun(Arg) when is_list(Arg) ->
-                          lists:flatten([$", Arg, $"]);
-                     (_) ->
-                          erlang:error(badarg)
-                  end, Args),
-    ArgStr = string:join(Quoted, " "),
+riak_debug_cmd(Path, N) ->
     ExecName = rt_config:get(exec_name, "riak"),
-    lists:flatten(io_lib:format("~s/dev/dev~b/riak/bin/~s debug ~s", [Path, N, ExecName, ArgStr])).
-
-run_git(Path, Cmd) ->
-    lager:info("Running: ~s", [gitcmd(Path, Cmd)]),
-    {0, Out} = cmd(gitcmd(Path, Cmd)),
-    Out.
+    lists:flatten(io_lib:format("~s/dev/dev~b/riak/bin/~s-debug", [Path, N, ExecName])).
 
 run_riak(N, Path, Cmd) ->
     lager:info("Running: ~s", [riakcmd(Path, N, Cmd)]),
@@ -106,14 +89,8 @@ setup_harness(_Test, _Args) ->
     %% otherwise, if the next test boots a legacy node we'll end up with cover
     %% incompatabilities and crash the cover server
     rt_cover:maybe_stop_on_nodes(),
-    Path = relpath(root),
     %% Stop all discoverable nodes, not just nodes we'll be using for this test.
     rt:pmap(fun(X) -> stop_all(X ++ "/dev") end, devpaths()),
-
-    %% Reset nodes to base state
-    lager:info("Resetting nodes to fresh state"),
-    _ = run_git(Path, "reset HEAD --hard"),
-    _ = run_git(Path, "clean -fd"),
 
     lager:info("Cleaning up lingering pipe directories"),
     rt:pmap(fun(Dir) ->
@@ -122,8 +99,8 @@ setup_harness(_Test, _Args) ->
                     %% keeping some of the security of filename:join.
                     %% the extra slashes will be pruned by filename:join, but this
                     %% ensures that there will be at least one between "/tmp" and Dir
-                    PipeDir = filename:join(["/tmp//" ++ Dir, "dev"]),
-                    {0, _} = cmd("rm -rf " ++ PipeDir)
+                    PipeDir = filename:join(["/tmp/" ++ Dir, "dev"]),
+                    os:cmd("rm -rf " ++ PipeDir)
             end, devpaths()),
     ok.
 
@@ -691,14 +668,14 @@ interactive_loop(Port, Expected) ->
 admin(Node, Args, Options) ->
     N = node_id(Node),
     Path = relpath(node_version(N)),
-    Cmd = riak_admin_cmd(Path, N, Args),
-    lager:info("Running: ~ts", [Cmd]),
-    Result = execute_admin_cmd(Cmd, Options),
+    Cmd = riak_admin_cmd(Path, N),
+    lager:info("Running: ~ts with args: ~p", [Cmd, Args]),
+    Result = execute_admin_cmd(Cmd, Options ++ [{args, Args}]),
     lager:info("~ts", [Result]),
     {ok, Result}.
 
 execute_admin_cmd(Cmd, Options) ->
-    {_ExitCode, Result} = FullResult = wait_for_cmd(spawn_cmd(Cmd)),
+    {_ExitCode, Result} = FullResult = wait_for_cmd(spawn_cmd(Cmd, Options)),
     case lists:member(return_exit_code, Options) of
         true ->
             FullResult;
@@ -732,8 +709,8 @@ node_version(N) ->
 spawn_cmd(Cmd) ->
     spawn_cmd(Cmd, []).
 spawn_cmd(Cmd, Opts) ->
-    Port = open_port({spawn, lists:flatten(Cmd)}, [stream, in, exit_status, stderr_to_stdout] ++ Opts),
-    Port.
+    open_port({spawn_executable, lists:flatten(Cmd)},
+              [stream, in, exit_status, stderr_to_stdout] ++ Opts).
 
 wait_for_cmd(Port) ->
     rt:wait_until(node(),
@@ -857,8 +834,8 @@ get_node_debug_logs({_Node, NodeNum}, Acc) ->
     delete_existing_debug_log_file(DebugLogFile),
     Path = relpath(node_version(NodeNum)),
     Args = ["--logs"],
-    Cmd = riak_debug_cmd(Path, NodeNum, Args),
-    {ExitCode, Result} = wait_for_cmd(spawn_cmd(Cmd)),
+    Cmd = riak_debug_cmd(Path, NodeNum),
+    {ExitCode, Result} = wait_for_cmd(spawn_cmd(Cmd, [{args, Args}])),
     lager:info("~p ExitCode ~p, Result = ~p", [Cmd, ExitCode, Result]),
     case filelib:is_file(DebugLogFile) of
         true ->

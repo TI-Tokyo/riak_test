@@ -102,6 +102,19 @@ setup_harness(_Test, _Args) ->
                     PipeDir = filename:join(["/tmp/" ++ Dir, "dev"]),
                     os:cmd("rm -rf " ++ PipeDir)
             end, devpaths()),
+
+    lager:info("Cleaning up data dirs"),
+    lists:map(fun(X) -> clean_data_dir_all(X) end,
+              devpaths()),
+
+    ok.
+
+clean_data_dir_all(DevPath) ->
+    Devs = filelib:wildcard(DevPath ++ "/dev/*"),
+    Clean = fun(C) ->
+                    rm_dir(C ++ "/riak/data")
+            end,
+    [Clean(D) || D <- Devs],
     ok.
 
 relpath(Vsn) ->

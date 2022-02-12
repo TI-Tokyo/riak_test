@@ -38,10 +38,10 @@ get(Nodes, Table, Key) ->
 get(Nodes, Table, Key, Options) ->
     riakc_ts:get(ts_setup:conn(Nodes), Table, Key, Options).
 
-'query'(Nodes, Qry) ->
-    'query'(Nodes, Qry, []).
+query(Nodes, Qry) ->
+    query(Nodes, Qry, []).
 
-'query'(Nodes, Qry, Options) ->
+query(Nodes, Qry, Options) ->
     lager:info("Running query ~ts", [Qry]),
     Got = riakc_ts:query(ts_setup:conn(Nodes), Qry, [], undefined, Options),
     lager:info("Result is ~p", [Got]),

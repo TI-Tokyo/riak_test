@@ -254,10 +254,10 @@ table_to_list(Table) ->
     Table.
 
 get_data(api) ->
-    [{<<"family1">>, <<"seriesX">>, 100, 1, <<"test1">>, 1.0, true}] ++
-    [{<<"family1">>, <<"seriesX">>, 200, 2, <<"test2">>, 2.0, false}] ++
-    [{<<"family1">>, <<"seriesX">>, 300, 3, <<"test3">>, 3.0, true}] ++
-    [{<<"family1">>, <<"seriesX">>, 400, 4, <<"test4">>, 4.0, false}].
+    [{<<"family1">>, <<"seriesX">>, 100, 1, <<"test1">>, 1.0, true},
+     {<<"family1">>, <<"seriesX">>, 200, 2, <<"test2">>, 2.0, false},
+     {<<"family1">>, <<"seriesX">>, 300, 3, <<"test3">>, 3.0, true},
+     {<<"family1">>, <<"seriesX">>, 400, 4, <<"test4">>, 4.0, false}].
 
 get_map(api) ->
     [{<<"myfamily">>, 1},

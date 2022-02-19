@@ -24,12 +24,13 @@
 
 -export([put/3,
          get/3, get/4,
-         'query'/2, 'query'/3,
+         query/2, query/3,
          insert/4, insert_no_columns/3
         ]).
 
--spec put(list(node()), string(), list(tuple())) -> 'ok'|{'error', term()}.
+-spec put(list(node()), string(), list(tuple())) -> ok | {error, term()}.
 put(Nodes, Table, Records) ->
+    lager:info("Putting data ~p", [Records]),
     riakc_ts:put(ts_setup:conn(Nodes), Table, Records).
 
 get(Nodes, Table, Key) ->
@@ -42,7 +43,7 @@ query(Nodes, Qry) ->
     query(Nodes, Qry, []).
 
 query(Nodes, Qry, Options) ->
-    lager:info("Running query ~ts", [Qry]),
+    lager:info("Running query: \"~s\"", [Qry]),
     Got = riakc_ts:query(ts_setup:conn(Nodes), Qry, [], undefined, Options),
     lager:info("Result is ~p", [Got]),
     Got.

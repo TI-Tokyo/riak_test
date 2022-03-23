@@ -68,7 +68,7 @@ create_bucket_type(Nodes, DDL, Table) ->
 
 -spec create_bucket_type(list(node()), string(), string(), pos_integer()) -> {ok, term()} | term().
 create_bucket_type([Node|_Rest], DDL, Table, NVal) when is_integer(NVal) ->
-    Props = io_lib:format("{\"props\": {\"n_val\": ~s, \"table_def\": \"~s\"}}", [integer_to_list(NVal), DDL]),
+    Props = io_lib:format("{\"props\": {\"n_val\": ~s, \"table_def\": \"~ts\"}}", [integer_to_list(NVal), DDL]),
     rt:admin(Node, ["bucket-type", "create", table_to_list(Table), lists:flatten(Props)]).
 
 

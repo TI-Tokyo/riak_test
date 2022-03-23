@@ -60,12 +60,14 @@ expected_show(Table, NVal) ->
     "dw = one,\n"
     "last_write_wins = true,\n"
     "n_val = " ++ integer_to_list(NVal) ++ ",\n"
+    "node_confirms = 0,\n"
     "notfound_ok = true,\n"
     "postcommit = '',\n"
     "pr = 0,\n"
     "pw = 0,\n"
     "r = one,\n"
     "rw = one,\n"
+    "sync_on_write = backend,\n"
     "w = quorum)".
 
 initialize(Table) ->

@@ -25,6 +25,7 @@ verify_aaefold_nval
 verify_aaefold_range
 verify_api_timeouts
 verify_asis_put
+verify_basic_upgrade
 verify_busy_dist_port
 verify_commit_hooks
 verify_conditional_postcommit
@@ -44,9 +45,9 @@ verify_riak_stats
 verify_siblingmerge_basic
 verify_stats_removal
 verify_tick_change
+verify_tictac_aae
 verify_tictacaae_nodedown
 verify_tictacrebuild_via_statsfold
-verify_tictac_aae
 verify_vclock
 verify_vclock_raw
 verify_vclock_zlib

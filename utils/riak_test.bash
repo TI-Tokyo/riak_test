@@ -12,7 +12,7 @@ _riak_test()
     fi
 
     case $prev in
-        riak_test|*/riak_test)
+        riak_test|*/riak_test|./riak_test)
             COMPREPLY=( $(compgen -W "-h -c -t -s -d -x -v -o -b -u -r -F \
                                       --help --conf --tests --suites \
                                       --dir --skip --verbose --outdir --backend \

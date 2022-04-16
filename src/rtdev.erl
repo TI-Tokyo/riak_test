@@ -459,7 +459,7 @@ deploy_nodes(NodeConfig) ->
 
     %% Start nodes
     %%[run_riak(N, relpath(node_version(N)), "start") || N <- Nodes],
-    lists:map(fun(N) -> run_riak(N, relpath(node_version(N)), "start") end, NodesN),
+    rt:pmap(fun(N) -> run_riak(N, relpath(node_version(N)), "start") end, NodesN),
 
     %% Ensure nodes started
     [ok = rt:wait_until_pingable(N) || N <- Nodes],

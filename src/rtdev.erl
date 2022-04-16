@@ -65,11 +65,6 @@ riak_debug_cmd(Path, N, Args) ->
     ExecName = rt_config:get(exec_name, "riak"),
     lists:flatten(io_lib:format("~s/dev/dev~b/riak/bin/~s debug ~s", [Path, N, ExecName, ArgStr])).
 
-run_git(Path, Cmd) ->
-    lager:info("Running: ~s", [gitcmd(Path, Cmd)]),
-    {0, Out} = cmd(gitcmd(Path, Cmd)),
-    Out.
-
 run_riak(N, Path, Cmd) ->
     lager:info("Running: ~s", [riakcmd(Path, N, Cmd)]),
     R = os:cmd(riakcmd(Path, N, Cmd)),
@@ -103,14 +98,8 @@ setup_harness(_Test, _Args) ->
     %% otherwise, if the next test boots a legacy node we'll end up with cover
     %% incompatabilities and crash the cover server
     rt_cover:maybe_stop_on_nodes(),
-    Path = relpath(root),
     %% Stop all discoverable nodes, not just nodes we'll be using for this test.
     rt:pmap(fun(X) -> stop_all(X ++ "/dev") end, devpaths()),
-
-    %% Reset nodes to base state
-    lager:info("Resetting nodes to fresh state"),
-    _ = run_git(Path, "reset HEAD --hard"),
-    _ = run_git(Path, "clean -fd"),
 
     lager:info("Cleaning up lingering pipe directories"),
     rt:pmap(fun(Dir) ->

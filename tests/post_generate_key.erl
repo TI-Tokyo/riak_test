@@ -68,7 +68,7 @@ get_url(Url) ->
 
 post_was_successful({ok, "201", _, _}) -> true;
 post_was_successful(Other) ->
-    lager:warning("That's not a 201: ~p", [Other]),
+    logger:warning("That's not a 201: ~p", [Other]),
     false.
 
 location_header({ok, _, Headers, _}) ->
@@ -79,7 +79,7 @@ is_old_url(Url) ->
         {match, _} ->
             true;
         nomatch ->
-            lager:warning("That's not an old url: ~s", [Url]),
+            logger:warning("That's not an old url: ~s", [Url]),
             false
     end.
 
@@ -88,12 +88,12 @@ is_new_url(Url) ->
         {match, _} ->
             true;
         nomatch ->
-            lager:warning("That's not a new url: ~s", [Url]),
+            logger:warning("That's not a new url: ~s", [Url]),
             false
     end.
 
 
 get_was_successful({ok, "200", _, _}) -> true;
 get_was_successful(Other) ->
-    lager:warning("That's not a 200: ~p", [Other]),
+    logger:warning("That's not a 200: ~p", [Other]),
     false.

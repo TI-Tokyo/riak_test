@@ -29,7 +29,7 @@ confirm() ->
     make_certs:endusers(CertDir, "rootCA", ["site3.basho.com", "site4.basho.com"]),
 
 
-    lager:info("Deploy some nodes"),
+    logger:info("Deploy some nodes"),
     PrivDir = rt:priv_dir(),
     Conf = [
             {riak_core, [
@@ -64,16 +64,16 @@ confirm() ->
                       _ -> true
                   end,
 
-    lager:info("Checking non-SSL results in error"),
+    logger:info("Checking non-SSL results in error"),
     %% connections over regular HTTP get told to go elsewhere
     C0 = rhc:create(IP0, Port0, "riak", []),
     ?assertMatch({error, {ok, "426", _, _}}, rhc:ping(C0)),
 
-    lager:info("Checking SSL demands authentication"),
+    logger:info("Checking SSL demands authentication"),
     C1 = rhc:create(IP, Port, "riak", [{is_ssl, true}]),
     ?assertMatch({error, {ok, "401", _, _}}, rhc:ping(C1)),
 
-    lager:info("Checking that unknown user demands reauth"),
+    logger:info("Checking that unknown user demands reauth"),
     C2 = rhc:create(IP, Port, "riak", [{is_ssl, true},
                                         {credentials, "user", "pass"}]),
     ?assertMatch({error, {ok, "401", _, _}}, rhc:ping(C2)),
@@ -82,11 +82,11 @@ confirm() ->
     %% via HTTP(s) we can test it with just one change
     Username = "user",
 
-    lager:info("Creating user"),
+    logger:info("Creating user"),
     %% grant the user credentials
     ok = rpc:call(Node, riak_core_console, add_user, [[Username, "password=password"]]),
 
-    lager:info("Setting trust mode on user"),
+    logger:info("Setting trust mode on user"),
     %% trust anyone from this host
     MyIP = case IP0 of
                "127.0.0.1" -> IP0;
@@ -100,27 +100,27 @@ confirm() ->
                                                          MyIP++"/32",
                                                          "trust"]]),
 
-    lager:info("Checking that credentials are ignored in trust mode"),
+    logger:info("Checking that credentials are ignored in trust mode"),
     %% invalid credentials should be ignored in trust mode
     C3 = rhc:create(IP, Port, "riak", [{is_ssl, true}, {credentials,
                                                         Username,
                                                         "pass"}]),
     ?assertEqual(ok, rhc:ping(C3)),
 
-    lager:info("Setting password mode on user"),
+    logger:info("Setting password mode on user"),
     %% require password from our IP
     ok = rpc:call(Node, riak_core_console, add_source, [[Username,
                                                          MyIP++"/32",
                                                          "password"]]),
 
-    lager:info("Checking that incorrect password demands reauth"),
+    logger:info("Checking that incorrect password demands reauth"),
     %% invalid credentials should be rejected in password mode
     C4 = rhc:create(IP, Port, "riak", [{is_ssl, true}, {credentials,
                                                         Username,
                                                         "pass"}]),
     ?assertMatch({error, {ok, "401", _, _}}, rhc:ping(C4)),
 
-    lager:info("Checking that correct password is successful"),
+    logger:info("Checking that correct password is successful"),
     %% valid credentials should be accepted in password mode
     C5 = rhc:create(IP, Port, "riak", [{is_ssl, true}, {credentials,
                                                         Username,
@@ -128,7 +128,7 @@ confirm() ->
 
     ?assertEqual(ok, rhc:ping(C5)),
 
-    lager:info("verifying the peer certificate rejects mismatch with server cert"),
+    logger:info("verifying the peer certificate rejects mismatch with server cert"),
     %% verifying the peer certificate reject mismatch with server cert
     C6 = rhc:create(IP, Port, "riak", [{is_ssl, true},
                                        {credentials, Username, "password"},
@@ -143,7 +143,7 @@ confirm() ->
     ?assertMatch({error,{conn_failed,{error,_}}}, rhc:ping(C6)),
 
 
-    lager:info("verifying the peer certificate should work if the cert is valid"),
+    logger:info("verifying the peer certificate should work if the cert is valid"),
     %% verifying the peer certificate should work if the cert is valid
     C7 = rhc:create(IP, Port, "riak", [{is_ssl, true},
                                        {credentials, Username, "password"},
@@ -157,7 +157,7 @@ confirm() ->
 
     ?assertEqual(ok, rhc:ping(C7)),
 
-    lager:info("verifying that user cannot get/put without grants"),
+    logger:info("verifying that user cannot get/put without grants"),
     ?assertMatch({error, {ok, "403", _, _}}, rhc:get(C7, <<"hello">>,
                                                      <<"world">>)),
 
@@ -166,7 +166,7 @@ confirm() ->
 
     ?assertMatch({error, {ok, "403", _, _}}, rhc:put(C7, Object)),
 
-    lager:info("Granting riak_kv.get, checking get works but put doesn't"),
+    logger:info("Granting riak_kv.get, checking get works but put doesn't"),
     ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.get", "on",
                                                     "default", "hello", "to", Username]]),
 
@@ -176,7 +176,7 @@ confirm() ->
 
     ?assertMatch({error, {ok, "403", _, _}}, rhc:put(C7, Object)),
 
-    lager:info("Granting riak_kv.put, checking put works and roundtrips with get"),
+    logger:info("Granting riak_kv.put, checking put works and roundtrips with get"),
     ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.put", "on",
                                                     "default", "hello", "to", Username]]),
 
@@ -188,16 +188,16 @@ confirm() ->
     ?assertEqual(<<"world">>, riakc_obj:key(O)),
     ?assertEqual(<<"howareyou">>, riakc_obj:get_value(O)),
 
-    lager:info("Checking that delete is disallowed"),
+    logger:info("Checking that delete is disallowed"),
     %% delete
     ?assertMatch({error, {ok, "403", _, _}}, rhc:delete(C7, <<"hello">>,
                                                         <<"world">>)),
 
-    lager:info("Checking that delete for non-existing key is disallowed"),
+    logger:info("Checking that delete for non-existing key is disallowed"),
     ?assertMatch({error, {ok, "403", _, _}}, rhc:delete(C7, <<"hello">>,
                                                         <<"_xxboguskey">>)),
 
-    lager:info("Granting riak_kv.delete, checking that delete succeeds"),
+    logger:info("Granting riak_kv.delete, checking that delete succeeds"),
     ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.delete", "on",
                                                     "default", "hello", "to", Username]]),
     ?assertEqual(ok, rhc:delete(C7, <<"hello">>,
@@ -210,13 +210,13 @@ confirm() ->
     %% write it back for list_buckets later
     ?assertEqual(ok, rhc:put(C7, Object)),
 
-    lager:info("Checking that delete for non-existing key is allowed"),
+    logger:info("Checking that delete for non-existing key is allowed"),
     ?assertMatch({error, {ok, "404", _, _}}, rhc:delete(C7, <<"hello">>,
                                                         <<"_xxboguskey">>)),
 
 
     %% slam the door in the user's face
-    lager:info("Revoking get/put/delete, checking that get/put/delete are disallowed"),
+    logger:info("Revoking get/put/delete, checking that get/put/delete are disallowed"),
     ok = rpc:call(Node, riak_core_console, revoke,
                   [["riak_kv.put,riak_kv.get,riak_kv.delete", "on",
                     "default", "hello", "from", Username]]),
@@ -226,60 +226,60 @@ confirm() ->
 
     ?assertMatch({error, {ok, "403", _, _}}, rhc:put(C7, Object)),
 
-    lager:info("Pausing to build the tension (to mysteriously make tests pass)", []),
+    logger:info("Pausing to build the tension (to mysteriously make tests pass)", []),
     timer:sleep(1000),
     %% list buckets
-    lager:info("Checking that list buckets is disallowed"),
+    logger:info("Checking that list buckets is disallowed"),
     ?assertMatch({error, {"403", _}}, rhc:list_buckets(C7)),
 
-    lager:info("Granting riak_kv.list_buckets, checking that list_buckets succeeds"),
+    logger:info("Granting riak_kv.list_buckets, checking that list_buckets succeeds"),
     ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.list_buckets", "on",
                                                     "default", "to", Username]]),
     ?assertMatch({ok, [<<"hello">>]}, rhc:list_buckets(C7)),
 
     %% list keys
-    lager:info("Checking that list keys is disallowed"),
+    logger:info("Checking that list keys is disallowed"),
     ?assertMatch({error, {"403", _}}, rhc:list_keys(C7, <<"hello">>)),
 
-    lager:info("Granting riak_kv.list_keys, checking that list_keys succeeds"),
+    logger:info("Granting riak_kv.list_keys, checking that list_keys succeeds"),
     ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.list_keys", "on",
                                                     "default", "to", Username]]),
 
     ?assertMatch({ok, [<<"world">>]}, rhc:list_keys(C7, <<"hello">>)),
 
-    lager:info("Revoking list_keys"),
+    logger:info("Revoking list_keys"),
     ok = rpc:call(Node, riak_core_console, revoke, [["riak_kv.list_keys", "on",
                                                     "default", "from", Username]]),
 
     %% list keys with bucket type
     rt:create_and_activate_bucket_type(Node, <<"list-keys-test">>, []),
 
-    lager:info("Checking that list keys on a bucket-type is disallowed"),
+    logger:info("Checking that list keys on a bucket-type is disallowed"),
     ?assertMatch({error, {"403", _}}, rhc:list_keys(C7, {<<"list-keys-test">>, <<"hello">>})),
 
-    lager:info("Granting riak_kv.list_keys on the bucket type, checking that list_keys succeeds"),
+    logger:info("Granting riak_kv.list_keys on the bucket type, checking that list_keys succeeds"),
     ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.list_keys", "on",
                                                     "list-keys-test", "to", Username]]),
     ?assertMatch({ok, []}, rhc:list_keys(C7, {<<"list-keys-test">>, <<"hello">>})),
 
-    lager:info("Checking that get_bucket is disallowed"),
+    logger:info("Checking that get_bucket is disallowed"),
     ?assertMatch({error, {ok, "403", _, _}}, rhc:get_bucket(C7, <<"hello">>)),
 
-    lager:info("Granting riak_core.get_bucket, checking that get_bucket succeeds"),
+    logger:info("Granting riak_core.get_bucket, checking that get_bucket succeeds"),
     ok = rpc:call(Node, riak_core_console, grant, [["riak_core.get_bucket", "on",
                                                     "default", "hello", "to", Username]]),
 
     ?assertEqual(3, proplists:get_value(n_val, element(2, rhc:get_bucket(C7,
                                                                          <<"hello">>)))),
 
-    lager:info("Checking that reset_bucket is disallowed"),
+    logger:info("Checking that reset_bucket is disallowed"),
     ?assertMatch({error, {ok, "403", _, _}}, rhc:reset_bucket(C7, <<"hello">>)),
 
-    lager:info("Checking that set_bucket is disallowed"),
+    logger:info("Checking that set_bucket is disallowed"),
     ?assertMatch({error, {ok, "403", _, _}}, rhc:set_bucket(C7, <<"hello">>,
                                                             [{n_val, 5}])),
 
-    lager:info("Granting set_bucket, checking that set_bucket succeeds"),
+    logger:info("Granting set_bucket, checking that set_bucket succeeds"),
     ok = rpc:call(Node, riak_core_console, grant, [["riak_core.set_bucket", "on",
                                                     "default", "hello", "to", Username]]),
 
@@ -294,14 +294,14 @@ confirm() ->
         false -> ok;
         true ->
             %% 2i permission test
-            lager:info("Checking 2i is disallowed"),
+            logger:info("Checking 2i is disallowed"),
             ?assertMatch({error, {"403", _}},
                          rhc:get_index(C7, <<"hello">>,
                                                    {binary_index,
                                                     "name"},
                                                    <<"John">>)),
 
-            lager:info("Granting 2i permissions, checking that results come back"),
+            logger:info("Granting 2i permissions, checking that results come back"),
             ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.index", "on",
                                                             "default", "to", Username]]),
 
@@ -312,12 +312,12 @@ confirm() ->
                                                     "name"},
                                                    <<"John">>)),
 
-            lager:info("Checking that 2i on a bucket-type is disallowed"),
+            logger:info("Checking that 2i on a bucket-type is disallowed"),
             ?assertMatch({error, {"403", _}},
                          rhc:get_index(C7, {<<"list-keys-test">>,
                                             <<"hello">>}, {binary_index, "name"}, <<"John">>)),
 
-            lager:info("Granting riak_kv.index on the bucket type, checking that get_index succeeds"),
+            logger:info("Granting riak_kv.index on the bucket type, checking that get_index succeeds"),
             ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.index", "on",
                                                     "list-keys-test", "to", Username]]),
             ?assertMatch({ok, ?INDEX_RESULTS{}},
@@ -330,7 +330,7 @@ confirm() ->
     %% counters
 
     %% grant get/put again
-    lager:info("Granting get/put for counters, checking value and increment"),
+    logger:info("Granting get/put for counters, checking value and increment"),
     ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.get,riak_kv.put", "on",
                                                     "default", "hello", "to", Username]]),
 
@@ -345,7 +345,7 @@ confirm() ->
                                           <<"numberofpies">>)),
 
     %% revoke get
-    lager:info("Revoking get, checking that value fails but increment succeeds"),
+    logger:info("Revoking get, checking that value fails but increment succeeds"),
     ok = rpc:call(Node, riak_core_console, revoke,
                   [["riak_kv.get", "on", "default", "hello", "from", Username]]),
 
@@ -355,7 +355,7 @@ confirm() ->
                           <<"numberofpies">>, 5),
 
     %% revoke put
-    lager:info("Revoking put, checking that increment fails"),
+    logger:info("Revoking put, checking that increment fails"),
     ok = rpc:call(Node, riak_core_console, revoke,
                   [["riak_kv.put", "on", "default", "hello", "from", Username]]),
 
@@ -366,7 +366,7 @@ confirm() ->
     %% load this module on all the nodes
     ok = rt:load_modules_on_nodes([?MODULE], Nodes),
 
-    lager:info("Checking that full-bucket mapred is disallowed"),
+    logger:info("Checking that full-bucket mapred is disallowed"),
     ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.put", "on",
                                                     "default", "MR", "to", Username]]),
 
@@ -390,7 +390,7 @@ confirm() ->
                                                        reduce_set_union}, undefined,
                                                true}])),
 
-    lager:info("Granting list-keys, asserting full-bucket mapred is still disallowed"),
+    logger:info("Granting list-keys, asserting full-bucket mapred is still disallowed"),
     ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.list_keys", "on",
                                                     "default", "MR", "to", Username]]),
 
@@ -403,12 +403,12 @@ confirm() ->
                                                        reduce_set_union}, undefined,
                                                true}])),
 
-    lager:info("Granting mapreduce, checking that job succeeds"),
+    logger:info("Granting mapreduce, checking that job succeeds"),
     ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.mapreduce", "on",
                                                     "default", "MR", "to", Username]]),
 
     
-    lager:info("checking erlang mapreduce works"),
+    logger:info("checking erlang mapreduce works"),
     ?assertMatch({ok, [{1, _}]},
                  rhc:mapred_bucket(C7, <<"MR">>, [{map, {modfun,
                                                      riak_kv_mapreduce,
@@ -418,7 +418,7 @@ confirm() ->
                                                        reduce_set_union}, undefined,
                                                true}])),
 
-    lager:info("checking that insecure input modfun fails"),
+    logger:info("checking that insecure input modfun fails"),
     ?assertMatch({error, _},
                  rhc:mapred_bucket(C7, {modfun, ?MODULE, mapred_modfun_input,
                                         []}, [{map, {modfun,
@@ -429,7 +429,7 @@ confirm() ->
                                                        reduce_set_union}, undefined,
                                                true}])),
 
-    lager:info("checking that insecure query modfuns fail"),
+    logger:info("checking that insecure query modfuns fail"),
     ?assertMatch({error, _},
                  rhc:mapred_bucket(C7, <<"MR">>, [{map, {modfun,
                                                      ?MODULE,
@@ -439,11 +439,11 @@ confirm() ->
                                                        reduce_set_union}, undefined,
                                                true}])),
 
-    lager:info("whitelisting module path"),
+    logger:info("whitelisting module path"),
     {?MODULE, _ModBin, ModFile} = code:get_object_code(?MODULE),
     ok = rpc:call(Node, application, set_env, [riak_kv, add_paths, [filename:dirname(ModFile)]]),
 
-    lager:info("checking that insecure input modfun fails when whitelisted but"
+    logger:info("checking that insecure input modfun fails when whitelisted but"
                " lacking permissions"),
     ?assertMatch({error, {"403", _}},
                  rhc:mapred_bucket(C7, {modfun, ?MODULE, mapred_modfun_input,
@@ -458,7 +458,7 @@ confirm() ->
     ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.mapreduce", "on",
                                                     "any", "to", Username]]),
 
-    lager:info("checking that insecure input modfun works when whitelisted and"
+    logger:info("checking that insecure input modfun works when whitelisted and"
                " has permissions"),
     ?assertMatch({ok, _},
                  rhc:mapred_bucket(C7, {modfun, ?MODULE, mapred_modfun_input,
@@ -473,7 +473,7 @@ confirm() ->
     ok = rpc:call(Node, riak_core_console, revoke, [["riak_kv.mapreduce", "on",
                                                     "any", "from", Username]]),
 
-    lager:info("checking that insecure query modfuns works when whitelisted"),
+    logger:info("checking that insecure query modfuns works when whitelisted"),
     ?assertMatch({ok, _},
                  rhc:mapred_bucket(C7, <<"MR">>, [{map, {modfun,
                                                      ?MODULE,
@@ -484,7 +484,7 @@ confirm() ->
                                                true}])),
 
 
-    lager:info("Revoking list-keys, checking that full-bucket mapred fails"),
+    logger:info("Revoking list-keys, checking that full-bucket mapred fails"),
     ok = rpc:call(Node, riak_core_console, revoke, [["riak_kv.list_keys", "on",
                                                     "default", "MR", "from", Username]]),
 
@@ -498,13 +498,13 @@ confirm() ->
                                                        reduce_set_union}, undefined,
                                                true}])),
 
-    lager:info("Pausing to build the tension (to mysteriously make tests pass)", []),
+    logger:info("Pausing to build the tension (to mysteriously make tests pass)", []),
     timer:sleep(1000),
     crdt_tests(Nodes, C7),
 
     URL = lists:flatten(io_lib:format("https://~s:~b", [IP, Port])),
 
-    lager:info("checking link walking fails because it is deprecated"),
+    logger:info("checking link walking fails because it is deprecated"),
 
     ?assertMatch({ok, "403", _, <<"Link walking is deprecated", _/binary>>},
                        ibrowse:send_req(URL ++ "/riak/hb/first/_,_,_", [], get,
@@ -514,7 +514,7 @@ confirm() ->
                                                                      "rootCA/cert.pem"])},
                                          {reuse_sessions, false}]}])),
 
-    lager:info("checking search 1.0 404s because search is removed"),
+    logger:info("checking search 1.0 404s because search is removed"),
 
     ?assertMatch({ok, "404", _, _},
                        ibrowse:send_req(URL ++ "/solr/index/select?q=foo:bar&wt=json", [], get,
@@ -546,7 +546,7 @@ mapred_modfun_input(Pipe, _Args, _Timeout) ->
 crdt_tests([Node|_]=Nodes, RHC) ->
     Username = "user",
 
-    lager:info("Creating bucket types for CRDTs"),
+    logger:info("Creating bucket types for CRDTs"),
     Types = [{<<"counters">>, counter, riakc_counter:to_op(riakc_counter:increment(5, riakc_counter:new()))},
              {<<"sets">>, set, riakc_set:to_op(riakc_set:add_element(<<"foo">>, riakc_set:new()))}],
     [ begin
@@ -555,12 +555,12 @@ crdt_tests([Node|_]=Nodes, RHC) ->
           rt:wait_until_bucket_type_visible(Nodes, BType)
       end || {BType, DType, _Op} <- Types ],
 
-    lager:info("Checking that CRDT fetch is denied"),
+    logger:info("Checking that CRDT fetch is denied"),
 
     [ ?assertDenied(rhc:fetch_type(RHC, {BType, <<"bucket">>}, <<"key">>))
      ||  {BType, _, _} <- Types],
 
-    lager:info("Granting CRDT riak_kv.get, checking that fetches succeed"),
+    logger:info("Granting CRDT riak_kv.get, checking that fetches succeed"),
 
     [ grant(Node, ["riak_kv.get", "on", binary_to_list(Type), "to", Username]) || {Type, _, _} <- Types ],
 
@@ -568,13 +568,13 @@ crdt_tests([Node|_]=Nodes, RHC) ->
                   (rhc:fetch_type(RHC, {BType, <<"bucket">>}, <<"key">>))) ||
           {BType, DType, _, _} <- Types],
 
-    lager:info("Checking that CRDT update is denied"),
+    logger:info("Checking that CRDT update is denied"),
 
     [ ?assertDenied(rhc:update_type(RHC, {BType, <<"bucket">>}, <<"key">>, Op))
      ||  {BType, _, Op} <- Types],
 
 
-    lager:info("Granting CRDT riak_kv.put, checking that updates succeed"),
+    logger:info("Granting CRDT riak_kv.put, checking that updates succeed"),
 
     [ grant(Node, ["riak_kv.put", "on", binary_to_list(Type), "to", Username]) || {Type, _, _} <- Types ],
 

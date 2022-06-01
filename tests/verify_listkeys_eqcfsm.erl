@@ -71,16 +71,16 @@ prop_test() ->
     ?FORALL(Cmds, noshrink(commands(?MODULE)),
             ?WHENFAIL(
                begin
-                   _ = lager:error("*********************** FAILED!!!!"
+                   _ = logger:error("*********************** FAILED!!!!"
                                    "*******************")
                end,
                ?TRAPEXIT(
                   begin
                       Nodes = setup_cluster(random:uniform(?MAX_CLUSTER_SIZE)),
-                      lager:info("======================== Will run commands with Nodes:~p:", [Nodes]),
-                      [lager:info(" Command : ~p~n", [Cmd]) || Cmd <- Cmds],
+                      logger:info("======================== Will run commands with Nodes:~p:", [Nodes]),
+                      [logger:info(" Command : ~p~n", [Cmd]) || Cmd <- Cmds],
                       {H, _S, Res} = run_commands(?MODULE, Cmds, [{nodelist, Nodes}]),
-                      lager:info("======================== Ran commands"),
+                      logger:info("======================== Ran commands"),
                       rt:clean_cluster(Nodes),
                       aggregate(zip(state_names(H),command_names(Cmds)), 
                           equals(Res, ok))
@@ -141,7 +141,7 @@ precondition(_From,_To,_S,{call,_,_,_}) ->
 %% EQC FSM postconditions
 %% ====================================================================
 postcondition(_From,_To,_S,{call,_,verify,_},{error, Reason}) ->
-    lager:info("Error: ~p", [Reason]),
+    logger:info("Error: ~p", [Reason]),
     false;
 postcondition(_From,_To,S,{call,_,verify,_},KeyDict) ->
     Res = audit_keys_per_node(S, KeyDict),
@@ -160,14 +160,14 @@ audit_keys_per_node(S, KeyDict) ->
 %% callback functions
 %% ====================================================================
 preload_data({BucketType, _}, Bucket, Nodes, NumKeys, _KeyFilter) ->
-    lager:info("Nodes: ~p", [Nodes]),
+    logger:info("Nodes: ~p", [Nodes]),
     Node = hd(Nodes),
-    lager:info("*******************[CMD]  First node ~p", [Node]),
-    lager:info("Writing to bucket ~p", [Bucket]),
+    logger:info("*******************[CMD]  First node ~p", [Node]),
+    logger:info("Writing to bucket ~p", [Bucket]),
     put_keys(Node, {BucketType, Bucket}, NumKeys).
 
 verify(undefined, _Nodes, _KeyFilter) ->
-    lager:info("Nothing to compare.");
+    logger:info("Nothing to compare.");
 verify(Buckets, Nodes,  KeyFilter) ->
     Keys = orddict:fold(fun({Bucket, BucketType}, _, Acc) ->
                             ListVal = [ list_filter_sort(Node, {BucketType, Bucket}, KeyFilter) 
@@ -179,9 +179,9 @@ verify(Buckets, Nodes,  KeyFilter) ->
     Keys.
     
 log_transition(S) ->
-    lager:debug("Buckets and key counts at transition:"),
+    logger:debug("Buckets and key counts at transition:"),
     orddict:fold(fun({Bucket, BucketType} = _Key, NumKeys, _Acc) -> 
-                     lager:debug("Bucket:~p, BucketType:~p, NumKeys:~p", [Bucket,BucketType,NumKeys])
+                     logger:debug("Bucket:~p, BucketType:~p, NumKeys:~p", [Bucket,BucketType,NumKeys])
                  end,
                  [],
                  S#state.buckets).
@@ -205,7 +205,7 @@ assert_equal(Expected, Actual) ->
     case Expected -- Actual of
         [] ->
             ok;
-        Diff -> lager:info("Expected:~p~nActual:~p~nExpected -- Actual: ~p", 
+        Diff -> logger:info("Expected:~p~nActual:~p~nExpected -- Actual: ~p", 
                             [length(Expected), length(Actual), length(Diff)])
     end,
     length(Actual) == length(Expected)
@@ -240,7 +240,7 @@ node_list(NumNodes) ->
     [?DEV(N) || N <- NodesN].
 
 put_keys(Node, Bucket, Num) ->
-    lager:info("*******************[CMD]  Putting ~p keys into bucket ~p on node ~p", [Num, Bucket, Node]),
+    logger:info("*******************[CMD]  Putting ~p keys into bucket ~p on node ~p", [Num, Bucket, Node]),
     Pid = rt:pbc(Node),
     try
         Keys = [list_to_binary(["", integer_to_list(Ki)]) || Ki <- lists:seq(0, Num - 1)],

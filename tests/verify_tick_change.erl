@@ -48,7 +48,7 @@ confirm() ->
            fun() ->
                    write_read_poll_check(Nodes, NewTime, Start, End, Bucket, W)
            end),
-    lager:info("If we got this far, then we found no inconsistencies\n"),
+    logger:info("If we got this far, then we found no inconsistencies\n"),
     [begin
          RemoteTime = rpc:call(Node, net_kernel, get_net_ticktime, []),
          io:format("Node ~p tick is ~p\n", [Node, RemoteTime]),

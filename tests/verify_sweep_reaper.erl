@@ -191,7 +191,7 @@ verify_aae_and_reaper_interaction([Node|_] = Nodes, KV1, KV2, KV3) ->
     false = check_reaps(Node, Client, KV3),
     enable_aae(Node),
     false = verify_data(Node, KV3, delete, 30000),
-    lager:info("As expected since tombstones are outside grace period"),
+    logger:info("As expected since tombstones are outside grace period"),
     manually_sweep_all(Node),
     false = check_reaps(Node, Client, KV3),
     false = check_reaps(Node, Client, KV3),
@@ -289,11 +289,11 @@ test_status([Node|_] = _Nodes, KV) ->
     get_sweep_status(Node).
 
 enable_aae(Node) ->
-    lager:info("enable aae", []),
+    logger:info("enable aae", []),
     rpc:call(Node, application, set_env, [riak_kv, anti_entropy_concurrency, 10]).
 
 disable_aae(Node) ->
-    lager:info("disable aae", []),
+    logger:info("disable aae", []),
     rpc:call(Node, application, set_env, [riak_kv, anti_entropy_concurrency, 0]).
 
 kill_riak_kv_sweeper(Nodes) ->
@@ -308,11 +308,11 @@ wait_for_sweep() ->
     wait_for_sweep(?WAIT_FOR_SWEEP).
 
 wait_for_sweep(WaitTime) ->
-    lager:info("Wait for sweep ~p s", [WaitTime div 1000]),
+    logger:info("Wait for sweep ~p s", [WaitTime div 1000]),
     timer:sleep(WaitTime).
 
 write_data(Client, KVs) ->
-    lager:info("Writing data ~p keys", [length(KVs)]),
+    logger:info("Writing data ~p keys", [length(KVs)]),
     write_data(Client, KVs, []).
 write_data(Client, KVs, Opts) ->
     write_data(Client, ?BUCKET, KVs, Opts).
@@ -343,7 +343,7 @@ delete_keys(Client, KVs) ->
     delete_keys(Client, KVs, []).
 
 delete_keys(Client, KVs, Opt) ->
-    lager:info("Delete data ~p keys ~p", [length(KVs), Opt]),
+    logger:info("Delete data ~p keys ~p", [length(KVs), Opt]),
     [{delete_key(Client, K, Opt)}  || {K, _V} <- KVs].
 
 delete_key(Client, Key, Opt) ->
@@ -352,12 +352,12 @@ delete_key(Client, Key, Opt) ->
 
 check_reaps(Node, Client, KVs) ->
     RR1 = get_read_repairs(Node),
-    lager:info("Check data ~p keys", [length(KVs)]),
+    logger:info("Check data ~p keys", [length(KVs)]),
     Results = [check_reap(Client, K)|| {K, _V} <- KVs],
     Reaped = length([ true || true <- Results]),
     RR2 = get_read_repairs(Node),
     ReadRepaired = RR2-RR1,
-    lager:info("Reaped ~p Read repaired ~p", [Reaped, ReadRepaired]),
+    logger:info("Reaped ~p Read repaired ~p", [Reaped, ReadRepaired]),
     Reaped == length(KVs).
 
 check_reap(Client, Key) ->
@@ -377,11 +377,11 @@ create_pb_clients(Nodes) ->
      end || N <- Nodes].
 
 set_tombstone_grace(Nodes, Time) ->
-    lager:info("set_tombstone_grace ~p s ", [Time]),
+    logger:info("set_tombstone_grace ~p s ", [Time]),
     rpc:multicall(Nodes, application, set_env, [riak_kv, tombstone_grace_period, Time]).
 
 set_sweep_throttle(Nodes, {Limit, Sleep}) ->
-    lager:info("set_sweep_throttle ~p ~p ms ", [Limit, Sleep]),
+    logger:info("set_sweep_throttle ~p ~p ms ", [Limit, Sleep]),
     rpc:multicall(Nodes, application, set_env, [riak_kv, sweep_throttle, {pace, Limit, Sleep}]),
     Expected = [{pace, Limit, Sleep} || _ <- Nodes],
     rt:wait_until(
@@ -391,22 +391,22 @@ set_sweep_throttle(Nodes, {Limit, Sleep}) ->
       end).
 
 set_sweep_concurrency(Nodes, N) ->
-    lager:info("set_sweep_concurrency ~p ", [N]),
+    logger:info("set_sweep_concurrency ~p ", [N]),
     rpc:multicall(Nodes, application, set_env, [riak_kv, sweep_concurrency,N]).
 
 stop_all_sweeps(Nodes) ->
-    lager:info("stop all sweeps"),
+    logger:info("stop all sweeps"),
     {Succ, Fail} = rpc:multicall(Nodes, riak_kv_sweeper, stop_all_sweeps, []),
     BadResults = [Res || Res <- Succ, not is_integer(Res)],
     ?assertEqual([], BadResults),
     ?assertEqual([], Fail).
 
 enable_sweep_scheduling(Nodes) ->
-    lager:info("enable sweep scheduling"),
+    logger:info("enable sweep scheduling"),
     rpc:multicall(Nodes, riak_kv_sweeper, enable_sweep_scheduling, []).
 
 remove_sweep_participant(Nodes, Module) ->
-    lager:info("remove sweep participant"),
+    logger:info("remove sweep participant"),
     {Succ, Fail} = rpc:multicall(Nodes, riak_kv_sweeper, remove_sweep_participant, [Module]),
     FalseResults =
         [false || false <- Succ],
@@ -414,7 +414,7 @@ remove_sweep_participant(Nodes, Module) ->
 
 
 add_sweep_participant(Nodes) ->
-    lager:info("add sweep participant"),
+    logger:info("add sweep participant"),
     rpc:multicall(Nodes, riak_kv_delete_sup, maybe_add_sweep_participant, []).
 
 manually_sweep_all(Node) ->
@@ -423,7 +423,7 @@ manually_sweep_all(Node) ->
     [begin manual_sweep(Node, Index), timer:sleep(500), Index  end || Index <- Indices].
 
 manual_sweep(Node, Partition) ->
-   lager:info("Manual sweep index ~p", [Partition]),
+   logger:info("Manual sweep index ~p", [Partition]),
    rpc:call(Node, riak_kv_sweeper, sweep, [Partition]).
 
 get_read_repairs(Node) ->
@@ -442,7 +442,7 @@ verify_data(Node, KeyValues, Mode) ->
     verify_data(Node, KeyValues, Mode, MaxTime).
 
 verify_data(Node, KeyValues, Mode, MaxTime) ->
-    lager:info("Verify all replicas are eventually correct"),
+    logger:info("Verify all replicas are eventually correct"),
     PB = rt:pbc(Node),
     CheckFun =
         fun() ->
@@ -457,10 +457,10 @@ verify_data(Node, KeyValues, Mode, MaxTime) ->
                     false ->
                         case length(Bad) < (NumGood div 20) of
                             true ->
-                                lager:info("Data not yet correct: ~p mismatches ~p ",
+                                logger:info("Data not yet correct: ~p mismatches ~p ",
                                            [Num-NumGood, Bad]);
                             false ->
-                                lager:info("Data not yet correct: ~p mismatches",
+                                logger:info("Data not yet correct: ~p mismatches",
                                            [Num-NumGood])
                         end,
                         false
@@ -471,10 +471,10 @@ verify_data(Node, KeyValues, Mode, MaxTime) ->
     Response =
         case rt:wait_until(CheckFun, Retry, Delay) of
             ok ->
-                lager:info("Data is now correct. Yay!"),
+                logger:info("Data is now correct. Yay!"),
                 true;
             _ ->
-                lager:error("AAE failed to fix data"),
+                logger:error("AAE failed to fix data"),
                 false
         end,
     riakc_pb_socket:stop(PB),
@@ -504,4 +504,4 @@ verify_replicas(Node, B, K, V, N, _Mode) ->
 
 format_subtest(Test) ->
     TestString = atom_to_list(Test),
-    lager:info("~s", [string:centre(" " ++ TestString ++ " " , 79, $=)]).
+    logger:info("~s", [string:centre(" " ++ TestString ++ " " , 79, $=)]).

@@ -32,7 +32,7 @@
 confirm() ->
     Nodes = ts_setup:start_cluster(3),
     Conn = ts_setup:conn(Nodes),
-    lager:info("Built a cluster of ~p~n", [Nodes]),
+    logger:info("Built a cluster of ~p~n", [Nodes]),
     Self = self(),
     _Pid = spawn_link(fun() -> create_table_test(Self) end),
     Got1 = riak_shell_test_util:loop(),
@@ -48,7 +48,7 @@ confirm() ->
 
 create_table_test(Pid) ->
     State = riak_shell_test_util:shell_init(),
-    lager:info("~n~nStart running the command set-------------------------", []),
+    logger:info("~n~nStart running the command set-------------------------", []),
     CreateTable = lists:flatten(io_lib:format("~s;", [ts_data:get_ddl(small)])),
     Describe =
         "Column,Type,Nullable,Partition Key,Local Key,Interval,Unit,Sort Order\n"
@@ -74,8 +74,8 @@ create_table_test(Pid) ->
            ],
     Result = riak_shell_test_util:run_commands(Cmds, State,
                                                ?DONT_INCREMENT_PROMPT),
-    lager:info("Result is ~p~n", [Result]),
-    lager:info("~n~n------------------------------------------------------", []),
+    logger:info("Result is ~p~n", [Result]),
+    logger:info("~n~n------------------------------------------------------", []),
     Pid ! Result.
 
 query_table_test(Pid, Conn) ->
@@ -86,7 +86,7 @@ query_table_test(Pid, Conn) ->
     Select = lists:flatten(io_lib:format("~s;", [SQL])),
     State = riak_shell_test_util:shell_init(),
     Expected = lists:flatten(query(Conn, SQL)),
-    lager:info("~n~nStart running the command set-------------------------", []),
+    logger:info("~n~nStart running the command set-------------------------", []),
     Cmds = [
         %% 'connection prompt on' means you need to do unicode printing and stuff
         {run,
@@ -102,8 +102,8 @@ query_table_test(Pid, Conn) ->
     ],
     Result = riak_shell_test_util:run_commands(Cmds, State,
         ?DONT_INCREMENT_PROMPT),
-    lager:info("Result is ~p~n", [Result]),
-    lager:info("~n~n------------------------------------------------------", []),
+    logger:info("Result is ~p~n", [Result]),
+    logger:info("~n~n------------------------------------------------------", []),
     Pid ! Result.
 
 %% Stolen from the innards of riak_shell

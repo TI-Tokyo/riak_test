@@ -57,7 +57,7 @@ confirm() ->
         % everything's enabled on the trailing nodes
         || Bool <- ?TEST_ORDER ++ [true, true]],
 
-    lager:info("Deploying ~b nodes ...", [erlang:length(Configs)]),
+    logger:info("Deploying ~b nodes ...", [erlang:length(Configs)]),
     Nodes = rt:deploy_nodes(Configs),
 
     job_enable_common:setup_cluster(Nodes),

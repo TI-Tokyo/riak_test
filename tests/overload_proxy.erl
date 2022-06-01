@@ -91,7 +91,7 @@ handle_call({is_settled, ThresholdSecs}, _From, State=#state{last_msg_ts=LastMsg
               end,
       {reply, Reply, State};
 handle_call(Request, _From, State) ->
-    lager:error("Unknown message received: ~p~n", [Request]),
+    logger:error("Unknown message received: ~p~n", [Request]),
     {reply, ok, State}.
 
 %%--------------------------------------------------------------------

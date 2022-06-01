@@ -339,11 +339,11 @@ assert_float(String, {ok, Thing1}, {ok, Thing2}) ->
 assert_float(String, {Cols, [ValsA]} = Exp, {Cols, [ValsB]} = Got) ->
     case assertf2(tuple_to_list(ValsA), tuple_to_list(ValsB)) of
         fail ->
-            lager:info("*****************", []),
-            lager:info("Test ~p failed", [String]),
-            lager:info("Exp ~p", [Exp]),
-            lager:info("Got ~p", [Got]),
-            lager:info("*****************", []),
+            logger:info("*****************", []),
+            logger:info("Test ~p failed", [String]),
+            logger:info("Exp ~p", [Exp]),
+            logger:info("Got ~p", [Got]),
+            logger:info("*****************", []),
             fail;
         pass ->
             pass
@@ -370,11 +370,11 @@ assert(_,      X,   X)   -> pass;
 assert(_, {error, {ErrCode, _ErrMsg}}, {error, {ErrCode, '_'}}) ->
     pass;
 assert(String, Exp, Got) ->
-    lager:info("*****************", []),
-    lager:info("Test ~p failed", [String]),
-    lager:info("Exp ~p", [Exp]),
-    lager:info("Got ~p", [Got]),
-    lager:info("*****************", []),
+    logger:info("*****************", []),
+    logger:info("Test ~p failed", [String]),
+    logger:info("Exp ~p", [Exp]),
+    logger:info("Got ~p", [Got]),
+    logger:info("*****************", []),
     fail.
 
 %% Match an error code and use a regex to match the error string

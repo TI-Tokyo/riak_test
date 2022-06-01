@@ -52,7 +52,7 @@ confirm() ->
     PrevTrcFile = FileBase ++ "Before",
     CurrTrcFile = FileBase ++ "After",
 
-    lager:info("STARTING TRACE"),
+    logger:info("STARTING TRACE"),
 
     [redbug:start("riak_kv_vnode:head/3",
                   rt_redbug:default_trace_options() ++
@@ -67,14 +67,14 @@ confirm() ->
 
     ?assertEqual([], ReadRes),
 
-    lager:info("upgrade all to current"),
+    logger:info("upgrade all to current"),
 
     rt:upgrade(Prev1, current),
     rt:upgrade(Prev2, current),
 
     ?assertEqual(ok, rt:wait_until_capability(Prev1, {riak_kv, get_request_type}, head)),
 
-    lager:info("TRACE AGAIN"),
+    logger:info("TRACE AGAIN"),
 
     [redbug:start("riak_kv_vnode:head/3",
                   rt_redbug:default_trace_options() ++
@@ -100,7 +100,7 @@ assert_head_cnt(ExpectedHeadCnt, File) ->
     ?assertEqual(ExpectedHeadCnt, Actual).
 
 head_cnt(File) ->
-    lager:info("checking ~p", [File]),
+    logger:info("checking ~p", [File]),
     {ok, FileData} = file:read_file(File),
     count_matches(re:run(FileData, "{riak_kv_vnode,head,3}", [global])).
 

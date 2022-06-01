@@ -14,7 +14,7 @@ bench(Config, NodeList, TestName, Runners) ->
     bench(Config, NodeList, TestName, Runners, false).
 
 bench(Config, NodeList, TestName, Runners, Drop) ->
-    lager:info("Starting basho_bench run"),
+    logger:info("Starting basho_bench run"),
 
     LoadGens = rt_config:get(perf_loadgens, ["localhost"]),
 
@@ -22,8 +22,8 @@ bench(Config, NodeList, TestName, Runners, Drop) ->
         true ->
             Fun = fun(Node) ->
                         R = rtssh:ssh_cmd(Node, "sudo ~/bin/drop_caches.sh"),
-                        lager:info("Dropped cache for node: ~p ret: ~p",
-                                   [Node, R])
+                        logger:info("Dropped cache for node: ~p ret: ~p",
+                                    [Node, R])
                 end,
             rt:pmap(Fun, NodeList);
         _ -> ok
@@ -67,27 +67,27 @@ bench(Config, NodeList, TestName, Runners, Drop) ->
                     Cmd = ?ESCRIPT++" "++
                         BBDir++"/"++"basho_bench -d "++
                         BBDir++"/"++TestName++"_"++Num++" "++RemotePath,
-                    lager:info("Spawning remote basho_bench w/ ~p on ~p",
-                               [Cmd, LG]),
+                    logger:info("Spawning remote basho_bench w/ ~p on ~p",
+                                 [Cmd, LG]),
                     {0, R} = rtssh:ssh_cmd(LG, Cmd, false),
-                    lager:info("bench run finished, on ~p returned ~p",
+                    logger:info("bench run finished, on ~p returned ~p",
                    [LG, R]),
                     {0, _} = rtssh:ssh_cmd(LG, "rm -r "++BBTmp++"/"),
             Owner ! {done, ok}
                 catch
                     Class:Error ->
-                        lager:error("basho_bench died with error ~p:~p",
-                                    [Class, Error]),
+                        logger:error("basho_bench died with error ~p:~p",
+                                     [Class, Error]),
             Owner ! {done, error}
                 after
-                    lager:info("finished bb run")
+                    logger:info("finished bb run")
                 end
         end,
     S = self(),
     [spawn(fun() -> F(R, S) end)|| R <- GenList],
     [ok] = lists:usort([receive {done, R} -> R end
             || _ <- GenList]),
-    lager:debug("removing stage dir"),
+    logger:debug("removing stage dir"),
     {ok, FL} = file:list_dir(BBTmpStage),
     [file:delete(BBTmpStage++File) || File <- FL],
     ok = file:del_dir(BBTmpStage).
@@ -121,7 +121,7 @@ config(Rate, Duration, NodeList, KeyGen,
 
 config(Rate, Duration, NodeList, KeyGen,
        ValGen, Operations, Bucket, Driver0, ExtraOpt) ->
-    lager:info("Bucket is: ~p", [Bucket]),
+    logger:info("Bucket is: ~p", [Bucket]),
     {Driver, DriverB} = case Driver0 of
         '2i' ->
             {pb, riakc_pb};

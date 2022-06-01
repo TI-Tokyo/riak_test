@@ -49,7 +49,7 @@ confirm() ->
     %% Create bucket type for maps.
     rt:create_and_activate_bucket_type(Node, ?TYPE, [{datatype, map}]),
 
-    lager:info("Write map on 2.0.2"),
+    logger:info("Write map on 2.0.2"),
     %% Write some sample data.
     Map = riakc_map:update(
             {<<"name">>, register},
@@ -66,11 +66,11 @@ confirm() ->
     %% Stop PB connection.
     riakc_pb_socket:stop(Pid),
 
-    lager:info("Upgrade to current"),
+    logger:info("Upgrade to current"),
     %% Upgrade all nodes.
     [upgrade(N, current) || N <- Nodes],
 
-    lager:info("Update map on upgraded cluster"),
+    logger:info("Update map on upgraded cluster"),
     %% Create PB connection.
     Pid2 = rt:pbc(Node),
     riakc_pb_socket:set_options(Pid2, [queue_if_disconnected]),
@@ -96,7 +96,7 @@ confirm() ->
     pass.
 
 upgrade(Node, NewVsn) ->
-    lager:info("Upgrading ~p to ~p", [Node, NewVsn]),
+    logger:info("Upgrading ~p to ~p", [Node, NewVsn]),
     rt:upgrade(Node, NewVsn),
     rt:wait_for_service(Node, riak_kv),
     ok.

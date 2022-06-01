@@ -48,14 +48,14 @@ confirm() ->
     ]),
     rt:join_cluster(Cluster1),
     % rt:join_cluster(Cluster2),
-    lager:info("Set up clusters: ~p, ~p", [Cluster1, Cluster2]),
+    logger:info("Set up clusters: ~p, ~p", [Cluster1, Cluster2]),
     %%
     %% Select a random node, and use it to create an immutable bucket
     %%
     Node = lists:nth(rand:uniform(length((Cluster1))), Cluster1),
     rt:create_and_activate_bucket_type(Node, ?BUCKET_TYPE, [{write_once, true}]),
     rt:wait_until_bucket_type_status(?BUCKET_TYPE, active, Cluster1),
-    lager:info("Created ~p bucket type on ~p", [?BUCKET_TYPE, Node]),
+    logger:info("Created ~p bucket type on ~p", [?BUCKET_TYPE, Node]),
     %%
     %%
     %%
@@ -85,7 +85,7 @@ confirm_put(Node) ->
             ?assertMatch({n_val_violation, 3}, Error)
         end
     ),
-    lager:info("confirm_put...ok"),
+    logger:info("confirm_put...ok"),
     pass.
 
 
@@ -111,7 +111,7 @@ confirm_w(Nodes) ->
         end
     ),
     rt:heal(PartitonInfo),
-    lager:info("confirm_pw...ok"),
+    logger:info("confirm_pw...ok"),
     pass.
 
 
@@ -137,7 +137,7 @@ confirm_pw(Nodes) ->
         end
     ),
     rt:heal(PartitonInfo),
-    lager:info("confirm_pw...ok"),
+    logger:info("confirm_pw...ok"),
     pass.
 
 confirm_rww(Nodes) ->
@@ -165,7 +165,7 @@ confirm_rww(Nodes) ->
         V1 =:= V2
     end),
     ?assert(NumFastMerges < num_fast_merges(Nodes)),
-    lager:info("confirm_rww...ok"),
+    logger:info("confirm_rww...ok"),
     pass.
 
 %%
@@ -189,7 +189,7 @@ confirm_async_put(Node) ->
     %%
     rt:create_and_activate_bucket_type(Node, ?ASYNC_PUT_BUCKET_TYPE, [{write_once, true}, {backend, myeleveldb}]),
     rt:wait_until_bucket_type_status(?ASYNC_PUT_BUCKET_TYPE, active, [Node]),
-    lager:info("Created ~p bucket type on ~p", [?ASYNC_PUT_BUCKET_TYPE, Node]),
+    logger:info("Created ~p bucket type on ~p", [?ASYNC_PUT_BUCKET_TYPE, Node]),
     %%
     %% Clear the intercept counters
     %%
@@ -236,7 +236,7 @@ confirm_async_put(Node) ->
     %%
     %% done!
     %%
-    lager:info("confirm_async_put...ok"),
+    logger:info("confirm_async_put...ok"),
     pass.
 
 verify_put(Node, Bucket, Key, Value) ->

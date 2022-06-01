@@ -58,19 +58,19 @@ confirm() ->
     %% Write key some times
     write_key(CoordClient, [<<"bob">>, <<"phil">>, <<"pete">>]),
 
-    lager:info("wrote key thrice"),
+    logger:info("wrote key thrice"),
 
     %% %% take a node that is a primary down
     {NewPL, DeadPrimary, _} = kill_primary(PL),
 
-    lager:info("killed a primary"),
+    logger:info("killed a primary"),
 
     %% %% This way a tombstone finds its way to a fallback, to later
     %% %% wreak DOOM!!!!
     Client = up_client(DeadPrimary, Clients),
     delete_key(Client),
 
-    lager:info("deleted key, and have tombstone response"),
+    logger:info("deleted key, and have tombstone response"),
 
     %% %% Take down the fallback
     {NewPL2, DeadFallback, _DeadPartition} = kill_fallback(NewPL),
@@ -78,14 +78,14 @@ confirm() ->
     %% %% Bring the primary back up
     _PL3 = start_node(DeadPrimary, NewPL2),
 
-    lager:info("killed the fallback, and restored the primary"),
+    logger:info("killed the fallback, and restored the primary"),
 
     %% %% wait for reaping maybe read for vclock ts and wait until there
     %% %% is not one
     UpClient = up_client(DeadFallback, Clients),
     read_it_and_reap(UpClient),
 
-    lager:info("read repaired, and reaped the tombstone"),
+    logger:info("read repaired, and reaped the tombstone"),
 
     %% %% write the key again, this will start a new clock, a clock
     %% that is in the past of that lingering tombstone. We use the
@@ -98,10 +98,10 @@ confirm() ->
     %% Read twice, just in case (repair, reap.)
     Res1 = read_key(P1),
 
-    lager:info("TS? ~p~n", [Res1]),
+    logger:info("TS? ~p~n", [Res1]),
     Res2 = read_key(P1),
 
-    lager:info("res ~p", [Res2]),
+    logger:info("res ~p", [Res2]),
 
     ?assertMatch({ok, _}, Res2),
     {ok, Obj} = Res2,
@@ -136,11 +136,11 @@ write_key(Client, [Val | Rest], Opts) ->
 write_key({_, Client}, Val, Opts) when is_binary(Val) ->
     Object = case riakc_pb_socket:get(Client, ?BUCKET, ?KEY, []) of
                  {ok, O1} ->
-                     lager:info("writing existing!"),
+                     logger:info("writing existing!"),
                      O2 = riakc_obj:update_metadata(O1, dict:new()),
                      riakc_obj:update_value(O2, Val);
                  _ ->
-                     lager:info("writing new!"),
+                     logger:info("writing new!"),
                      riakc_obj:new(?BUCKET, ?KEY, Val)
              end,
     riakc_pb_socket:put(Client, Object, Opts).
@@ -157,10 +157,10 @@ delete_key({_, Client}) ->
     rt:wait_until(fun() ->
                           case  riakc_pb_socket:get(Client, ?BUCKET, ?KEY, [deletedvclock]) of
                               {error, notfound, VC} ->
-                                  lager:info("TSVC ~p~n", [VC]),
+                                  logger:info("TSVC ~p~n", [VC]),
                                   true;
                               Res ->
-                                  lager:info("no ts yet: ~p~n", [Res]),
+                                  logger:info("no ts yet: ~p~n", [Res]),
                                   false
                           end
                   end).
@@ -171,7 +171,7 @@ read_it_and_reap({_, Client}) ->
                               {error, notfound} ->
                                   true;
                               Res ->
-                                  lager:info("not reaped ts yet: ~p~n", [Res]),
+                                  logger:info("not reaped ts yet: ~p~n", [Res]),
                                   false
                           end
                   end).
@@ -203,7 +203,7 @@ kill_and_wait(Preflist, Type) ->
             erlang:error(no_nodes_of_type, [Type, Preflist]);
         {value, {{Idx, Node}, Type}, PL2} ->
             kill_node(Node),
-            lager:info("killed ~p~n", [Node]),
+            logger:info("killed ~p~n", [Node]),
             [{{_, N2}, _}|_] = PL2,
             {wait_for_new_pl(Preflist, N2), Node, Idx}
     end.
@@ -214,7 +214,7 @@ kill_node(Node) ->
 wait_for_new_pl(PL, Node) ->
     rt:wait_until(fun() ->
                           NewPL = get_preflist(Node),
-                          lager:info("new ~p~n old ~p~nNode ~p~n", [NewPL, PL, Node]),
+                          logger:info("new ~p~n old ~p~nNode ~p~n", [NewPL, PL, Node]),
                           NewPL /= PL
                   end),
     get_preflist(Node).

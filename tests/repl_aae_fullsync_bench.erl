@@ -55,17 +55,17 @@ aae_fs_test(NumKeysAOnly, NumKeysBoth, ANodes, BNodes) ->
     %%---------------------------------------------------------
 
     rt:log_to_nodes(AllNodes, "Test fullsync from cluster A leader ~p to cluster B", [LeaderA]),
-    lager:info("Test fullsync from cluster A leader ~p to cluster B", [LeaderA]),
+    logger:info("Test fullsync from cluster A leader ~p to cluster B", [LeaderA]),
     repl_util:enable_fullsync(LeaderA, "B"),
     rt:wait_until_ring_converged(ANodes),
     {Time,_} = timer:tc(repl_util,start_and_wait_until_fullsync_complete,[LeaderA]),
-    lager:info("Fullsync completed in ~p seconds", [Time/1000/1000]),
+    logger:info("Fullsync completed in ~p seconds", [Time/1000/1000]),
 
     %% verify data is replicated to B
     NumKeysToVerify = min(1000, NumKeysAOnly),
     rt:log_to_nodes(AllNodes, "Verify: Reading ~p keys repl'd from A(~p) to B(~p)",
                     [NumKeysToVerify, LeaderA, BFirst]),
-    lager:info("Verify: Reading ~p keys repl'd from A(~p) to B(~p)",
+    logger:info("Verify: Reading ~p keys repl'd from A(~p) to B(~p)",
                [NumKeysToVerify, LeaderA, BFirst]),
     ?assertEqual(0, repl_util:wait_for_reads(BFirst, 1, NumKeysToVerify, TestBucket, 2)),
 

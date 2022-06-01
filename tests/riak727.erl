@@ -75,7 +75,7 @@ add_one_four_config(Node) ->
 
 -spec copy(file:filename(), file:filename()) -> ok.
 copy(File, DestDir) ->
-    lager:info("Copying ~p to ~p~n", [File, DestDir]),
+    logger:info("Copying ~p to ~p~n", [File, DestDir]),
     {ok, _} = file:copy(File, DestDir),
     ok.
 

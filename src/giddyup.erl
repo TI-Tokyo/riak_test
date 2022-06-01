@@ -31,7 +31,7 @@
 get_suite(Platform) ->
     Schema = get_schema(Platform),
     Name = kvc:path('project.name', Schema),
-    lager:info("Retrieved Project: ~s", [Name]),
+    logger:info("Retrieved Project: ~s", [Name]),
     Tests = kvc:path('project.tests', Schema),
     TestProps  =
         fun(Test) ->
@@ -65,17 +65,17 @@ get_schema(Platform, Retries) ->
     Project = rt_config:get(rt_project),
     Version = rt:get_version(),
     URL = lists:flatten(io_lib:format("http://~s/projects/~s?platform=~s&version=~s", [Host, Project, Platform, Version])),
-    lager:info("giddyup url: ~s", [URL]),
+    logger:info("giddyup url: ~s", [URL]),
 
     rt:check_ibrowse(),
     case {Retries, ibrowse:send_req(URL, [], get, [], [])} of
         {_, {ok, "200", _Headers, JSON}} -> mochijson2:decode(JSON);
         {0, Error} ->
-            lager:error("GiddyUp GET failed: ~p", [Error]),
+            logger:error("GiddyUp GET failed: ~p", [Error]),
             exit(1);
         {_, Error} ->
-            lager:warning("GiddyUp GET failed: ~p", [Error]),
-            lager:warning("GiddyUp trying ~p more times", [Retries]),
+            logger:warning("GiddyUp GET failed: ~p", [Error]),
+            logger:warning("GiddyUp trying ~p more times", [Retries]),
             timer:sleep(60000),
             get_schema(Platform, Retries - 1)
     end.
@@ -84,12 +84,12 @@ get_schema(Platform, Retries) ->
 post_result(TestResult) ->
     Host = rt_config:get(giddyup_host),
     URL = "http://" ++ Host ++ "/test_results",
-    lager:info("giddyup url: ~s", [URL]),
+    logger:info("giddyup url: ~s", [URL]),
     rt:check_ibrowse(),
     case rt:post_result(TestResult, #rt_webhook{name="GiddyUp", url=URL, headers=[basic_auth()]}) of
         {ok, RC, Headers} ->
             {_, Location} = lists:keyfind("Location", 1, Headers),
-            lager:info("Test Result successfully POSTed to GiddyUp! ResponseCode: ~s, URL: ~s", [RC, Location]),
+            logger:info("Test Result successfully POSTed to GiddyUp! ResponseCode: ~s, URL: ~s", [RC, Location]),
             {ok, Location};
         error ->
             error
@@ -145,20 +145,20 @@ post_artifact(TRURL, {FName, Body}) ->
                          300000) of
         {ok, [$2|_], Headers, _Body} ->
             {_, Location} = lists:keyfind("Location", 1, Headers),
-            lager:info("Successfully uploaded test artifact ~s to GiddyUp! URL: ~s", [FName, Location]),
+            logger:info("Successfully uploaded test artifact ~s to GiddyUp! URL: ~s", [FName, Location]),
             ok;
         {ok, RC, Headers, Body} ->
-            lager:info("Test artifact ~s failed to upload!", [FName]),
-            lager:debug("Status: ~p~nHeaders: ~p~nBody: ~s~n", [RC, Headers, Body]),
+            logger:info("Test artifact ~s failed to upload!", [FName]),
+            logger:debug("Status: ~p~nHeaders: ~p~nBody: ~s~n", [RC, Headers, Body]),
             error;
         X ->
-            lager:error("Error uploading ~s to giddyup. ~p~n"
+            logger:error("Error uploading ~s to giddyup. ~p~n"
                         "URL: ~p~nRequest Body: ~p~nContent Type: ~p~n",
                         [FName, X, URL, ReqBody, CType]),
             error
     catch
         Throws ->
-            lager:error("Error uploading ~s to giddyup. ~p~n"
+            logger:error("Error uploading ~s to giddyup. ~p~n"
                         "URL: ~p~nRequest Body: ~p~nContent Type: ~p~n",
                         [FName, Throws, URL, ReqBody, CType])
     end.
@@ -232,7 +232,7 @@ upload_zipfile(Base, FileList, ZipName) ->
         {ok, Contents} = file:read_file(ZipFile),
         giddyup:post_artifact(Base, {ZipName, Contents});
     {error, Error} ->
-        lager:error("Could not upload file: ~p because of ~p", [ZipFile, Error])
+        logger:error("Could not upload file: ~p because of ~p", [ZipFile, Error])
     end,
     file:delete(ZipFile).
 
@@ -269,6 +269,6 @@ parse_webhook(Props) ->
                 name=proplists:get_value(name, Props, "Webhook"),
                 headers=proplists:get_value(headers, Props, [])};
         false ->
-            lager:error("Invalid configuration for webhook : ~p", Props),
+            logger:error("Invalid configuration for webhook : ~p", Props),
             undefined
     end.

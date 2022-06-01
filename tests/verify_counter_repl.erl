@@ -93,7 +93,7 @@ rand_amt() ->
 
 %% Set up bi-directional full sync replication.
 repl_power_activate(ClusterA, ClusterB) ->
-    lager:info("repl power...ACTIVATE!"),
+    logger:info("repl power...ACTIVATE!"),
     LeaderA = get_leader(hd(ClusterA)),
     info("got leader A"),
     LeaderB = get_leader(hd(ClusterB)),
@@ -130,4 +130,4 @@ get_mgr_port({_, Node}) ->
     Port.
 
 info(Message) ->
-    lager:info(Message).
+    logger:info(Message).

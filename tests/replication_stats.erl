@@ -81,12 +81,12 @@ fullsync_enabled_and_started() ->
                 {FullTime, _} = timer:tc(repl_util,
                                          start_and_wait_until_fullsync_complete,
                                          [LeaderA, undefined, Me]),
-                lager:info("Fullsync completed in ~p", [FullTime])
+                logger:info("Fullsync completed in ~p", [FullTime])
         end),
 
     Result = receive
         fullsync_started ->
-            lager:info("Fullsync started!"),
+            logger:info("Fullsync started!"),
 
             case rpc:call(LeaderA, riak_repl_console, fs_remotes_status,
                           []) of

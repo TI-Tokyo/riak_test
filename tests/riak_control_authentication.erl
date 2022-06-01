@@ -129,12 +129,12 @@ verify_authentication_pre20(Vsn) ->
 
 %% @doc Verify the disabled authentication method works.
 verify_authentication(Vsn, ?RC_AUTH_NONE_CONFIG) ->
-    lager:info("Verifying auth 'none', ~p.", [Vsn]),
+    logger:info("Verifying auth 'none', ~p.", [Vsn]),
     Nodes =   build_singleton_cluster(Vsn, ?RC_AUTH_NONE_CONFIG),
     Node =    lists:nth(1, Nodes),
 
     %% Assert that we can load the main page.
-    lager:info("Verifying Control loads."),
+    logger:info("Verifying Control loads."),
     Command = io_lib:format("curl -sL -w %{http_code} ~s~p -o /dev/null", 
                             [rt:http_url(Node), "/admin"]),
     ?assertEqual("200", os:cmd(Command)),
@@ -144,20 +144,20 @@ verify_authentication(Vsn, ?RC_AUTH_NONE_CONFIG) ->
     pass;
 %% @doc Verify the disabled authentication method works with force SSL.
 verify_authentication(Vsn, ?RC_AUTH_NONE_CONFIG_FORCE_SSL) ->
-    lager:info("Verifying auth 'none', 'force_ssl' 'true', ~p.", [Vsn]),
+    logger:info("Verifying auth 'none', 'force_ssl' 'true', ~p.", [Vsn]),
     Nodes =   build_singleton_cluster(Vsn,
                                       ?RC_AUTH_NONE_CONFIG_FORCE_SSL),
     Node =    lists:nth(1, Nodes),
 
     %% Assert that we get redirected if we hit the HTTP port.
-    lager:info("Verifying redirect to SSL."),
+    logger:info("Verifying redirect to SSL."),
     RedirectCommand = io_lib:format("curl -sL -w %{http_code} ~s~p -o /dev/null", 
                                     [rt:http_url(Node), "/admin"]),
     ?assertEqual("303", os:cmd(RedirectCommand)),
 
     %% TODO: Temporarily disabled because of OTP R16B02 SSL bug.
     %% Assert that we can access resource over the SSL port.
-    % lager:info("Verifying Control loads over SSL."),
+    % logger:info("Verifying Control loads over SSL."),
     % AccessCommand = io_lib:format("curl --insecure -sL -w %{http_code} ~s~p", 
     %                               [rt:https_url(Node), "/admin"]),
     % ?assertEqual("200", os:cmd(AccessCommand)),
@@ -167,24 +167,24 @@ verify_authentication(Vsn, ?RC_AUTH_NONE_CONFIG_FORCE_SSL) ->
     pass;
 %% @doc Verify the userlist authentication method works.
 verify_authentication(Vsn, ?RC_AUTH_USERLIST_CONFIG) ->
-    lager:info("Verifying auth 'userlist', ~p.", [Vsn]),
+    logger:info("Verifying auth 'userlist', ~p.", [Vsn]),
     Nodes =   build_singleton_cluster(Vsn, ?RC_AUTH_USERLIST_CONFIG),
     Node =    lists:nth(1, Nodes),
 
     %% Assert that we get redirected if we hit the HTTP port.
-    lager:info("Verifying redirect to SSL."),
+    logger:info("Verifying redirect to SSL."),
     RedirectCommand = io_lib:format("curl -sL -w %{http_code} ~s~p -o /dev/null", 
                                     [rt:http_url(Node), "/admin"]),
     ?assertEqual("303", os:cmd(RedirectCommand)),
 
     %% Assert that we can access resource over the SSL port.
-    lager:info("Verifying Control loads over SSL."),
+    logger:info("Verifying Control loads over SSL."),
     AccessCommand = io_lib:format("curl --insecure -sL -w %{http_code} ~s~p -o /dev/null", 
                                   [rt:https_url(Node), "/admin"]),
     ?assertEqual("401", os:cmd(AccessCommand)),
 
     %% Assert that we can access resource over the SSL port.
-    lager:info("Verifying Control loads with credentials."),
+    logger:info("Verifying Control loads with credentials."),
     AuthCommand = io_lib:format("curl -u user:pass --insecure -sL -w %{http_code} ~s~p -o /dev/null", 
                                 [rt:https_url(Node), "/admin"]),
     ?assertEqual("200", os:cmd(AuthCommand)),
@@ -194,26 +194,26 @@ verify_authentication(Vsn, ?RC_AUTH_USERLIST_CONFIG) ->
     pass;
 %% @doc Verify the userlist authentication method works.
 verify_authentication(Vsn, ?RC_AUTH_USERLIST_CONFIG_FORCE_SSL) ->
-    lager:info("Verifying auth 'userlist', 'force_ssl' 'true', ~p.", [Vsn]),
+    logger:info("Verifying auth 'userlist', 'force_ssl' 'true', ~p.", [Vsn]),
     Nodes =   build_singleton_cluster(Vsn, ?RC_AUTH_USERLIST_CONFIG_FORCE_SSL),
     Node =    lists:nth(1, Nodes),
 
     %% Assert that we get redirected if we hit the HTTP port.
-    lager:info("Verifying redirect to SSL."),
+    logger:info("Verifying redirect to SSL."),
     RedirectCommand = io_lib:format("curl -sL -w %{http_code} ~s~p -o /dev/null", 
                                     [rt:http_url(Node), "/admin"]),
     ?assertEqual("303", os:cmd(RedirectCommand)),
 
     %% TODO: Temporarily disabled because of OTP R16B02 SSL bug.
     %% Assert that we can access resource over the SSL port.
-    % lager:info("Verifying Control loads over SSL."),
+    % logger:info("Verifying Control loads over SSL."),
     % AccessCommand = io_lib:format("curl --insecure -sL -w %{http_code} ~s~p -o /dev/null", 
     %                               [rt:https_url(Node), "/admin"]),
     % ?assertEqual("401", os:cmd(AccessCommand)),
 
     %% TODO: Temporarily disabled because of OTP R16B02 SSL bug.
     %% Assert that we can access resource over the SSL port.
-    % lager:info("Verifying Control loads with credentials."),
+    % logger:info("Verifying Control loads with credentials."),
     % AuthCommand = io_lib:format("curl -u user:pass --insecure -sL -w %{http_code} ~s~p -o /dev/null", 
     %                             [rt:https_url(Node), "/admin"]),
     % ?assertEqual("200", os:cmd(AuthCommand)),
@@ -223,18 +223,18 @@ verify_authentication(Vsn, ?RC_AUTH_USERLIST_CONFIG_FORCE_SSL) ->
     pass;
 %% @doc Verify the userlist authentication method works.
 verify_authentication(Vsn, ?RC_AUTH_USERLIST_CONFIG_NO_FORCE_SSL) ->
-    lager:info("Verifying auth 'userlist', 'force_ssl' 'false', ~p.", [Vsn]),
+    logger:info("Verifying auth 'userlist', 'force_ssl' 'false', ~p.", [Vsn]),
     Nodes =   build_singleton_cluster(Vsn, ?RC_AUTH_USERLIST_CONFIG_NO_FORCE_SSL),
     Node =    lists:nth(1, Nodes),
 
     %% Assert that we can access resource over the SSL port.
-    lager:info("Verifying Control loads over SSL."),
+    logger:info("Verifying Control loads over SSL."),
     AccessCommand = io_lib:format("curl --insecure -sL -w %{http_code} ~s~p -o /dev/null", 
                                   [rt:http_url(Node), "/admin"]),
     ?assertEqual("401", os:cmd(AccessCommand)),
 
     %% Assert that we can access resource over the SSL port.
-    lager:info("Verifying Control loads with credentials."),
+    logger:info("Verifying Control loads with credentials."),
     AuthCommand = io_lib:format("curl -u user:pass --insecure -sL -w %{http_code} ~s~p -o /dev/null",
                                 [rt:http_url(Node), "/admin"]),
     ?assertEqual("200", os:cmd(AuthCommand)),
@@ -260,5 +260,5 @@ build_singleton_cluster(Vsn, Config) ->
     VersionedNodes = [{Vsn, N} || N <- Nodes],
     rt:wait_for_control(VersionedNodes),
 
-    lager:info("Build ~p, nodes: ~p.", [Vsn, Nodes]),
+    logger:info("Build ~p, nodes: ~p.", [Vsn, Nodes]),
     Nodes.

@@ -47,7 +47,7 @@
 
 confirm() ->
     %% Deploy a node to test against
-    lager:info("Deploy node to test riak repl command line"),
+    logger:info("Deploy node to test riak repl command line"),
     [Node] = rt:deploy_nodes(1, [], [riak_kv, riak_repl]),
     ?assertEqual(ok, rt:wait_until_nodes_ready([Node])),
     rt_intercept:add(Node,
@@ -117,7 +117,7 @@ confirm() ->
     pass.
 
 check_cmd(Node, Cmd) ->
-    lager:info("Testing riak repl ~s on ~s", [Cmd, Node]),
+    logger:info("Testing riak repl ~s on ~s", [Cmd, Node]),
     {ok, Out} = rt:riak_repl(Node, [Cmd]),
     ?assertEqual("pass", Out).
 

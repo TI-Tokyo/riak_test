@@ -15,12 +15,12 @@ confirm() ->
 
     Claimant = rt:claimant_according_to(Node1),
 
-    lager:info("Upgrading claimant node"),
+    logger:info("Upgrading claimant node"),
     upgrade(Claimant, current),
 
     setup_location(Nodes, #{Claimant => "test_location"}),
 
-    lager:info("Upgrading all nodes"),
+    logger:info("Upgrading all nodes"),
     [rt:upgrade(Node, current) || Node <- Nodes, Node =/= Claimant],
 
     ?assertEqual([], riak_core_location:check_ring(rt:get_ring(Node1), ?N_VAL, 2)),
@@ -28,10 +28,10 @@ confirm() ->
     setup_location(Nodes, #{Node1 => "node1_location",
                             Node2 => "This_is_the_node2's_location"}),
 
-    lager:info("Downgrading all nodes"),
+    logger:info("Downgrading all nodes"),
     [rt:upgrade(Node, previous) || Node <- Nodes, Node =/= Claimant],
 
-    lager:info("Test verify location upgrade test: Passed"),
+    logger:info("Test verify location upgrade test: Passed"),
     pass.
 
 

@@ -48,10 +48,10 @@ confirm() ->
     create_strong_bucket_type(Node, ?NVAL),
     {ok, PL} = get_preflist(Node, Bucket, Key, ?NVAL),
     ?assertEqual(?NVAL, length(PL)),
-    lager:info("PREFERENCE LIST: ~n  ~p", [PL]),
+    logger:info("PREFERENCE LIST: ~n  ~p", [PL]),
     {{Idx0, _Node0}, primary} = hd(PL),
     Ensemble = {kv, Idx0, 3},
-    lager:info("Ensemble = ~p", [Ensemble]),
+    logger:info("Ensemble = ~p", [Ensemble]),
     PBC = rt:pbc(Node),
     {ok, Obj} = initial_write(PBC, Bucket, Key, Val),
     {ok, _Obj2} = assert_update(PBC, Bucket, Key, Obj, <<"test-val2">>),
@@ -59,7 +59,7 @@ confirm() ->
     {_Vsn, [View]} = rpc:call(Node, riak_ensemble_manager, get_views, [Ensemble]),
     {_, F1} = hd(lists:reverse(View)),
     {_, F2} = hd(tl(lists:reverse(View))),
-    lager:info("F1= ~p, F2=~p", [F1, F2]),
+    logger:info("F1= ~p, F2=~p", [F1, F2]),
     read_modify_write(PBC, Bucket, Key, <<"test-val2">>, <<"test-val3">>),
     [R1, R2] = Replacements,
     replace_node(Node, F1, R1),
@@ -80,15 +80,15 @@ assert_update(PBC, Bucket, Key, Obj, NewVal) ->
     {ok, Obj2}.
 
 update(PBC, Obj0, NewVal) ->
-    lager:info("Updating Key with ~p", [NewVal]),
+    logger:info("Updating Key with ~p", [NewVal]),
     Obj = riakc_obj:update_value(Obj0, NewVal),
     riakc_pb_socket:put(PBC, Obj).
 
 initial_write(PBC, Bucket, Key, Val) ->
     %% maps to a riak_ensemble put_once since there is no vclock
-    lager:info("Writing a consistent key"),
+    logger:info("Writing a consistent key"),
     ok = rt:pbc_write(PBC, Bucket, Key, Val),
-    lager:info("Read key to verify it exists"),
+    logger:info("Read key to verify it exists"),
     Obj = rt:pbc_read(PBC, Bucket, Key),
     ?assertEqual(Val, riakc_obj:get_value(Obj)),
     {ok, Obj}.
@@ -99,13 +99,13 @@ get_preflist(Node, Bucket, Key, NVal) ->
     {ok, PL}.
 
 create_strong_bucket_type(Node, NVal) ->
-    lager:info("Creating/activating 'strong' bucket type"),
+    logger:info("Creating/activating 'strong' bucket type"),
     rt:create_and_activate_bucket_type(Node, <<"strong">>,
                                        [{consistent, true}, {n_val, NVal}]),
     ensemble_util:wait_until_stable(Node, NVal).
 
 replace_node(Node, OldNode, NewNode) ->
-    lager:info("Replacing ~p with ~p", [OldNode, NewNode]),
+    logger:info("Replacing ~p with ~p", [OldNode, NewNode]),
     Nodes = [OldNode, NewNode],
     rt:staged_join(NewNode, Node),
     ?assertEqual(ok, rt:wait_until_ring_converged(Nodes)),
@@ -117,7 +117,7 @@ replace_node(Node, OldNode, NewNode) ->
     ensemble_util:wait_until_stable(Node, ?NVAL).
 
 force_replace_node(Node, OldNode, NewNode) ->
-    lager:info("Force Replacing ~p with ~p", [OldNode, NewNode]),
+    logger:info("Force Replacing ~p with ~p", [OldNode, NewNode]),
     Nodes = [OldNode, NewNode],
     rt:staged_join(NewNode, Node),
     ?assertEqual(ok, rt:wait_until_ring_converged(Nodes)),
@@ -131,7 +131,7 @@ force_replace_node(Node, OldNode, NewNode) ->
 expand_cluster(OldNodes, NewNodes0) ->
     %% Always have 2 replacement nodes
     {NewNodes, Replacements} = lists:split(length(NewNodes0)-2, NewNodes0),
-    lager:info("Expanding Cluster from ~p to ~p nodes", [length(OldNodes),
+    logger:info("Expanding Cluster from ~p to ~p nodes", [length(OldNodes),
             length(OldNodes) + length(NewNodes)]),
     PNode = hd(OldNodes),
     Nodes = OldNodes ++ NewNodes,

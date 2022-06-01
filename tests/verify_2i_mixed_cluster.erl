@@ -53,10 +53,10 @@ confirm() ->
     assertRangeQuery(Clients, [K(N) || N <- lists:seq(10, 19)], <<"field2_int">>, 10, 19),
     assertRangeQuery(Clients, [K(N) || N <- lists:seq(10, 17)], <<"$key">>, <<"obj10">>, <<"obj17">>),
 
-    lager:info("Delete an object, verify deletion..."),
+    logger:info("Delete an object, verify deletion..."),
     ToDel = [<<"obj05">>, <<"obj11">>],
     [?assertMatch(ok, riakc_pb_socket:delete(PBC1, ?BUCKET, KD)) || KD <- ToDel],
-    lager:info("Make sure the tombstone is reaped..."),
+    logger:info("Make sure the tombstone is reaped..."),
     ?assertMatch(ok, rt:wait_until(fun() -> rt:pbc_really_deleted(PBC1, ?BUCKET, ToDel) end)),
     
     assertExactQuery(Clients, [], <<"field1_bin">>, <<"val5">>),

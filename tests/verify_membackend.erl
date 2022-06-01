@@ -11,10 +11,10 @@ confirm() ->
     Tests = [ttl, max_memory, combo],
     [Res1, Res2] =
         [begin
-             lager:info("testing mode ~p", [Mode]),
+             logger:info("testing mode ~p", [Mode]),
              put(mode, Mode),
              [begin
-                  lager:info("testing setting ~p", [Test]),
+                  logger:info("testing setting ~p", [Test]),
                   ?MODULE:Test(Mode)
               end
               || Test <- Tests]
@@ -86,7 +86,7 @@ check_leave_and_expiry(NodeA, NodeB) ->
 
     ?assertEqual([], rt:systest_read(NodeA, 1, 100, ?BUCKET, 2)),
 
-    lager:info("waiting for keys to expire"),
+    logger:info("waiting for keys to expire"),
     timer:sleep(timer:seconds(210)),
 
     _ = rt:systest_read(NodeA, 1, 100, ?BUCKET, 2),
@@ -97,7 +97,7 @@ check_leave_and_expiry(NodeA, NodeB) ->
     ok.
 
 check_eviction(Node) ->
-    lager:info("checking that values are evicted when memory limit "
+    logger:info("checking that values are evicted when memory limit "
                "is exceeded"),
     Size = 20000 * 8,
     Val = <<0:Size>>,
@@ -130,7 +130,7 @@ check_eviction(Node) ->
     ok.
 
 check_put_delete(Node) ->
-    lager:info("checking that used mem is reclaimed on delete"),
+    logger:info("checking that used mem is reclaimed on delete"),
     Pid = get_remote_vnode_pid(Node),
 
     {MemBaseline, PutSize, Key} = put_until_changed(Pid, Node, 1000),
@@ -155,7 +155,7 @@ check_put_delete(Node) ->
     ok.
 
 check_put_consistent(Node) ->
-    lager:info("checking that used mem doesn't change on re-put"),
+    logger:info("checking that used mem doesn't change on re-put"),
     Pid = get_remote_vnode_pid(Node),
 
     {MemBaseline, _PutSize, Key} = put_until_changed(Pid, Node, 1000),
@@ -262,10 +262,10 @@ get_used_space(VNodePid) ->
             [{_Name, Stat}] = riak_kv_multi_backend:status(ModState),
             Stat;
         _Else ->
-            lager:error("didn't understand backend ~p", [Mod]),
+            logger:error("didn't understand backend ~p", [Mod]),
             throw(boom)
     end,
     Mem = proplists:get_value(used_memory, Status),
     PutObjSize = proplists:get_value(put_obj_size, Status),
-    lager:info("got ~p used memory, ~p put object size", [Mem, PutObjSize]),
+    logger:info("got ~p used memory, ~p put object size", [Mem, PutObjSize]),
     {Mem, PutObjSize}.

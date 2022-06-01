@@ -59,24 +59,24 @@ confirm() ->
     BFirst = hd(BNodes),
 
     rt:log_to_nodes(AllNodes, "Write data to A while both are in old state (no repl)"),
-    lager:info("Write data to A while both are in old state (no repl)"),
+    logger:info("Write data to A while both are in old state (no repl)"),
 
     ok = run_simple_write_test(AFirst, BFirst, no_repl),
     ok = run_2i_write_test(AFirst, BFirst, no_repl),
 
     %% in the second test protocol we upgrade the first cluster and write to it
     %% there is still no replication
-    lager:info("upgrade cluster A"),
+    logger:info("upgrade cluster A"),
 
     UpgradeNodeFn = fun(Node) ->
-                            lager:info("Upgrading ~p", [Node]),
+                            logger:info("Upgrading ~p", [Node]),
                             ok = rt:upgrade(Node, current),
                             ok = rt:wait_for_service(Node, riak_kv)
                     end,
     [ok = UpgradeNodeFn(X) || X <- ANodes],
 
     rt:log_to_nodes(AllNodes, "Write data to A after the first cluster has been updated but the second is in old state (no repl)"),
-    lager:info("Write data to A after the first cluster has been updated but the second is in old state (no repl)"),
+    logger:info("Write data to A after the first cluster has been updated but the second is in old state (no repl)"),
 
     ok = run_simple_write_test(AFirst, BFirst, no_repl),
     ok = run_2i_write_test(AFirst, BFirst, no_repl),
@@ -84,11 +84,11 @@ confirm() ->
     %% in the third test protocol we upgrade the second cluster and when we write to
     %% the first there is still no replication because its not enabled
 
-    lager:info("upgrade cluster B"),
+    logger:info("upgrade cluster B"),
 
     [ok = UpgradeNodeFn(X) || X <- BNodes],
     rt:log_to_nodes(AllNodes, "Write data to A after both clusters have been updated (no repl)"),
-    lager:info( "Write data to A after both clusters have been updated (no repl)"),
+    logger:info( "Write data to A after both clusters have been updated (no repl)"),
 
     ok = run_simple_write_test(AFirst, BFirst, no_repl),
     ok = run_2i_write_test(AFirst, BFirst, no_repl),
@@ -118,20 +118,20 @@ confirm() ->
     Len = length(ANodes ++ BNodes),
     Ports = lists:seq(10016, 10006 + 10 * Len, 10),
     %% DevPaths = rt_config:get(rtdev_path),
-    %% lager:info("DevPaths is ~p~n", [DevPaths]),
+    %% logger:info("DevPaths is ~p~n", [DevPaths]),
     %% DevPath = [filename:join([X, "dev"]) || {current, X} <- DevPaths],
-    %% lager:info("DevPath is ~p~n", [DevPath]),
-    %% lager:info("Nodes are ~p~n", [ANodes ++ BNodes]),
+    %% logger:info("DevPath is ~p~n", [DevPath]),
+    %% logger:info("Nodes are ~p~n", [ANodes ++ BNodes]),
     %% Devs = [filename:join([DevPath, H]) || [H | _Rest] <-
     %%                  [string:tokens(atom_to_list(X), "@") || X <- ANodes ++ BNodes]],
-    %% lager:info("Devs is ~p~n", [Devs]),
+    %% logger:info("Devs is ~p~n", [Devs]),
     NodesAndPorts = lists:zip(ANodes ++ BNodes, Ports),
-    lager:info("NodesAndPorts is ~p", [NodesAndPorts]),
+    logger:info("NodesAndPorts is ~p", [NodesAndPorts]),
     SetConfFun = fun(Node, Port) ->
                          ReplConf = [
                                      {riak_core, [{cluster_mgr,  {"127.0.0.1", Port}}]}
                                     ],
-                         lager:info("Setting ReplConf ~p on ~p", [ReplConf, Node]),
+                         logger:info("Setting ReplConf ~p on ~p", [ReplConf, Node]),
                          ok = rt:set_advanced_conf(Node, ReplConf)
                  end,
     [ok = SetConfFun(Node, Port) || {Node, Port} <- NodesAndPorts],
@@ -139,11 +139,11 @@ confirm() ->
 
     %% test V3 replication (index by zero [sigh] bloody nerds count proper already)
     rt:log_to_nodes(AllNodes, "run replication2 tests"),
-    lager:info("About to go into replication2:replication/3"),
+    logger:info("About to go into replication2:replication/3"),
     fin = replication2:replication(ANodes, BNodes, false),
 
     %% final test set of 2i
-    lager:info("running replicated 2i tests"),
+    logger:info("running replicated 2i tests"),
     ok = run_2i_write_test(AFirst, BFirst, repl),
 
     pass.
@@ -188,13 +188,13 @@ run_2i_write_test(WriteClusterNode, ReadClusterNode, no_repl) ->
                      secondary_index_tests:int_to_key(17 + Offset)),
 
     %% delete objects test the write cluster only
-    lager:info("Delete an object, verify deletion..."),
+    logger:info("Delete an object, verify deletion..."),
     ToDel = [
              secondary_index_tests:int_to_key(5 + Offset),
              secondary_index_tests:int_to_key(11 + Offset)
             ],
     [?assertMatch(ok, riakc_pb_socket:delete(PBC1, ?BUCKET2i, KD)) || KD <- ToDel],
-    lager:info("Make sure the tombstone is reaped..."),
+    logger:info("Make sure the tombstone is reaped..."),
     ?assertMatch(ok, rt:wait_until(fun() ->
                                            rt:pbc_really_deleted(PBC1, ?BUCKET2i, ToDel)
                                    end)),
@@ -258,13 +258,13 @@ run_2i_write_test(WriteClusterNode, ReadClusterNode, repl) ->
                      secondary_index_tests:int_to_key(10 + Offset),
                      secondary_index_tests:int_to_key(17 + Offset)),
 
-    lager:info("Delete an object, verify deletion..."),
+    logger:info("Delete an object, verify deletion..."),
     ToDel = [
              secondary_index_tests:int_to_key(5 + Offset),
              secondary_index_tests:int_to_key(11 + Offset)
             ],
     [?assertMatch(ok, riakc_pb_socket:delete(PBC1, ?BUCKET2i, KD)) || KD <- ToDel],
-    lager:info("Make sure the tombstone is reaped..."),
+    logger:info("Make sure the tombstone is reaped..."),
     ?assertMatch(ok, rt:wait_until(fun() ->
                                            rt:pbc_really_deleted(PBC1, ?BUCKET2i, ToDel)
                                    end)),
@@ -291,7 +291,7 @@ run_2i_write_test(WriteClusterNode, ReadClusterNode, repl) ->
     ok.
 
 assertExactQuery(C, K, F, V) ->
-    lager:info("Expecting ~p Index ~p Value ~p", [K, F, V]),
+    logger:info("Expecting ~p Index ~p Value ~p", [K, F, V]),
     secondary_index_tests:assertExactQuery(C, K, F, V, {false, false}).
 
 assertRangeQuery(C, K, F, V1, V2) ->
@@ -300,20 +300,20 @@ assertRangeQuery(C, K, F, V1, V2) ->
 run_simple_write_test(WriteClusterNode, ReadClusterNode, no_repl) ->
     TestHash = erlang:md5(term_to_binary(os:timestamp())),
     TestBucket = <<TestHash/binary, "-no_repl">>,
-    lager:info("Writing 100 more keys to ~p", [WriteClusterNode]),
+    logger:info("Writing 100 more keys to ~p", [WriteClusterNode]),
     ?assertEqual([], replication:do_write(WriteClusterNode, 101, 200, TestBucket, 2)),
 
-    lager:info("Reading 0 keys written to ~p on ~p becuz no replication",
+    logger:info("Reading 0 keys written to ~p on ~p becuz no replication",
                [WriteClusterNode, ReadClusterNode]),
     ?assertEqual(0, wait_for_reads(ReadClusterNode, 101, 200, TestBucket, 2)),
     ok;
 run_simple_write_test(WriteClusterNode, ReadClusterNode, repl) ->
     TestHash = erlang:md5(term_to_binary(os:timestamp())),
     TestBucket = <<TestHash/binary, "repl">>,
-    lager:info("Writing 100 more keys to ~p", [WriteClusterNode]),
+    logger:info("Writing 100 more keys to ~p", [WriteClusterNode]),
     ?assertEqual([], replication:do_write(WriteClusterNode, 101, 200, TestBucket, 2)),
 
-    lager:info("Reading 100 keys written to ~p on ~p becuz no replication",
+    logger:info("Reading 100 keys written to ~p on ~p becuz no replication",
                [WriteClusterNode, ReadClusterNode]),
     ?assertEqual(100, wait_for_reads(ReadClusterNode, 101, 200, TestBucket, 2)),
     ok.

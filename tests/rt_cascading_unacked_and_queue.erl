@@ -168,6 +168,6 @@ ensure_unacked_and_queue_tests([{N123Leader, N123}, {N456Leader, N456}], TestBuc
 
     ],
     lists:foreach(fun({Name, Eval}) ->
-        lager:info("===== ensure_unacked_and_queue: ~s =====", [Name]),
+        logger:info("===== ensure_unacked_and_queue: ~s =====", [Name]),
         Eval()
                   end, Tests).

@@ -81,17 +81,17 @@ setup_clusters() ->
             {4, ?CONFIG(?B_RING, ?B_NVAL)}]),
     rt:join_cluster(ClusterA),
     rt:join_cluster(ClusterB),
-    lager:info("Waiting for convergence."),
+    logger:info("Waiting for convergence."),
     rt:wait_until_ring_converged(ClusterA),
     rt:wait_until_ring_converged(ClusterB),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end,
                     ClusterA ++ ClusterB),
     
-    lager:info("Ready for test."),
+    logger:info("Ready for test."),
     [ClusterA, ClusterB].
 
 test_reconcile_between_clusters(ClusterA, ClusterB, QueueFun) ->
-    lager:info("Spoof reconciliation with an external cluster QueueFun=~w",
+    logger:info("Spoof reconciliation with an external cluster QueueFun=~w",
                 [QueueFun]),
     {DrainQueueFun, Protocol} =
         case QueueFun of
@@ -108,10 +108,10 @@ test_reconcile_between_clusters(ClusterA, ClusterB, QueueFun) ->
     NodeA = hd(ClusterA),
     NodeB = hd(ClusterB),
 
-    lager:info("Test empty clusters don't show any differences"),
+    logger:info("Test empty clusters don't show any differences"),
     {http, {IPA, PortA}} = lists:keyfind(http, 1, rt:connection_info(NodeA)),
     {http, {IPB, PortB}} = lists:keyfind(http, 1, rt:connection_info(NodeB)),
-    lager:info("Cluster A ~s ~w Cluster B ~s ~w", [IPA, PortA, IPB, PortB]),
+    logger:info("Cluster A ~s ~w Cluster B ~s ~w", [IPA, PortA, IPB, PortB]),
     
     {root_compare, 0}
         = fullsync_check({NodeA, IPA, PortA, ?A_NVAL},
@@ -119,7 +119,7 @@ test_reconcile_between_clusters(ClusterA, ClusterB, QueueFun) ->
     
     nextgenrepl_ttaaefs_manual:write_to_cluster(NodeA, 1, 100),
 
-    lager:info("Discover deltas, and request qeueuing"),
+    logger:info("Discover deltas, and request qeueuing"),
 
     SegList = 
         fullsync_push({NodeA, IPA, PortA, ?A_NVAL},
@@ -132,7 +132,7 @@ test_reconcile_between_clusters(ClusterA, ClusterB, QueueFun) ->
         = fullsync_check({NodeA, IPA, PortA, ?A_NVAL},
                             {NodeB, IPB, PortB, ?B_NVAL}),
     
-    lager:info("Discover deletes, and request qeueuing"),
+    logger:info("Discover deletes, and request qeueuing"),
 
     nextgenrepl_ttaaefs_manual:delete_from_cluster(NodeA, 1, 50, ?TEST_BUCKET),
 
@@ -161,7 +161,7 @@ test_reconcile_between_clusters(ClusterA, ClusterB, QueueFun) ->
     CommonValBin = <<"CommonValueToWriteForNV4Objects">>,
     nextgenrepl_ttaaefs_manual:write_to_cluster(NodeA, 1, 100, Nv4B, true, CommonValBin),
 
-    lager:info("Discover deltas, and request qeueuing - typed bucket"),
+    logger:info("Discover deltas, and request qeueuing - typed bucket"),
 
     _TypeSegList = 
         fullsync_push({NodeA, IPA, PortA, 4},
@@ -190,7 +190,7 @@ fullsync_check({SrcNode, _SrcIP, _SrcPort, SrcNVal},
     AAEResult = rpc:call(SrcNode, riak_client, ttaaefs_fullsync, [all_check, 60]),
     {ok, SnkC} = riak:client_connect(SinkNode),
     {N, []} = drain_queue_http(SrcNode, SnkC),
-    lager:info("Drained queue and pushed ~w objects (check)", [N]),
+    logger:info("Drained queue and pushed ~w objects (check)", [N]),
     AAEResult.
 
 
@@ -208,7 +208,7 @@ fullsync_push({SrcNode, _SrcIP, _SrcPort, SrcNVal},
 
     {ok, SnkC} = riak:client_connect(SnkNode),
     {N, SegList} = DrainQueueFun(SrcNode, SnkC),
-    lager:info("Drained queue and pushed ~w objects (push)", [N]),
+    logger:info("Drained queue and pushed ~w objects (push)", [N]),
     ExpectedBody = lists:flatten(io_lib:format("Queue q1_ttaaefs: 0 ~w 0", [N])),
     ?assertEqual(ExpectedBody, binary_to_list(Body)),
     SegList.

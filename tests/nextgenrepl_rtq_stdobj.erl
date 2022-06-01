@@ -65,14 +65,14 @@ confirm() ->
     rt:join_cluster(ClusterB),
     rt:join_cluster(ClusterC),
     
-    lager:info("Waiting for convergence."),
+    logger:info("Waiting for convergence."),
     rt:wait_until_ring_converged(ClusterA),
     rt:wait_until_ring_converged(ClusterB),
     rt:wait_until_ring_converged(ClusterC),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end,
                     ClusterA ++ ClusterB ++ ClusterC),
     
-    lager:info("Ready for test."),
+    logger:info("Ready for test."),
     test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC).
 
 test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
@@ -88,18 +88,18 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
     NodeB = hd(ClusterB),
     NodeC = hd(ClusterC),
 
-    lager:info("Test empty clusters don't show any differences"),
+    logger:info("Test empty clusters don't show any differences"),
     {http, {IPA, PortA}} = lists:keyfind(http, 1, rt:connection_info(NodeA)),
     {http, {IPB, PortB}} = lists:keyfind(http, 1, rt:connection_info(NodeB)),
     {http, {IPC, PortC}} = lists:keyfind(http, 1, rt:connection_info(NodeC)),
-    lager:info("Cluster A ~s ~w Cluster B ~s ~w Cluster C ~s ~w",
+    logger:info("Cluster A ~s ~w Cluster B ~s ~w Cluster C ~s ~w",
                 [IPA, PortA, IPB, PortB, IPC, PortC]),
     
     true = check_all_insync({NodeA, IPA, PortA},
                             {NodeB, IPB, PortB},
                             {NodeC, IPC, PortC}),
 
-    lager:info("Test 1000 key difference and resolve"),
+    logger:info("Test 1000 key difference and resolve"),
     % Write keys to cluster A, verify B and C do have them.
     write_to_cluster(NodeA, 1, 1000, new_obj),
     timer:sleep(?REPL_SLEEP),
@@ -109,7 +109,7 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
                             {NodeB, IPB, PortB},
                             {NodeC, IPC, PortC}),
     
-    lager:info("Test replicating tombstones"),
+    logger:info("Test replicating tombstones"),
     delete_from_cluster(NodeA, 901, 1000),
     timer:sleep(?REPL_SLEEP),
     read_from_cluster(NodeA, 901, 1000, ?COMMMON_VAL_INIT, 100),
@@ -119,7 +119,7 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
                             {NodeB, IPB, PortB},
                             {NodeC, IPC, PortC}),
 
-    lager:info("Test replicating modified objects"),
+    logger:info("Test replicating modified objects"),
     write_to_cluster(NodeB, 1, 100, ?COMMMON_VAL_MOD),
     timer:sleep(?REPL_SLEEP),
     read_from_cluster(NodeA, 1, 100, ?COMMMON_VAL_MOD, 0),
@@ -132,16 +132,16 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
                             {NodeB, IPB, PortB},
                             {NodeC, IPC, PortC}),
     
-    lager:info("Suspend a queue at source and confirm replication stops ..."),
-    lager:info("... but continues from unsuspended queues"),
+    logger:info("Suspend a queue at source and confirm replication stops ..."),
+    logger:info("... but continues from unsuspended queues"),
     ok = action_on_srcqueue(ClusterC, cluster_a, suspend_rtq),
     write_to_cluster(NodeC, 1001, 2000, new_obj),
     timer:sleep(?REPL_SLEEP),
     read_from_cluster(NodeB, 1001, 2000, ?COMMMON_VAL_INIT, 0),
     read_from_cluster(NodeA, 1001, 2000, ?COMMMON_VAL_INIT, 1000),
     ok = action_on_srcqueue(ClusterC, cluster_a, resume_rtq),
-    lager:info("Resuming the queue changes nothing ..."),
-    lager:info("... But new PUTs will now replicate"),
+    logger:info("Resuming the queue changes nothing ..."),
+    logger:info("... But new PUTs will now replicate"),
     timer:sleep(?REPL_SLEEP),
     read_from_cluster(NodeB, 1001, 2000, ?COMMMON_VAL_INIT, 0),
     read_from_cluster(NodeA, 1001, 2000, ?COMMMON_VAL_INIT, 1000),
@@ -150,7 +150,7 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
     read_from_cluster(NodeA, 1001, 1100, ?COMMMON_VAL_INIT, 100),
     read_from_cluster(NodeA, 1101, 2000, ?COMMMON_VAL_MOD, 0),
         % errors down to 100
-    lager:info("Full sync from another cluster will resolve"),
+    logger:info("Full sync from another cluster will resolve"),
     {clock_compare, 100} =
         fullsync_check({NodeB, IPB, PortB, ?B_NVAL},
                         {NodeA, IPA, PortA, ?A_NVAL},
@@ -162,8 +162,8 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
                             {NodeB, IPB, PortB},
                             {NodeC, IPC, PortC}),
 
-    lager:info("Suspend working on a queue from sink and confirm ..."),
-    lager:info("... replication stops but continues from unsuspended sinks"),
+    logger:info("Suspend working on a queue from sink and confirm ..."),
+    logger:info("... replication stops but continues from unsuspended sinks"),
     ok = action_on_snkqueue(ClusterA, cluster_a, suspend_snkqueue),
     timer:sleep(?REPL_SLEEP),
         % Sleep here as there may be established workers looping on an empty
@@ -173,15 +173,15 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
     read_from_cluster(NodeB, 2001, 3000, ?COMMMON_VAL_INIT, 0),
     read_from_cluster(NodeA, 2001, 3000, ?COMMMON_VAL_INIT, 1000),
     ok = action_on_snkqueue(ClusterA, cluster_a, resume_snkqueue),
-    lager:info("Resuming the queue prompts recovery ..."),
+    logger:info("Resuming the queue prompts recovery ..."),
     timer:sleep(?REPL_SLEEP),
     read_from_cluster(NodeB, 2001, 3000, ?COMMMON_VAL_INIT, 0),
     read_from_cluster(NodeA, 2001, 3000, ?COMMMON_VAL_INIT, 0),
 
-    lager:info("Stop a node in source - and repl OK"),
+    logger:info("Stop a node in source - and repl OK"),
     NodeA0 = hd(tl(ClusterA)),
     rt:stop_and_wait(NodeA0),
-    lager:info("Node stopped"),
+    logger:info("Node stopped"),
     write_to_cluster(NodeA, 3001, 4000, new_obj),
     read_from_cluster(NodeA, 3001, 4000, ?COMMMON_VAL_INIT, 0),
     {root_compare, 0} =
@@ -196,7 +196,7 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
     read_from_cluster(NodeB, 3001, 4000, ?COMMMON_VAL_INIT, 0),
     read_from_cluster(NodeC, 3001, 4000, ?COMMMON_VAL_INIT, 0),
 
-    lager:info("Node restarting"),
+    logger:info("Node restarting"),
     rt:start_and_wait(NodeA0),
     rt:wait_for_service(NodeA0, riak_kv),
 
@@ -209,9 +209,9 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
                             {root_compare, 0},
                             ?WAIT_LOOPS),
     
-    lager:info("Stop a node in sink - and repl OK"),
+    logger:info("Stop a node in sink - and repl OK"),
     rt:stop_and_wait(NodeA0),
-    lager:info("Node stopped"),
+    logger:info("Node stopped"),
     write_to_cluster(NodeB, 4001, 5000, new_obj),
     {root_compare, 0} =
         wait_for_outcome(?MODULE,
@@ -224,14 +224,14 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
 
     read_from_cluster(NodeA, 4001, 5000, ?COMMMON_VAL_INIT, 0),
     read_from_cluster(NodeC, 4001, 5000, ?COMMMON_VAL_INIT, 0),
-    lager:info("Node restarting"),
+    logger:info("Node restarting"),
     rt:start_and_wait(NodeA0),
     rt:wait_for_service(NodeA0, riak_kv),
 
 
-    lager:info("Kill a node in source - and repl OK"),
+    logger:info("Kill a node in source - and repl OK"),
     rt:brutal_kill(NodeA0),
-    lager:info("Node killed"),
+    logger:info("Node killed"),
     timer:sleep(1000), % Cluster may settle after kill
     write_to_cluster(NodeA, 5001, 8000, new_obj),
     {root_compare, 0} =
@@ -246,8 +246,8 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
     read_from_cluster(NodeB, 5001, 8000, ?COMMMON_VAL_INIT, 0),
     read_from_cluster(NodeC, 5001, 8000, ?COMMMON_VAL_INIT, 0),
 
-    lager:info("Confirm replication from cache-less cluster ..."),
-    lager:info(".. with node still killed in cluster A"),
+    logger:info("Confirm replication from cache-less cluster ..."),
+    logger:info(".. with node still killed in cluster A"),
     write_to_cluster(NodeC, 8001, 10000, new_obj),
     {root_compare, 0} =
         wait_for_outcome(?MODULE,
@@ -335,15 +335,15 @@ fullsync_check({SrcNode, _SrcIP, _SrcPort, SrcNVal},
     ok = rpc:call(SrcNode, ModRef, set_allsync, [SrcNVal, SinkNVal]),
     AAEResult = rpc:call(SrcNode, riak_client, ttaaefs_fullsync, [all_check, 60]),
 
-    % lager:info("Sleeping to await queue drain."),
+    % logger:info("Sleeping to await queue drain."),
     % timer:sleep(2000),
     
     AAEResult.
 
 %% @doc Write a series of keys and ensure they are all written.
 write_to_cluster(Node, Start, End, CommonValBin) ->
-    lager:info("Writing ~p keys to node ~p.", [End - Start + 1, Node]),
-    lager:warning("Note that only utf-8 keys are used"),
+    logger:info("Writing ~p keys to node ~p.", [End - Start + 1, Node]),
+    logger:warning("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F = 
         fun(N, Acc) ->
@@ -371,12 +371,12 @@ write_to_cluster(Node, Start, End, CommonValBin) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    lager:warning("~p errors while writing: ~p", [length(Errors), Errors]),
+    logger:warning("~p errors while writing: ~p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 delete_from_cluster(Node, Start, End) ->
-    lager:info("Deleting ~p keys from node ~p.", [End - Start + 1, Node]),
-    lager:warning("Note that only utf-8 keys are used"),
+    logger:info("Deleting ~p keys from node ~p.", [End - Start + 1, Node]),
+    logger:warning("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F = 
         fun(N, Acc) ->
@@ -392,7 +392,7 @@ delete_from_cluster(Node, Start, End) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    lager:warning("~p errors while deleting: ~p", [length(Errors), Errors]),
+    logger:warning("~p errors while deleting: ~p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 
@@ -402,7 +402,7 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors) ->
     read_from_cluster(Node, Start, End, CommonValBin, Errors, false).
 
 read_from_cluster(Node, Start, End, CommonValBin, Errors, LogErrors) ->
-    lager:info("Reading ~p keys from node ~p.", [End - Start + 1, Node]),
+    logger:info("Reading ~p keys from node ~p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
     F = 
         fun(N, Acc) ->
@@ -423,14 +423,14 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors, LogErrors) ->
     ErrorsFound = lists:foldl(F, [], lists:seq(Start, End)),
     case Errors of
         undefined ->
-            lager:info("Errors Found in read_from_cluster ~w",
+            logger:info("Errors Found in read_from_cluster ~w",
                         [length(ErrorsFound)]);
         _ ->
             case LogErrors of
                 true ->
                     LogFun = 
                         fun(Error) ->
-                            lager:info("Read error ~w", [Error])
+                            logger:info("Read error ~w", [Error])
                         end,
                     lists:foreach(LogFun, ErrorsFound);
                 false ->
@@ -440,7 +440,7 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors, LogErrors) ->
                 Errors ->
                     ok;
                 _ ->
-                    lists:foreach(fun(E) -> lager:warning("Read error ~w", [E]) end, ErrorsFound)
+                    lists:foreach(fun(E) -> logger:warning("Read error ~w", [E]) end, ErrorsFound)
             end,
             ?assertEqual(Errors, length(ErrorsFound))
     end.
@@ -456,7 +456,7 @@ wait_for_outcome(Module, Func, Args, ExpOutcome, LoopCount, MaxLoops) ->
         ExpOutcome ->
             ExpOutcome;
         NotRightYet ->
-            lager:info("~w not yet ~w ~w", [Func, ExpOutcome, NotRightYet]),
+            logger:info("~w not yet ~w ~w", [Func, ExpOutcome, NotRightYet]),
             timer:sleep(LoopCount * 2000),
             wait_for_outcome(Module, Func, Args, ExpOutcome,
                                 LoopCount + 1, MaxLoops)

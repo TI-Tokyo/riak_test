@@ -66,7 +66,7 @@ add_and_save(Node, Intercepts) ->
             [PatchesDir] ->
                 add(Node, Intercepts, PatchesDir);
             [] ->
-                lager:error("No basho-patches! Manually adding path"),
+                logger:error("No basho-patches! Manually adding path"),
                 add(Node, Intercepts, "lib/basho-patches")
         end,
     ok.
@@ -108,7 +108,7 @@ transform_anon_fun(Mapping) ->
     Mapping.
 
 remote_compile_and_load(Node, F) ->
-    lager:debug("Compiling and loading file ~s on node ~s", [F, Node]),
+    logger:debug("Compiling and loading file ~s on node ~s", [F, Node]),
     {ok, _, Bin} = rpc:call(Node, compile, file, [F, [binary]]),
     ModName = list_to_atom(filename:basename(F, ".erl")),
     {module, _} = rpc:call(Node, code, load_binary, [ModName, F, Bin]),

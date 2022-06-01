@@ -93,7 +93,7 @@ get_put_data_test(Ctx) ->
     Key = [<<"a">>, <<"b">>, 10101010],
     ?assertMatch(ok, riakc_ts:put(C, ts_data:get_default_bucket(), Data)),
     Got = riakc_ts:get(C, ts_data:get_default_bucket(), Key, []),
-    lager:info("get_put_data_test Got ~p", [Got]),
+    logger:info("get_put_data_test Got ~p", [Got]),
     ?assertMatch({ok, {_, Data}}, Got),
     pass.
 

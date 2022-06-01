@@ -51,7 +51,7 @@
 
 %% @doc riak_test callback
 confirm() ->
-    lager:info("Build ~b node cluster", [?NODE_COUNT]),
+    logger:info("Build ~b node cluster", [?NODE_COUNT]),
     Nodes = rt:build_cluster(?NODE_COUNT),
 
     [rt:wait_for_service(Node, riak_pipe) || Node <- Nodes],
@@ -62,11 +62,11 @@ confirm() ->
 
     rt_pipe:assert_no_zombies(Nodes),
 
-    lager:info("~s: PASS", [atom_to_list(?MODULE)]),
+    logger:info("~s: PASS", [atom_to_list(?MODULE)]),
     pass.
 
 verify_worker_restart_failure_input_forwarding([RN]) ->
-    lager:info("Verify input forwarding after worker restart failure"),
+    logger:info("Verify input forwarding after worker restart failure"),
 
     %% make a worker fail, and then also fail to restart, and check
     %% that the input that killed it generates a processing error,

@@ -46,13 +46,13 @@ confirm() ->
     Items    = 10000, %% How many test items in each group to write/verify?
     run_test(Items, 4),
 
-    lager:info("Test verify_2i_handoff passed."),
+    logger:info("Test verify_2i_handoff passed."),
     pass.
 
 run_test(Items, NTestNodes) ->
-    lager:info("Testing handoff (items ~p, nodes: ~p)", [Items, NTestNodes]),
+    logger:info("Testing handoff (items ~p, nodes: ~p)", [Items, NTestNodes]),
 
-    lager:info("Spinning up test nodes"),
+    logger:info("Spinning up test nodes"),
     [RootNode, FirstJoin, SecondJoin, LastJoin] = Nodes = 
         deploy_test_nodes(NTestNodes),
 
@@ -60,7 +60,7 @@ run_test(Items, NTestNodes) ->
 
     set_handoff_encoding(default, Nodes),
 
-    lager:info("Initialise bucket type."),
+    logger:info("Initialise bucket type."),
     BProps = [{allow_mult, true}, {last_write_wins, false},
                 {node_confirms, 1}, {dvv_enabled, true}],
     B1 = {<<"type1">>, <<"B1">>},
@@ -71,78 +71,78 @@ run_test(Items, NTestNodes) ->
 
     RootClient = rt:pbc(RootNode),
 
-    lager:info("Populating initial data."),
+    logger:info("Populating initial data."),
     HttpC1 = rt:httpc(RootNode),
     lists:foreach(fun(N) -> put_an_object(HttpC1, B1, N) end, lists:seq(1, Items)),
     lists:foreach(fun(N) -> put_an_object(HttpC1, B2, N) end, lists:seq(1, Items)),
 
-    lager:info("Testing 2i Queries"),
+    logger:info("Testing 2i Queries"),
     repeatedly_test_query(RootClient, Items, B1, 1, assert),
     repeatedly_test_query(RootClient, Items, B2, 1, assert),
 
-    lager:info("Waiting for service on second node."),
+    logger:info("Waiting for service on second node."),
     rt:wait_for_service(FirstJoin, riak_kv),
 
-    lager:info("Joining new node with cluster."),
+    logger:info("Joining new node with cluster."),
     rt:join(FirstJoin, RootNode),
     repeatedly_test_query(RootClient, Items, B1, ?Q_LOOP, assert),
     ?assertEqual(ok, rt:wait_until_nodes_ready([RootNode, FirstJoin])),
     rt:wait_until_no_pending_changes([RootNode, FirstJoin]),
-    lager:info("Handoff complete"),
+    logger:info("Handoff complete"),
 
-    lager:info("Testing 2i Queries post-handoff"),
+    logger:info("Testing 2i Queries post-handoff"),
     FirstClient = rt:pbc(FirstJoin),
     repeatedly_test_query(FirstClient, Items, B1, 1, assert),
     repeatedly_test_query(FirstClient, Items, B2, 1, assert),
     riakc_pb_socket:stop(FirstClient),
 
     
-    lager:info("Waiting for service on third node."),
+    logger:info("Waiting for service on third node."),
     rt:wait_for_service(SecondJoin, riak_kv),
 
-    lager:info("Joining new node with cluster."),
+    logger:info("Joining new node with cluster."),
     rt:join(SecondJoin, RootNode),
     repeatedly_test_query(RootClient, Items, B1, ?Q_LOOP, assert),
     ?assertEqual(ok, rt:wait_until_nodes_ready([RootNode, SecondJoin])),
     rt:wait_until_no_pending_changes([RootNode, SecondJoin]),
-    lager:info("Handoff complete"),
+    logger:info("Handoff complete"),
 
-    lager:info("Testing 2i Queries post-handoff"),
+    logger:info("Testing 2i Queries post-handoff"),
     SecondClient = rt:pbc(SecondJoin),
     repeatedly_test_query(SecondClient, Items, B1, 1, assert),
     repeatedly_test_query(SecondClient, Items, B2, 1, assert),
     riakc_pb_socket:stop(SecondClient),
 
-    lager:info("Joining new node with cluster."),
+    logger:info("Joining new node with cluster."),
     rt:join(LastJoin, RootNode),
     repeatedly_test_query(RootClient, Items, B1, ?Q_LOOP, assert),
     ?assertEqual(ok, rt:wait_until_nodes_ready([RootNode, LastJoin])),
     rt:wait_until_no_pending_changes([RootNode, LastJoin]),
-    lager:info("Handoff complete"),
+    logger:info("Handoff complete"),
 
-    lager:info("Testing 2i Queries post-handoff"),
+    logger:info("Testing 2i Queries post-handoff"),
     LastClient = rt:pbc(LastJoin),
     repeatedly_test_query(LastClient, Items, B1, 1, assert),
     repeatedly_test_query(LastClient, Items, B2, 1, assert),
     riakc_pb_socket:stop(LastClient),
 
-    lager:info("Stopping node in cluster"),
+    logger:info("Stopping node in cluster"),
     rt:stop(LastJoin),
     repeatedly_test_query(RootClient, Items, B1, ?Q_LOOP, assert),
     rt:wait_until_unpingable(LastJoin),
 
-    lager:info("Loading data whilst node down"),
+    logger:info("Loading data whilst node down"),
     lists:foreach(fun(N) -> put_an_object(HttpC1, B1, N) end, lists:seq(Items + 1, 2 * Items)),
     lists:foreach(fun(N) -> put_an_object(HttpC1, B2, N) end, lists:seq(Items + 1, 2 * Items)),
 
-    lager:info("Check 2i shows new results"),
+    logger:info("Check 2i shows new results"),
     repeatedly_test_query(RootClient, 2 * Items, B1, 1, assert),
 
-    lager:info("Restarting node in cluster"),
-    lager:info("Primary vnodes on restarted nodes ..."),
-    lager:info("... will take over before hinted handoffs complete ..."),
-    lager:info("... so 2i results will not contain recent additions ..."),
-    lager:info("... until those transfers finish"),
+    logger:info("Restarting node in cluster"),
+    logger:info("Primary vnodes on restarted nodes ..."),
+    logger:info("... will take over before hinted handoffs complete ..."),
+    logger:info("... so 2i results will not contain recent additions ..."),
+    logger:info("... until those transfers finish"),
     rt:start(LastJoin),
     repeatedly_test_query(RootClient, 2 * Items, B1, ?Q_LOOP, report),
     rt:wait_until_pingable(LastJoin),
@@ -151,7 +151,7 @@ run_test(Items, NTestNodes) ->
     repeatedly_test_query(RootClient, 2 * Items, B1, ?Q_LOOP, report),
     rt:wait_until_transfers_complete([RootNode, FirstJoin, SecondJoin, LastJoin]),
 
-    lager:info("Check 2i now shows new results"),
+    logger:info("Check 2i now shows new results"),
     repeatedly_test_query(RootClient, 2 * Items, B1, 1, assert),
     repeatedly_test_query(RootClient, 2 * Items, B2, 1, assert),
     LastClientX = rt:pbc(LastJoin),
@@ -162,7 +162,7 @@ run_test(Items, NTestNodes) ->
     riakc_pb_socket:stop(RootClient),
 
     %% Prepare for the next call to our test (we aren't polite about it, it's faster that way):
-    lager:info("Bringing down test nodes"),
+    logger:info("Bringing down test nodes"),
     lists:foreach(fun(N) -> rt:brutal_kill(N) end, Nodes),
     pass.
 
@@ -178,17 +178,17 @@ reportIfEqual(PB, Expected, B, Query, Opts, ResultKey) ->
     PBKeys = proplists:get_value(ResultKey, PBRes, []),
     case length(PBKeys) of
         Expected ->
-            lager:info("Expected keys found ~w", [Expected]);
+            logger:info("Expected keys found ~w", [Expected]);
         N ->
-            lager:info("Expected keys ~w but only ~w keys found",
+            logger:info("Expected keys ~w but only ~w keys found",
                         [Expected, N])
     end.
 
 set_handoff_encoding(default, _) ->
-    lager:info("Using default encoding type."),
+    logger:info("Using default encoding type."),
     true;
 set_handoff_encoding(Encoding, Nodes) ->
-    lager:info("Forcing encoding type to ~p.", [Encoding]),
+    logger:info("Forcing encoding type to ~p.", [Encoding]),
 
     %% Update all nodes (capabilities are not re-negotiated):
     [begin
@@ -213,7 +213,7 @@ override_data(Encoding) ->
        ]}].
 
 assert_using(Node, {CapabilityCategory, CapabilityName}, ExpectedCapabilityName) ->
-    lager:info("assert_using ~p =:= ~p", [ExpectedCapabilityName, CapabilityName]),
+    logger:info("assert_using ~p =:= ~p", [ExpectedCapabilityName, CapabilityName]),
     ExpectedCapabilityName =:= rt:capability(Node, {CapabilityCategory, CapabilityName}).
 
 
@@ -256,7 +256,7 @@ stream_loop(Acc) ->
         {_Ref, {error, <<"{error,timeout}">>}} ->
             {error, timeout};
         {_Ref, Wat} ->
-            lager:info("got a wat ~p", [Wat]),
+            logger:info("got a wat ~p", [Wat]),
             stream_loop(Acc)
     end.
 
@@ -270,7 +270,7 @@ repeatedly_test_query(Client, Items, Bucket, N, assert) ->
                 {<<"field2_int">>, 1, Items},
                 ?Q_OPTS, results),
     timer:sleep(?Q_PAUSE),
-    lager:info("2i test loop complete - ~w items found~n", [Items]),
+    logger:info("2i test loop complete - ~w items found~n", [Items]),
     repeatedly_test_query(Client, Items, Bucket, N - 1, assert);
 repeatedly_test_query(Client, Items, Bucket, N, report) ->
     reportIfEqual(Client, Items, Bucket,

@@ -33,7 +33,7 @@ run_test(RingSize) ->
                     {handoff_concurrency, 100},
                     {vnode_inactivity_timeout, 1000}]}]}],
 
-    lager:info("Testing with ring-size ~w", [RingSize]),    
+    logger:info("Testing with ring-size ~w", [RingSize]),    
 
     AllNodes = rt:deploy_nodes(6, Conf),
     [Node1, Node2, Node3, Node4, Node5, Node6] = AllNodes,
@@ -142,18 +142,18 @@ run_test(RingSize) ->
     % Because of tail violations need to increase n_val to satisfy diversity of locations
     assert_no_location_violation(Ring10, 4, 3),
 
-    lager:info("Test verify location settings with ring size ~w: Passed",
+    logger:info("Test verify location settings with ring size ~w: Passed",
                 [RingSize]),
     
     rt:clean_cluster(AllNodes),
 
-    lager:info("Cluster cleaned"),
+    logger:info("Cluster cleaned"),
 
     pass.
 
 -spec set_location(node(), string()) -> ok | {fail, term()}.
 set_location(Node, Location) ->
-    lager:info("Set ~p node location to ~p", [Node, Location]),
+    logger:info("Set ~p node location to ~p", [Node, Location]),
     JoinFun = fun() ->
         {ok, Result} = rt:admin(Node, ["cluster", "location", Location]),
         lists:prefix("Success:", Result)
@@ -167,11 +167,11 @@ setup_location([OnNode | _] = Nodes, NodeMap) ->
     ?assertEqual(ok, rt:wait_until_no_pending_changes(Nodes)).
 
 assert_ring_satisfy_n_val(Ring) ->
-  lager:info("Ensure that every preflists satisfy n_val"),
+  logger:info("Ensure that every preflists satisfy n_val"),
   ?assertEqual([], riak_core_ring_util:check_ring(Ring, ?N_VAL)).
 
 assert_no_ownership_change(RingA, RingB) ->
-  lager:info("Ensure no ownership changed"),
+  logger:info("Ensure no ownership changed"),
   ?assertEqual(riak_core_ring:all_owners(RingA), riak_core_ring:all_owners(RingB)).
 
 assert_no_location_violation(Ring) ->
@@ -183,7 +183,7 @@ assert_no_location_violation(Ring, NVal, MinNumberOfDistinctLocation) ->
   ?assertEqual([], riak_core_location:check_ring(Ring, NVal, MinNumberOfDistinctLocation)).
 
 log_assert_no_location_violation(Nval, Nval) ->
-  lager:info("Ensure that every preflists have uniq locations");
+  logger:info("Ensure that every preflists have uniq locations");
 log_assert_no_location_violation(NVal, MinNumberOfDistinctLocation) ->
-  lager:info("Ensure that every preflists (n_val: ~p) have at leaset ~p distinct locations",
+  logger:info("Ensure that every preflists (n_val: ~p) have at leaset ~p distinct locations",
              [NVal, MinNumberOfDistinctLocation]).

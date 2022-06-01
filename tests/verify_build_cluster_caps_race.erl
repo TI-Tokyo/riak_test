@@ -28,18 +28,18 @@ staged_join(InitiatingNode, DestinationNode) ->
 
 confirm() ->
     %% Deploy a set of new nodes
-    lager:info("Deploying nodes"),
+    logger:info("Deploying nodes"),
 
     [Node1, Node2] = rt:deploy_nodes(2),
 
     configure_intercept(Node2),
 
-    lager:info("joining Node 2 to the cluster..."),
+    logger:info("joining Node 2 to the cluster..."),
     ?assertMatch({error, _}, staged_join(Node2, Node1)),
     pass.
 
 %% init must return `starting' status for join to fail
 configure_intercept(Node) ->
-    lager:info("Doing unspeakably evil things to the VM"),
+    logger:info("Doing unspeakably evil things to the VM"),
     rt_intercept:add(Node, {init,
                             [{{get_status,0}, get_status}]}).

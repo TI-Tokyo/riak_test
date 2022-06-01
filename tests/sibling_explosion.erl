@@ -24,7 +24,7 @@ confirm() ->
     [Node1] = rt:deploy_nodes(1, Conf),
     N = 100,
 
-    lager:info("Put new object in ~p via PBC.", [Node1]),
+    logger:info("Put new object in ~p via PBC.", [Node1]),
     PB = rt:pbc(Node1),
 
     A0 = riakc_obj:new(<<"b">>, <<"k">>, sets:from_list([0])),
@@ -78,7 +78,7 @@ resolve_update(Obj, N) ->
         Values ->
             Value0 = resolve(Values, sets:new()),
             Value = sets:add_element(N, Value0),
-            lager:info("Storing ~p", [N]),
+            logger:info("Storing ~p", [N]),
             riakc_obj:update_metadata(riakc_obj:update_value(Obj, Value), dict:new())
     end.
 

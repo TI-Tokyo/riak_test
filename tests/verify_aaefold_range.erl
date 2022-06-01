@@ -66,12 +66,12 @@ verify_aae_fold(Nodes) ->
     {ok, CH} = riak:client_connect(hd(Nodes)),
     {ok, CT} = riak:client_connect(lists:last(Nodes)),
 
-    lager:info("Fold for empty tree range"),
+    logger:info("Fold for empty tree range"),
     TreeQuery = {merge_tree_range, ?BUCKET, all, small, all, all, pre_hash},
     {ok, RH0} = riak_client:aae_fold(TreeQuery, CH),
     {ok, RT0} = riak_client:aae_fold(TreeQuery, CT),
 
-    lager:info("Commencing object load"),
+    logger:info("Commencing object load"),
     KeyLoadFun = 
         fun(Node, KeyCount) ->
             KVs = test_data(KeyCount + 1,
@@ -82,9 +82,9 @@ verify_aae_fold(Nodes) ->
         end,
 
     lists:foldl(KeyLoadFun, 1, Nodes),
-    lager:info("Loaded ~w objects", [?NUM_KEYS_PERNODE * length(Nodes)]),
+    logger:info("Loaded ~w objects", [?NUM_KEYS_PERNODE * length(Nodes)]),
 
-    lager:info("Fold for busy tree"),
+    logger:info("Fold for busy tree"),
     {ok, RH1} = riak_client:aae_fold(TreeQuery, CH),
     {ok, RT1} = riak_client:aae_fold(TreeQuery, CT),
     
@@ -94,14 +94,14 @@ verify_aae_fold(Nodes) ->
 
     ?assertMatch(true, [] == aae_exchange:compare_trees(RH1, RT1)),
     
-    lager:info("Make ~w changes", [?DELTA_COUNT]),
+    logger:info("Make ~w changes", [?DELTA_COUNT]),
     Changes2 = test_data(1, ?DELTA_COUNT, list_to_binary("U2")),
     ok = write_data(hd(Nodes), Changes2),
 
     {ok, RH2} = riak_client:aae_fold(TreeQuery, CH),
     DirtySegments1 = aae_exchange:compare_trees(RH1, RH2),
 
-    lager:info("Found ~w mismatched segments", [length(DirtySegments1)]),
+    logger:info("Found ~w mismatched segments", [length(DirtySegments1)]),
     ?assertMatch(true, length(DirtySegments1) > 0),
     ?assertMatch(true, length(DirtySegments1) =< ?DELTA_COUNT),
 
@@ -113,12 +113,12 @@ verify_aae_fold(Nodes) ->
 
     {ok, KCL1} = riak_client:aae_fold(FetchClocksQuery, CH),
 
-    lager:info("Found ~w mismatched keys", [length(KCL1)]),
+    logger:info("Found ~w mismatched keys", [length(KCL1)]),
 
     ?assertMatch(true, length(KCL1) >= ?DELTA_COUNT),
     MappedKCL1 = lists:map(fun({B, K, VC}) -> {{B, K}, VC} end, KCL1),
 
-    lager:info("Checking all mismatched keys in result"),
+    logger:info("Checking all mismatched keys in result"),
     MatchFun = 
         fun(I) ->
             K = to_key(I),
@@ -127,7 +127,7 @@ verify_aae_fold(Nodes) ->
         end,
     lists:foreach(MatchFun, lists:seq(1, ?DELTA_COUNT)),
     
-    lager:info("Stopping a node - query results should be unchanged"),
+    logger:info("Stopping a node - query results should be unchanged"),
     rt:stop_and_wait(hd(tl(Nodes))),
     
     {ok, KCL2} = riak_client:aae_fold(FetchClocksQuery, CH),

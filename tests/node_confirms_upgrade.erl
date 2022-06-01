@@ -57,7 +57,7 @@ confirm() ->
     %% Create a custom bucket (change allow_mult to true!)
     rt:pbc_set_bucket_prop(Pid, ?BUCKET, [{allow_mult, true}, {custom_prop, x}]),
 
-    lager:info("Write values on `previous'"),
+    logger:info("Write values on `previous'"),
     %% Write some sample data.
     TypedObject = riakc_obj:new(?TYPED_BUCKET, ?KEY, <<"v1">>),
     UntypedObject = riakc_obj:new(?BUCKET, ?KEY, <<"v1">>),
@@ -67,7 +67,7 @@ confirm() ->
     %% Stop PB connection.
     riakc_pb_socket:stop(Pid),
 
-    lager:info("Upgrade to current"),
+    logger:info("Upgrade to current"),
     %% Upgrade all nodes.
     [upgrade(N, current) || N <- Nodes],
 
@@ -77,12 +77,12 @@ confirm() ->
 
     {ok, UTO2} = riakc_pb_socket:get(Pid2, ?BUCKET, ?KEY),
     UTO3 = riakc_obj:update_value(UTO2, <<"v2">>),
-    lager:info("Update custom bucket object on upgraded cluster"),
+    logger:info("Update custom bucket object on upgraded cluster"),
     ok = riakc_pb_socket:put(Pid2, UTO3),
 
     {ok, TO2} = riakc_pb_socket:get(Pid2, ?TYPED_BUCKET, ?KEY),
     TO3 = riakc_obj:update_value(TO2, <<"v2">>),
-    lager:info("Update typed bucket object on upgraded cluster"),
+    logger:info("Update typed bucket object on upgraded cluster"),
     riakc_pb_socket:put(Pid2, TO3),
     ok = riakc_pb_socket:put(Pid2, TO3),
 
@@ -92,7 +92,7 @@ confirm() ->
     pass.
 
 upgrade(Node, NewVsn) ->
-    lager:info("Upgrading ~p to ~p", [Node, NewVsn]),
+    logger:info("Upgrading ~p to ~p", [Node, NewVsn]),
     rt:upgrade(Node, NewVsn),
     rt:wait_for_service(Node, riak_kv),
     ok.

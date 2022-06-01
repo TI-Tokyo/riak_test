@@ -37,10 +37,10 @@ rtq_data_buildup_test(ClusterNodes) ->
     {SourceLeader, SinkLeaderA, SinkLeaderB, SourceNodes, _SinkANodes, _SinkBNodes} = ClusterNodes,
 
     %% Enable RT replication from source cluster "SinkA"
-    lager:info("Enabling realtime between ~p and ~p", [SourceLeader, SinkLeaderB]),
+    logger:info("Enabling realtime between ~p and ~p", [SourceLeader, SinkLeaderB]),
     enable_rt(SourceLeader, SourceNodes, "SinkA"),
     %% Enable RT replication from source cluster "SinkB"
-    lager:info("Enabling realtime between ~p and ~p", [SourceLeader, SinkLeaderA]),
+    logger:info("Enabling realtime between ~p and ~p", [SourceLeader, SinkLeaderA]),
     enable_rt(SourceLeader, SourceNodes, "SinkB"),
 
     %% Get the baseline byte count for the rtq for each sink cluster
@@ -63,21 +63,21 @@ rtq_bytes(Node) ->
 
 make_clusters() ->
     NodeCount = rt_config:get(num_nodes, 6),
-    lager:info("Deploy ~p nodes", [NodeCount]),
+    logger:info("Deploy ~p nodes", [NodeCount]),
     Nodes = deploy_nodes(NodeCount, true),
 
     {SourceNodes, SinkNodes} = lists:split(2, Nodes),
     {SinkANodes, SinkBNodes} = lists:split(2, SinkNodes),
-    lager:info("SinkANodes: ~p", [SinkANodes]),
-    lager:info("SinkBNodes: ~p", [SinkBNodes]),
+    logger:info("SinkANodes: ~p", [SinkANodes]),
+    logger:info("SinkBNodes: ~p", [SinkBNodes]),
 
-    lager:info("Build source cluster"),
+    logger:info("Build source cluster"),
     repl_util:make_cluster(SourceNodes),
 
-    lager:info("Build sink cluster A"),
+    logger:info("Build sink cluster A"),
     repl_util:make_cluster(SinkANodes),
 
-    lager:info("Build sink cluster B"),
+    logger:info("Build sink cluster B"),
     repl_util:make_cluster(SinkBNodes),
 
     SourceFirst = hd(SourceNodes),
@@ -89,26 +89,26 @@ make_clusters() ->
     repl_util:name_cluster(AFirst, "SinkA"),
     repl_util:name_cluster(BFirst, "SinkB"),
 
-    lager:info("Waiting for convergence."),
+    logger:info("Waiting for convergence."),
     rt:wait_until_ring_converged(SourceNodes),
     rt:wait_until_ring_converged(SinkANodes),
     rt:wait_until_ring_converged(SinkBNodes),
 
-    lager:info("Waiting for transfers to complete."),
+    logger:info("Waiting for transfers to complete."),
     rt:wait_until_transfers_complete(SourceNodes),
     rt:wait_until_transfers_complete(SinkANodes),
     rt:wait_until_transfers_complete(SinkBNodes),
 
     %% get the leader for the source cluster
-    lager:info("waiting for leader to converge on the source cluster"),
+    logger:info("waiting for leader to converge on the source cluster"),
     ?assertEqual(ok, repl_util:wait_until_leader_converge(SourceNodes)),
 
     %% get the leader for the first sink cluster
-    lager:info("waiting for leader to converge on sink cluster A"),
+    logger:info("waiting for leader to converge on sink cluster A"),
     ?assertEqual(ok, repl_util:wait_until_leader_converge(SinkANodes)),
 
     %% get the leader for the second cluster
-    lager:info("waiting for leader to converge on cluster B"),
+    logger:info("waiting for leader to converge on cluster B"),
     ?assertEqual(ok, repl_util:wait_until_leader_converge(SinkBNodes)),
 
     SourceLeader = repl_util:get_leader(SourceFirst),
@@ -121,12 +121,12 @@ make_clusters() ->
     %% disable_cascading(ALeader, SinkANodes),
     %% disable_cascading(BLeader, SinkBNodes),
 
-    lager:info("Source Leader: ~p SinkALeader: ~p SinkBLeader: ~p", [SourceLeader, ALeader, BLeader]),
+    logger:info("Source Leader: ~p SinkALeader: ~p SinkBLeader: ~p", [SourceLeader, ALeader, BLeader]),
     {SourceLeader, ALeader, BLeader, SourceNodes, SinkANodes, SinkBNodes}.
 
 %% @doc Connect two clusters using a given name.
 connect_cluster(Source, Port, Name) ->
-    lager:info("Connecting ~p to ~p for cluster ~p.",
+    logger:info("Connecting ~p to ~p for cluster ~p.",
                [Source, Port, Name]),
     repl_util:connect_cluster(Source, "127.0.0.1", Port),
     ?assertEqual(ok, repl_util:wait_for_connection(Source, Name)).
@@ -134,7 +134,7 @@ connect_cluster(Source, Port, Name) ->
 %% @doc Connect two clusters for replication using their respective leader nodes.
 connect_clusters(SourceLeader, SinkLeader, SinkName) ->
     SinkPort = repl_util:get_port(SinkLeader),
-    lager:info("connect source cluster to ~p on port ~p", [SinkName, SinkPort]),
+    logger:info("connect source cluster to ~p on port ~p", [SinkName, SinkPort]),
     repl_util:connect_cluster(SourceLeader, "127.0.0.1", SinkPort),
     ?assertEqual(ok, repl_util:wait_for_connection(SourceLeader, SinkName)).
 
@@ -173,13 +173,13 @@ disable_cascading(Leader, Nodes) ->
 
 %% @doc Write a series of keys and ensure they are all written.
 write_to_cluster(Node, Start, End) ->
-    lager:info("Writing ~p keys to node ~p.", [End - Start, Node]),
+    logger:info("Writing ~p keys to node ~p.", [End - Start, Node]),
     ?assertEqual([],
                  repl_util:do_write(Node, Start, End, ?TEST_BUCKET, 1)).
 
 %% @doc Read from cluster a series of keys, asserting a certain number
 %%      of errors.
 read_from_cluster(Node, Start, End, Errors) ->
-    lager:info("Reading ~p keys from node ~p.", [End - Start, Node]),
+    logger:info("Reading ~p keys from node ~p.", [End - Start, Node]),
     Res2 = rt:systest_read(Node, Start, End, ?TEST_BUCKET, 1),
     ?assertEqual(Errors, length(Res2)).

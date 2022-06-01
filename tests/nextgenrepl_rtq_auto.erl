@@ -76,7 +76,7 @@ confirm() ->
             {2, ?CONFIG(?B_RING, ?B_NVAL, 0, ClusterBSrcQ, false)},
             {2, ?CONFIG(?C_RING, ?C_NVAL, 10, ClusterCSrcQ, false)}]),
     
-    lager:info("Discover Peer IP/ports and restart with peer config"),
+    logger:info("Discover Peer IP/ports and restart with peer config"),
     FoldToPeerConfigHTTP = 
         fun(Node, Acc) ->
             {http, {IP, Port}} =
@@ -86,26 +86,26 @@ confirm() ->
         end,
     reset_peer_config(FoldToPeerConfigHTTP, ClusterA, ClusterB, ClusterC),
     
-    lager:info("Waiting for convergence."),
+    logger:info("Waiting for convergence."),
     rt:wait_until_ring_converged(ClusterA),
     rt:wait_until_ring_converged(ClusterB),
     rt:wait_until_ring_converged(ClusterC),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end,
                     ClusterA ++ ClusterB ++ ClusterC),
     
-    lager:info("Ready for test - with http client for rtq."),
+    logger:info("Ready for test - with http client for rtq."),
     pass =
         test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC),
     StatsA0 = get_stats(ClusterA),
     StatsB0 = get_stats(ClusterB),
-    lager:info("ClusterA stats ~w", [StatsA0]),
-    lager:info("ClusterB stats ~w", [StatsB0]),
+    logger:info("ClusterA stats ~w", [StatsA0]),
+    logger:info("ClusterB stats ~w", [StatsB0]),
     ?assertMatch(0, element(1, StatsB0)),
     ?assertMatch(200, element(2, StatsB0)),
     ?assertMatch(true, element(1, StatsA0) >= 100),
     ?assertMatch(true, element(2, StatsB0) >= 0),
     
-    lager:info("Discover Peer IP/ports for pb and restart with peer config"),
+    logger:info("Discover Peer IP/ports for pb and restart with peer config"),
     FoldToPeerConfigPB = 
         fun(Node, Acc) ->
             {pb, {IP, Port}} =
@@ -124,20 +124,20 @@ confirm() ->
             {2, ?CONFIG(?B_RING, ?B_NVAL, 10, ClusterBSrcQ, true)},
             {2, ?CONFIG(?C_RING, ?C_NVAL, 100, ClusterCSrcQ, true)}]),
     reset_peer_config(FoldToPeerConfigPB, ClusterApb, ClusterBpb, ClusterCpb),
-    lager:info("Waiting for convergence."),
+    logger:info("Waiting for convergence."),
     rt:wait_until_ring_converged(ClusterApb),
     rt:wait_until_ring_converged(ClusterBpb),
     rt:wait_until_ring_converged(ClusterCpb),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end,
                     ClusterApb ++ ClusterBpb ++ ClusterCpb),
     
-    lager:info("Ready for test - with protocol buffers client for rtq."),
+    logger:info("Ready for test - with protocol buffers client for rtq."),
     pass =
         test_rtqrepl_between_clusters(ClusterApb, ClusterBpb, ClusterCpb),
     StatsA1 = get_stats(ClusterA),
     StatsB1 = get_stats(ClusterB),
-    lager:info("ClusterA stats ~w", [StatsA1]),
-    lager:info("ClusterB stats ~w", [StatsB1]),
+    logger:info("ClusterA stats ~w", [StatsA1]),
+    logger:info("ClusterB stats ~w", [StatsB1]),
     pass.
 
 
@@ -166,18 +166,18 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
     NodeB = hd(ClusterB),
     NodeC = hd(ClusterC),
 
-    lager:info("Test empty clusters don't show any differences"),
+    logger:info("Test empty clusters don't show any differences"),
     {http, {IPA, PortA}} = lists:keyfind(http, 1, rt:connection_info(NodeA)),
     {http, {IPB, PortB}} = lists:keyfind(http, 1, rt:connection_info(NodeB)),
     {http, {IPC, PortC}} = lists:keyfind(http, 1, rt:connection_info(NodeC)),
-    lager:info("Cluster A ~s ~w Cluster B ~s ~w Cluster C ~s ~w",
+    logger:info("Cluster A ~s ~w Cluster B ~s ~w Cluster C ~s ~w",
                 [IPA, PortA, IPB, PortB, IPC, PortC]),
     
     true = check_all_insync({NodeA, IPA, PortA},
                             {NodeB, IPB, PortB},
                             {NodeC, IPC, PortC}),
 
-    lager:info("Test 1000 key difference and resolve"),
+    logger:info("Test 1000 key difference and resolve"),
     % Write keys to cluster A, verify B and C do have them.
     write_to_cluster(NodeA, 1, 1000, new_obj),
     timer:sleep(?REPL_SLEEP),
@@ -187,7 +187,7 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
                             {NodeB, IPB, PortB},
                             {NodeC, IPC, PortC}),
     
-    lager:info("Test replicating tombstones"),
+    logger:info("Test replicating tombstones"),
     delete_from_cluster(NodeA, 901, 1000),
     timer:sleep(?REPL_SLEEP),
     read_from_cluster(NodeA, 901, 1000, ?COMMMON_VAL_INIT, 100),
@@ -197,7 +197,7 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
                             {NodeB, IPB, PortB},
                             {NodeC, IPC, PortC}),
 
-    lager:info("Test replicating modified objects"),
+    logger:info("Test replicating modified objects"),
     write_to_cluster(NodeB, 1, 100, ?COMMMON_VAL_MOD),
     timer:sleep(?REPL_SLEEP),
     read_from_cluster(NodeA, 1, 100, ?COMMMON_VAL_MOD, 0),
@@ -239,15 +239,15 @@ fullsync_check({SrcNode, _SrcIP, _SrcPort, SrcNVal},
     ok = rpc:call(SrcNode, ModRef, set_allsync, [SrcNVal, SinkNVal]),
     AAEResult = rpc:call(SrcNode, riak_client, ttaaefs_fullsync, [all_check, 60]),
 
-    % lager:info("Sleeping to await queue drain."),
+    % logger:info("Sleeping to await queue drain."),
     % timer:sleep(2000),
     
     AAEResult.
 
 %% @doc Write a series of keys and ensure they are all written.
 write_to_cluster(Node, Start, End, CommonValBin) ->
-    lager:info("Writing ~p keys to node ~p.", [End - Start + 1, Node]),
-    lager:warning("Note that only utf-8 keys are used"),
+    logger:info("Writing ~p keys to node ~p.", [End - Start + 1, Node]),
+    logger:warning("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F = 
         fun(N, Acc) ->
@@ -275,12 +275,12 @@ write_to_cluster(Node, Start, End, CommonValBin) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    lager:warning("~p errors while writing: ~p", [length(Errors), Errors]),
+    logger:warning("~p errors while writing: ~p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 delete_from_cluster(Node, Start, End) ->
-    lager:info("Deleting ~p keys from node ~p.", [End - Start + 1, Node]),
-    lager:warning("Note that only utf-8 keys are used"),
+    logger:info("Deleting ~p keys from node ~p.", [End - Start + 1, Node]),
+    logger:warning("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F = 
         fun(N, Acc) ->
@@ -296,7 +296,7 @@ delete_from_cluster(Node, Start, End) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    lager:warning("~p errors while deleting: ~p", [length(Errors), Errors]),
+    logger:warning("~p errors while deleting: ~p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 
@@ -306,7 +306,7 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors) ->
     read_from_cluster(Node, Start, End, CommonValBin, Errors, false).
 
 read_from_cluster(Node, Start, End, CommonValBin, Errors, LogErrors) ->
-    lager:info("Reading ~p keys from node ~p.", [End - Start + 1, Node]),
+    logger:info("Reading ~p keys from node ~p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
     F = 
         fun(N, Acc) ->
@@ -327,14 +327,14 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors, LogErrors) ->
     ErrorsFound = lists:foldl(F, [], lists:seq(Start, End)),
     case Errors of
         undefined ->
-            lager:info("Errors Found in read_from_cluster ~w",
+            logger:info("Errors Found in read_from_cluster ~w",
                         [length(ErrorsFound)]);
         _ ->
             case LogErrors of
                 true ->
                     LogFun = 
                         fun(Error) ->
-                            lager:info("Read error ~w", [Error])
+                            logger:info("Read error ~w", [Error])
                         end,
                     lists:foreach(LogFun, ErrorsFound);
                 false ->
@@ -344,7 +344,7 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors, LogErrors) ->
             %     Errors ->
             %         ok;
             %     _ ->
-            %         lists:foreach(fun(E) -> lager:warning("Read error ~w", [E]) end, ErrorsFound)
+            %         lists:foreach(fun(E) -> logger:warning("Read error ~w", [E]) end, ErrorsFound)
             % end,
             ?assertEqual(Errors, length(ErrorsFound))
     end.

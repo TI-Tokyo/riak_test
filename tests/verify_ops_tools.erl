@@ -27,17 +27,17 @@
 %% to support troubleshooting
 
 confirm() ->
-    lager:info("Spinning up test nodes"),
+    logger:info("Spinning up test nodes"),
     Config = [{riak_core, [{ring_creation_size, 8}]},
                 {riak_kv, [{anti_entropy, {off, []}}]}],
     
     [RootNode | _RestNodes] = rt:build_cluster(2, Config),
     rt:wait_for_service(RootNode, riak_kv),
     
-    lager:info("Calling redbug and recon - are they there?"),
+    logger:info("Calling redbug and recon - are they there?"),
     ok = rpc:call(RootNode, redbug, help, []),
-    lager:info("Redbug present"),
+    logger:info("Redbug present"),
     2 = length(rpc:call(RootNode, recon, node_stats_list, [2, 2])),
-    lager:info("Recon present"),
+    logger:info("Recon present"),
     
     pass.

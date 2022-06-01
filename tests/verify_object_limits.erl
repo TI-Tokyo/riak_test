@@ -47,18 +47,18 @@ confirm() ->
     rt:setup_log_capture(Node1),
 
     % For the sibling test, we need the bucket to allow siblings
-    lager:info("Configuring bucket to allow siblings"),
+    logger:info("Configuring bucket to allow siblings"),
     ?assertMatch(ok, riakc_pb_socket:set_bucket(C, ?BUCKET,
                                                 [{allow_mult, true}])),
     verify_size_limits(C, Node1),
     verify_sibling_limits(C, Node1),
-    lager:notice("Starting readrepair section of test"),
+    logger:notice("Starting readrepair section of test"),
     verify_readrepair_ignore_max_size(C, Node1),
     verify_readrepair_ignore_max_sib(C, Node1),
     pass.
 
 verify_size_limits(C, Node1) ->
-    lager:info("Verifying size limits"),
+    logger:info("Verifying size limits"),
     Puts = [{1, ok},
             {10, ok},
             {50, ok},
@@ -66,13 +66,13 @@ verify_size_limits(C, Node1) ->
             {?MAX_SIZE, error},
             {?MAX_SIZE*2, error}],
     [begin
-            lager:info("Checking put of size ~p, expected ~p", [N, X]),
+            logger:info("Checking put of size ~p, expected ~p", [N, X]),
             K = <<N:32/big-integer>>,
             V = <<0:(N)/integer-unit:8>>, % N zeroes bin
             O = riakc_obj:new(?BUCKET, K, V),
             % Verify behavior on write
             Res = riakc_pb_socket:put(C, O),
-            lager:info("Result : ~p", [Res]),
+            logger:info("Result : ~p", [Res]),
             case X of
                 ok ->
                     ?assertMatch({N, ok}, {N, Res});
@@ -83,7 +83,7 @@ verify_size_limits(C, Node1) ->
                     verify_size_write_warning(Node1, K, N)
             end,
             % Now verify on read
-            lager:info("Now checking read of size ~p, expected ~p", [N, X]),
+            logger:info("Now checking read of size ~p, expected ~p", [N, X]),
             ReadRes = riakc_pb_socket:get(C, ?BUCKET, K),
             case X of
                 ok ->
@@ -98,19 +98,19 @@ verify_size_limits(C, Node1) ->
     ok.
 
 verify_size_write_warning(Node, K, N) ->
-    lager:info("Looking for write warning for size ~p", [N]),
+    logger:info("Looking for write warning for size ~p", [N]),
     Pattern = io_lib:format("warning.*Writ.*~p.*~p",[?BUCKET, K]),
     Res = rt:expect_in_log(Node, Pattern),
     ?assertEqual({warning, N, true}, {warning, N, Res}).
 
 verify_size_read_warning(Node, K, N) ->
-    lager:info("Looking for read warning for size ~p", [N]),
+    logger:info("Looking for read warning for size ~p", [N]),
     Pattern = io_lib:format("warning.*Read.*~p.*~p",[?BUCKET, K]),
     Res = rt:expect_in_log(Node, Pattern),
     ?assertEqual({warning, N, true}, {warning, N, Res}).
 
 verify_size_write_error(Node, K, N) ->
-    lager:info("Looking for write error for size ~p", [N]),
+    logger:info("Looking for write error for size ~p", [N]),
     Pattern = io_lib:format("error.*~p.*~p",[?BUCKET, K]),
     Res = rt:expect_in_log(Node, Pattern),
     ?assertEqual({warning, N, true}, {warning, N, Res}).
@@ -123,13 +123,13 @@ verify_sibling_limits(C, Node1) ->
     P = io_lib:format("warning.*siblings.*~p.*~p.*(~p)",
                       [?BUCKET, K, ?WARN_SIBLINGS+1]),
     Found = rt:expect_in_log(Node1, P),
-    lager:info("Looking for sibling warning: ~p", [Found]),
+    logger:info("Looking for sibling warning: ~p", [Found]),
     ?assertEqual(true, Found),
     % Generate error now
     [?assertMatch(ok, riakc_pb_socket:put(C, O)) 
      || _ <- lists:seq(?WARN_SIBLINGS+2, ?MAX_SIBLINGS)],
     Res = riakc_pb_socket:put(C, O),
-    lager:info("Result when too many siblings : ~p", [Res]),
+    logger:info("Result when too many siblings : ~p", [Res]),
     ?assertMatch({error,_},  Res),
     ok.
 
@@ -138,7 +138,7 @@ verify_readrepair_ignore_max_size(C, Node1) ->
     Intercept = {riak_kv_vnode, [{{put, 6}, put_as_readrepair},{{coord_put,6}, coord_put_as_readrepair}]},
     ok = rt_intercept:add(Node1, Intercept),
     % Do put with value greater than max size and confirm warning
-    lager:info("Checking readrepair put of size ~p, expecting ok result and log warning", [?MAX_SIZE*2]),
+    logger:info("Checking readrepair put of size ~p, expecting ok result and log warning", [?MAX_SIZE*2]),
     K = <<"rrsizetest">>,
     V = <<0:(?MAX_SIZE*2)/integer-unit:8>>,
     O = riakc_obj:new(?BUCKET, K, V),
@@ -149,7 +149,7 @@ verify_readrepair_ignore_max_size(C, Node1) ->
     ok.
 
 verify_readrepair_ignore_max_sib(C, Node1) ->
-    lager:info("Checking sibling warning on readrepair above max siblings=~p", [?MAX_SIBLINGS]),
+    logger:info("Checking sibling warning on readrepair above max siblings=~p", [?MAX_SIBLINGS]),
     K = <<"rrsibtest">>,
     V = <<"sibtest">>,
     O = riakc_obj:new(?BUCKET, K, V),
@@ -157,18 +157,18 @@ verify_readrepair_ignore_max_sib(C, Node1) ->
     [?assertMatch(ok, riakc_pb_socket:put(C, O)) 
      || _ <- lists:seq(1, ?MAX_SIBLINGS)],
     Res = riakc_pb_socket:put(C, O),
-    lager:info("Result when too many siblings : ~p", [Res]),
+    logger:info("Result when too many siblings : ~p", [Res]),
     ?assertMatch({error,_},  Res),
     % Add intercept to spoof writes as readrepair
     Intercept = {riak_kv_vnode, [{{put, 6}, put_as_readrepair},{{coord_put,6}, coord_put_as_readrepair}]},
     ok = rt_intercept:add(Node1, Intercept),
     % Verify readrepair writes return ok and log warning
-    lager:info("Verifying succesful put above max_siblings with readrepair"),
+    logger:info("Verifying succesful put above max_siblings with readrepair"),
     ?assertMatch(ok, riakc_pb_socket:put(C, O)),
     P = io_lib:format("warning.*siblings.*~p.*~p.*(~p)",
                       [?BUCKET, K, ?MAX_SIBLINGS+1]),
     Found = rt:expect_in_log(Node1, P),
-    lager:info("Looking for sibling warning: ~p", [Found]),
+    logger:info("Looking for sibling warning: ~p", [Found]),
     ?assertEqual(true, Found),
     % Clean intercept
     ok = rt_intercept:clean(Node1, riak_kv_vnode),

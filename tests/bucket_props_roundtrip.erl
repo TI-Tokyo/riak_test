@@ -62,17 +62,17 @@ confirm() ->
     pass.
 
 check_prop_set_and_get(Node, Prop, One, Two) ->
-    lager:info("-------- Testing roundtrip for property '~p' ---------", [Prop]),
+    logger:info("-------- Testing roundtrip for property '~p' ---------", [Prop]),
     HTTP = rt:httpc(Node),
     PBC = rt:pbc(Node),
-    lager:info("HTTP set = ~p", [One]),
+    logger:info("HTTP set = ~p", [One]),
     http_set_property(HTTP, Prop, One),
-    lager:info("PBC get should == ~p", [One]),
+    logger:info("PBC get should == ~p", [One]),
     ?assertEqual(One, pbc_get_property(PBC, Prop)),
 
-    lager:info("PBC set = ~p", [Two]),
+    logger:info("PBC set = ~p", [Two]),
     pbc_set_property(PBC, Prop, Two),
-    lager:info("HTTP get should = ~p", [Two]),
+    logger:info("HTTP get should = ~p", [Two]),
     ?assertEqual(Two, http_get_property(HTTP, Prop)),
     ok.
 

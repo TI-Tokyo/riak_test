@@ -51,7 +51,7 @@ confirm() ->
     Bin2 = <<"My Uncle was micro waving our socks and the dog threw up on the couch for an hour.">>,
     Obj1 = riakc_obj:new({BucketType, Bucket}, Key1, Bin1),
     Obj2 = riakc_obj:new({BucketType, Bucket}, Key2, Bin2),
-    lager:info("doing 2 consistent puts on A, bucket:~p", [Bucket]),
+    logger:info("doing 2 consistent puts on A, bucket:~p", [Bucket]),
     ok = riakc_pb_socket:put(PBA, Obj1),
     ok = riakc_pb_socket:put(PBA, Obj2),
 
@@ -60,7 +60,7 @@ confirm() ->
     rt:wait_until_ring_converged(ANodes),
 
     {Time, _} = timer:tc(repl_util, start_and_wait_until_fullsync_complete, [LeaderA]),
-    lager:info("Fullsync completed in ~p seconds", [Time/1000/1000]),
+    logger:info("Fullsync completed in ~p seconds", [Time/1000/1000]),
 
     %% Attempt to read the objects from cluster B to verify they have
     %% not been replicated via realtime replication
@@ -78,7 +78,7 @@ confirm() ->
 connect_clusters(LeaderA, LeaderB) ->
     {ok, {_IP, Port}} = rpc:call(LeaderB, application, get_env,
                                  [riak_core, cluster_mgr]),
-    lager:info("connect cluster A:~p to B on port ~p", [LeaderA, Port]),
+    logger:info("connect cluster A:~p to B on port ~p", [LeaderA, Port]),
     repl_util:connect_cluster(LeaderA, "127.0.0.1", Port),
     ?assertEqual(ok, repl_util:wait_for_connection(LeaderA, "B")).
 
@@ -89,7 +89,7 @@ make_clusters() ->
     ClusterASize = rt_config:get(cluster_a_size, 3),
     NVal = 5,
 
-    lager:info("Deploy ~p nodes", [NumNodes]),
+    logger:info("Deploy ~p nodes", [NumNodes]),
     Conf = ensemble_util:fast_config(NVal) ++
         [
          {riak_repl,
@@ -105,27 +105,27 @@ make_clusters() ->
 
     Nodes = rt:deploy_nodes(NumNodes, Conf, [riak_kv, riak_repl]),
     {ANodes, BNodes} = lists:split(ClusterASize, Nodes),
-    lager:info("ANodes: ~p", [ANodes]),
-    lager:info("BNodes: ~p", [BNodes]),
+    logger:info("ANodes: ~p", [ANodes]),
+    logger:info("BNodes: ~p", [BNodes]),
 
     AFirst = hd(ANodes),
     BFirst = hd(BNodes),
 
-    lager:info("Build cluster A"),
+    logger:info("Build cluster A"),
     repl_util:make_cluster(ANodes),
 
-    lager:info("Build cluster B"),
+    logger:info("Build cluster B"),
     repl_util:make_cluster(BNodes),
 
     ensemble_util:wait_until_stable(AFirst, NVal),
     ensemble_util:wait_until_stable(BFirst, NVal),
 
     %% get the leader for the first cluster
-    lager:info("waiting for leader to converge on cluster A"),
+    logger:info("waiting for leader to converge on cluster A"),
     ?assertEqual(ok, repl_util:wait_until_leader_converge(ANodes)),
 
     %% get the leader for the second cluster
-    lager:info("waiting for leader to converge on cluster B"),
+    logger:info("waiting for leader to converge on cluster B"),
     ?assertEqual(ok, repl_util:wait_until_leader_converge(BNodes)),
 
     %% Name the clusters

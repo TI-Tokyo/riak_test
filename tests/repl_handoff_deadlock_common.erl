@@ -58,7 +58,7 @@
 confirm(Strategy) ->
 
     inets:start(),
-    lager:info("Testing fullsync handoff deadlock with strategy ~p~n", [Strategy]),
+    logger:info("Testing fullsync handoff deadlock with strategy ~p~n", [Strategy]),
     {ClusterA, ClusterB} = make_clusters(Strategy),
 
     %% Simulate stop of 1/10th of vnodes before fold begins to provoke deadlock
@@ -111,7 +111,7 @@ verify_data({Client, Node}, Count) ->
 
 %% Set up bi-directional full sync replication.
 repl_power_activate(ClusterA, ClusterB) ->
-    lager:info("repl power...ACTIVATE!"),
+    logger:info("repl power...ACTIVATE!"),
     LeaderA = get_leader(hd(ClusterA)),
     info("got leader A"),
     LeaderB = get_leader(hd(ClusterB)),
@@ -148,4 +148,4 @@ get_mgr_port({_, Node}) ->
     Port.
 
 info(Message) ->
-    lager:info(Message).
+    logger:info(Message).

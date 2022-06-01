@@ -32,7 +32,7 @@ confirm() ->
     Cluster = [Node| _ ] = rt:build_cluster(lists:duplicate(?CLUSTER_SIZE, {lts, ?CONFIG})),
     Clients = [rt:pbc(N) || N <- Cluster],
 
-    lager:info("Writing ~p keys", [?NUM_KEYS]),
+    logger:info("Writing ~p keys", [?NUM_KEYS]),
     rt:systest_write(Node, ?NUM_KEYS, ?BUCKET),
 
     Before = count_keys(Clients, ?BUCKET),
@@ -52,9 +52,9 @@ count_keys(Client, Bucket) ->
     length(Keys).
 
 perform_upgrade(Node, Version) ->
-    lager:info("Upgrading node ~p", [Node]),
+    logger:info("Upgrading node ~p", [Node]),
     rt:upgrade(Node, Version),
-    lager:info("Upgrade finished on node ~p", [Node]),
+    logger:info("Upgrade finished on node ~p", [Node]),
     rt:wait_for_service(Node, riak_kv).
 perform_upgrade(Cluster, Version, TakeN) ->
     lists:foreach(fun(Node) -> perform_upgrade(Node, Version) end,

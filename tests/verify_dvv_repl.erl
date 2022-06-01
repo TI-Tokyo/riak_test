@@ -65,7 +65,7 @@ confirm() ->
     %% different nodes concurrently in the n_val=3 preflist.
     ?assertMatch(Count when Count =< 3, riakc_obj:value_count(AObj)),
     WaitFun = fun() ->
-                      lager:info("Checking sink object"),
+                      logger:info("Checking sink object"),
                       BObj = get_object(ClientB),
                       Resolved0 = resolve(riakc_obj:get_values(BObj)),
                       Resolved = lists:sort(sets:to_list(Resolved0)),
@@ -153,7 +153,7 @@ resolve_update(Values) ->
 
 %% Set up one way RT repl
 connect_realtime(ClusterA, ClusterB) ->
-    lager:info("repl power...ACTIVATE!"),
+    logger:info("repl power...ACTIVATE!"),
     LeaderA = get_leader(hd(ClusterA)),
     MgrPortB = get_mgr_port(hd(ClusterB)),
     repl_util:connect_cluster(LeaderA, "127.0.0.1", MgrPortB),

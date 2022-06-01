@@ -101,7 +101,7 @@ kill_leaders(Node, Ensembles) ->
     ok.
 
 wait_until_cluster(Nodes) ->
-    lager:info("Waiting until riak_ensemble cluster includes all nodes"),
+    logger:info("Waiting until riak_ensemble cluster includes all nodes"),
     Node = hd(Nodes),
     F = fun() ->
                 case rpc:call(Node, riak_ensemble_manager, cluster, []) of
@@ -112,18 +112,18 @@ wait_until_cluster(Nodes) ->
                 end
         end,
     ?assertEqual(ok, rt:wait_until(F)),
-    lager:info("....cluster ready"),
+    logger:info("....cluster ready"),
     ok.
 
 wait_until_stable(Node, Count) ->
-    lager:info("Waiting until all ensembles are stable"),
+    logger:info("Waiting until all ensembles are stable"),
     Ensembles = rpc:call(Node, riak_kv_ensembles, ensembles, []),
     wait_until_quorum(Node, root),
     [wait_until_quorum(Node, Ensemble) || Ensemble <- Ensembles],
-    lager:info("All ensembles have quorum"),
+    logger:info("All ensembles have quorum"),
     [wait_until_quorum_count(Node, Ensemble, Count) || Ensemble <- Ensembles],
-    lager:info("All ensembles have quorum count ~w confirmed", [Count]),
-    lager:info("....all stable"),
+    logger:info("All ensembles have quorum count ~w confirmed", [Count]),
+    logger:info("....all stable"),
     ok.
 
 wait_until_quorum(Node, Ensemble) ->
@@ -133,7 +133,7 @@ wait_until_quorum(Node, Ensemble) ->
                     true ->
                         true;
                     false ->
-                        lager:info("Quorum not ready: ~p", [Ensemble]),
+                        logger:info("Quorum not ready: ~p", [Ensemble]),
                         false
                 end
         end,
@@ -146,14 +146,14 @@ wait_until_quorum_count(Node, Ensemble, Want) ->
                     Count when Count >= Want ->
                         true;
                     Count ->
-                        lager:info("Count: ~p :: ~p < ~p", [Ensemble, Count, Want]),
+                        logger:info("Count: ~p :: ~p < ~p", [Ensemble, Count, Want]),
                         false
                 end
         end,
     ?assertEqual(ok, rt:wait_until(F)).
 
 wait_for_membership(Node) ->
-    lager:info("Waiting until ensemble membership matches ring ownership"),
+    logger:info("Waiting until ensemble membership matches ring ownership"),
     F = fun() ->
                 case rpc:call(Node, riak_kv_ensembles, check_membership, []) of
                     Results when is_list(Results) ->
@@ -163,5 +163,5 @@ wait_for_membership(Node) ->
                 end
         end,
     ?assertEqual(ok, rt:wait_until(F)),
-    lager:info("....ownership matches"),
+    logger:info("....ownership matches"),
     ok.

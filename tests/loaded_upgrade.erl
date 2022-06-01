@@ -61,7 +61,7 @@ confirm() ->
 
     [begin
          exit(Sup, normal),
-         lager:info("Upgrading ~p", [Node]),
+         logger:info("Upgrading ~p", [Node]),
          rt:upgrade(Node, current),
          rt:wait_for_service(Node, [riak_kv, riak_pipe]),
          {ok, NewSup} = rt_worker_sup:start_link([{concurrent, Concurrent},
@@ -90,7 +90,7 @@ upgrade_recv_loop(EndTime) ->
     Now = os:timestamp(),
     case Now > EndTime of
         true ->
-            lager:info("Done waiting 'cause ~p > ~p", [Now, EndTime]);
+            logger:info("Done waiting 'cause ~p > ~p", [Now, EndTime]);
         _ ->
             receive
                 {mapred, Node, bad_result} ->
@@ -102,18 +102,18 @@ upgrade_recv_loop(EndTime) ->
                 {listkeys, Node, not_equal} ->
                     {listkeys_not_equal, Node};
                 Msg ->
-                    lager:debug("Received Mesg ~p", [Msg]),
+                    logger:debug("Received Mesg ~p", [Msg]),
                     upgrade_recv_loop(EndTime)
             after timer:now_diff(EndTime, Now) div 1000 ->
-                    lager:info("Done waiting 'cause ~p is up", [?TIME_BETWEEN_UPGRADES])
+                    logger:info("Done waiting 'cause ~p is up", [?TIME_BETWEEN_UPGRADES])
             end
     end.
 
 seed_cluster(_Nodes=[Node1|_]) ->
-    lager:info("Seeding Cluster"),
+    logger:info("Seeding Cluster"),
 
     %% For List Keys
-    lager:info("Writing 100 keys to ~p", [Node1]),
+    logger:info("Writing 100 keys to ~p", [Node1]),
     rt:systest_write(Node1, 100, 3),
     ?assertEqual([], rt:systest_read(Node1, 100, 1)),
 
@@ -193,7 +193,7 @@ init_node_monitor(Node, Sup, TestProc) ->
     spawn_link(fun() -> node_monitor(Node, Sup, TestProc) end).
 
 node_monitor(Node, Sup, TestProc) ->
-    lager:info("Monitoring node ~p to make sure it stays up.", [Node]),
+    logger:info("Monitoring node ~p to make sure it stays up.", [Node]),
     erlang:process_flag(trap_exit, true),
     erlang:monitor_node(Node, true),
     node_monitor_loop(Node, Sup, TestProc).
@@ -201,13 +201,13 @@ node_monitor(Node, Sup, TestProc) ->
 node_monitor_loop(Node, Sup, TestProc) ->
     receive
         {nodedown, Node} ->
-            lager:error("Node ~p exited after upgrade!", [Node]),
+            logger:error("Node ~p exited after upgrade!", [Node]),
             exit(Sup, normal),
             ?assertEqual(nodeup, {nodedown, Node});
         {'EXIT', TestProc, _} ->
             erlang:monitor_node(Node, false),
             ok;
         Other ->
-            lager:warn("Node monitor for ~p got unknown message ~p", [Node, Other]),
+            logger:warn("Node monitor for ~p got unknown message ~p", [Node, Other]),
             node_monitor_loop(Node, Sup, TestProc)
     end.

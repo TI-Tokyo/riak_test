@@ -14,7 +14,7 @@ confirm() ->
     SinkPort = repl_util:get_cluster_mgr_port(SinkLead),
     repl_util:connect_cluster(SrcLead, "127.0.0.1", SinkPort),
 
-    lager:info("Loading source cluster"),
+    logger:info("Loading source cluster"),
     [] = repl_util:do_write(SrcLead, 1, 1000, ?TEST_BUCKET, 1),
 
     repl_util:enable_fullsync(SrcLead, "sink"),
@@ -24,7 +24,7 @@ confirm() ->
     % find a random fssource, suspend it, and then ensure we can get a
     % status.
     {ok, Suspended} = suspend_an_fs_source(SrcCluster),
-    lager:info("Suspended: ~p", [Suspended]),
+    logger:info("Suspended: ~p", [Suspended]),
     {ok, Status} = rt:riak_repl(SrcLead, "status"),
     FailLine = "RPC to '" ++ atom_to_list(SrcLead) ++ "' failed: timeout\n",
     ?assertNotEqual(FailLine, Status),
@@ -37,15 +37,15 @@ setup() ->
     rt:set_conf(all, [{"buckets.default.allow_mult", "false"}]),
     NodeCount = rt_config:get(num_nodes, 6),
 
-    lager:info("Deploy ~p nodes", [NodeCount]),
+    logger:info("Deploy ~p nodes", [NodeCount]),
     Nodes = rt:deploy_nodes(NodeCount, cluster_conf(), [riak_kv, riak_repl]),
     SplitSize = NodeCount div 2,
     {SourceNodes, SinkNodes} = lists:split(SplitSize, Nodes),
 
-    lager:info("making cluster Source from ~p", [SourceNodes]),
+    logger:info("making cluster Source from ~p", [SourceNodes]),
     repl_util:make_cluster(SourceNodes),
 
-    lager:info("making cluster Sink from ~p", [SinkNodes]),
+    logger:info("making cluster Sink from ~p", [SinkNodes]),
     repl_util:make_cluster(SinkNodes),
 
     SrcHead = hd(SourceNodes),

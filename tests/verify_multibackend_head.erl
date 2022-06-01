@@ -35,8 +35,8 @@
        ).
 
 confirm() ->
-    lager:info("Overriding backend set in configuration"),
-    lager:info("Multi backend with default settings (rt) to be used"),
+    logger:info("Overriding backend set in configuration"),
+    logger:info("Multi backend with default settings (rt) to be used"),
 
     {BackendRef, HeadSupport} = get_backendref(),
 
@@ -48,7 +48,7 @@ confirm() ->
     C = rt:httpc(Node1),
     PBC = rt:pbc(Node1),
 
-    lager:info("Setting up a bucket type to use backend and test"),
+    logger:info("Setting up a bucket type to use backend and test"),
     Type = <<"backend">>,
     TypedBucket = <<"TB0">>,
     UnTypedBucket = <<"B0">>,
@@ -58,7 +58,7 @@ confirm() ->
     rt:wait_until_bucket_props([Node1], {Type, TypedBucket}, BucketProps),
     rt:pbc_set_bucket_prop(PBC, UnTypedBucket, BucketProps),
     rt:wait_until_bucket_props([Node1], UnTypedBucket, BucketProps),
-    lager:info("Backend now setup for typed and untyped"),
+    logger:info("Backend now setup for typed and untyped"),
 
     [rt:httpc_write(C, {Type, TypedBucket}, <<X>>, <<"sample_value">>)
         || X <- lists:seq(1, 3)],
@@ -109,7 +109,7 @@ confirm() ->
 
 get_backendref() ->
     Backend = proplists:get_value(backend, riak_test_runner:metadata()),
-    lager:info("Running with backend ~p", [Backend]),
+    logger:info("Running with backend ~p", [Backend]),
     {get_backendref(Backend), Backend == leveled}.
 
 get_backendref(eleveldb) ->
@@ -126,16 +126,16 @@ verify_inc(Prev, Props, Keys) ->
     [begin
          Old = proplists:get_value(Key, Prev, 0),
          New = proplists:get_value(Key, Props, 0),
-         lager:info("~s: ~p -> ~p (expected ~p)", [Key, Old, New, Old + Inc]),
+         logger:info("~s: ~p -> ~p (expected ~p)", [Key, Old, New, Old + Inc]),
          ?assertEqual(New, (Old + Inc))
      end || {Key, Inc} <- Keys].
 
 get_stats(Node) ->
     timer:sleep(2000),
-    lager:info("Retrieving stats from node ~s", [Node]),
+    logger:info("Retrieving stats from node ~s", [Node]),
     StatsCommand = io_lib:format("curl -s -S ~s/stats", [rt:http_url(Node)]),
-    lager:debug("Retrieving stats using command ~s", [StatsCommand]),
+    logger:debug("Retrieving stats using command ~s", [StatsCommand]),
     StatString = os:cmd(StatsCommand),
     {struct, Stats} = mochijson2:decode(StatString),
-    %%lager:debug(StatString),
+    %%logger:debug(StatString),
     Stats.

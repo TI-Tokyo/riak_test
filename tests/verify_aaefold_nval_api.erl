@@ -74,7 +74,7 @@
 -define(DELTA_COUNT, 10).
 
 confirm() ->
-    lager:info("Testing without rebuilds - using http api"),
+    logger:info("Testing without rebuilds - using http api"),
     Nodes0 = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD),
     ClientHeadHTTP = rt:httpc(hd(Nodes0)),
     ClientTailHTTP = rt:httpc(lists:last(Nodes0)),
@@ -83,8 +83,8 @@ confirm() ->
     rt:clean_cluster(Nodes0),
 
     Nodes1 = rt:build_cluster(?NUM_NODES, ?CFG_REBUILD),
-    lager:info("Sleeping for twice rebuild tick - testing with rebuilds ongoing"),
-    lager:info("Testing this time with PB API"),
+    logger:info("Sleeping for twice rebuild tick - testing with rebuilds ongoing"),
+    logger:info("Testing this time with PB API"),
     timer:sleep(2 * ?REBUILD_TICK),
     ClientHeadPB = rt:pbc(hd(Nodes1)),
     ClientTailPB = rt:pbc(lists:last(Nodes1)),
@@ -95,11 +95,11 @@ confirm() ->
 
 verify_aae_fold(Nodes, Mod, CH, CT) ->
 
-    lager:info("Fold for empty root"),
+    logger:info("Fold for empty root"),
     {ok, {root, RH0}} = Mod:aae_merge_root(CH, ?N_VAL),
     {ok, {root, RT0}} = Mod:aae_merge_root(CT, ?N_VAL),
 
-    lager:info("Commencing object load"),
+    logger:info("Commencing object load"),
     KeyLoadFun =
         fun(Node, KeyCount) ->
             KVs = test_data(KeyCount + 1,
@@ -110,22 +110,22 @@ verify_aae_fold(Nodes, Mod, CH, CT) ->
         end,
 
     lists:foldl(KeyLoadFun, 1, Nodes),
-    lager:info("Loaded ~w objects", [?NUM_KEYS_PERNODE * length(Nodes)]),
+    logger:info("Loaded ~w objects", [?NUM_KEYS_PERNODE * length(Nodes)]),
     wait_until_root_stable(Mod, CH),
     wait_until_root_stable(Mod, CT),
 
-    lager:info("Fold for busy root"),
+    logger:info("Fold for busy root"),
     {ok, {root, RH1}} = Mod:aae_merge_root(CH, ?N_VAL),
     {ok, {root, RT1}} = Mod:aae_merge_root(CT, ?N_VAL),
 
-    lager:info("Dirty segments ~w",
+    logger:info("Dirty segments ~w",
         [leveled_tictac:find_dirtysegments(RH1, RT1)]),
     
     ?assertMatch(true, RH1 == RT1),
     ?assertMatch(true, RH0 == RT0),
     ?assertMatch(false, RH0 == RH1),
 
-    lager:info("Make ~w changes", [?DELTA_COUNT]),
+    logger:info("Make ~w changes", [?DELTA_COUNT]),
     Changes2 = test_data(1, ?DELTA_COUNT, list_to_binary("U2")),
     ok = write_data(hd(Nodes), Changes2),
 
@@ -134,7 +134,7 @@ verify_aae_fold(Nodes, Mod, CH, CT) ->
     {ok, {root, RH2}} = Mod:aae_merge_root(CH, ?N_VAL),
     DirtyBranches2 = aae_exchange:compare_roots(RH1, RH2),
 
-    lager:info("Found branch deltas ~w", [DirtyBranches2]),
+    logger:info("Found branch deltas ~w", [DirtyBranches2]),
     
     ?assertMatch(true, length(DirtyBranches2) > 0),
     ?assertMatch(true, length(DirtyBranches2) =< ?DELTA_COUNT),
@@ -142,7 +142,7 @@ verify_aae_fold(Nodes, Mod, CH, CT) ->
     {ok, {branches, BH2}} =
         Mod:aae_merge_branches(CH, ?N_VAL, DirtyBranches2),
 
-    lager:info("Make ~w changes to same keys", [?DELTA_COUNT]),
+    logger:info("Make ~w changes to same keys", [?DELTA_COUNT]),
     Changes3 = test_data(1, ?DELTA_COUNT, list_to_binary("U3")),
     ok = write_data(hd(Nodes), Changes3),
     
@@ -151,25 +151,25 @@ verify_aae_fold(Nodes, Mod, CH, CT) ->
     {ok, {root, RH3}} = Mod:aae_merge_root(CH, ?N_VAL),
     DirtyBranches3 = aae_exchange:compare_roots(RH2, RH3),
 
-    lager:info("Found ~w branch deltas", [length(DirtyBranches3)]),
+    logger:info("Found ~w branch deltas", [length(DirtyBranches3)]),
     ?assertMatch(true, DirtyBranches2 == DirtyBranches3),
 
     {ok, {branches, BH3}} =
         Mod:aae_merge_branches(CH, ?N_VAL, DirtyBranches3),
 
     DirtySegments1 = aae_exchange:compare_branches(BH2, BH3),
-    lager:info("Found ~w mismatched segments", [length(DirtySegments1)]),
+    logger:info("Found ~w mismatched segments", [length(DirtySegments1)]),
     ?assertMatch(true, length(DirtySegments1) > 0),
     ?assertMatch(true, length(DirtySegments1) =< ?DELTA_COUNT),
 
     {ok, {keysclocks, KCL1}} =
         Mod:aae_fetch_clocks(CH, ?N_VAL, DirtySegments1),
 
-    lager:info("Found ~w mismatched keys", [length(KCL1)]),
+    logger:info("Found ~w mismatched keys", [length(KCL1)]),
 
     ?assertMatch(true, length(KCL1) >= ?DELTA_COUNT),
 
-    lager:info("Checking all mismatched keys in result"),
+    logger:info("Checking all mismatched keys in result"),
     MatchFun =
         fun(I) ->
                 K = to_key(I),
@@ -179,7 +179,7 @@ verify_aae_fold(Nodes, Mod, CH, CT) ->
         end,
     lists:foreach(MatchFun, lists:seq(1, ?DELTA_COUNT)),
 
-    lager:info("Stopping a node - query results should be unchanged"),
+    logger:info("Stopping a node - query results should be unchanged"),
     rt:stop_and_wait(hd(tl(Nodes))),
     {ok, {branches, BH4}} =
         Mod:aae_merge_branches(CH, ?N_VAL, DirtyBranches3),
@@ -225,12 +225,12 @@ wait_until_root_stable(Mod, Client) ->
     {ok, {root, RH1}} = Mod:aae_merge_root(Client, ?N_VAL),
     case aae_exchange:compare_roots(RH0, RH1) of
         [] ->
-            lager:info("Root appears stable matched");
+            logger:info("Root appears stable matched");
         [L] ->
             Pre = L * 4,
             <<_B0:Pre/binary, V0:32/integer, _Post0/binary>> = RH0,
             <<_B1:Pre/binary, V1:32/integer, _Post1/binary>> = RH1,
-            lager:info("Root not stable: branch ~w compares ~w with ~w",
+            logger:info("Root not stable: branch ~w compares ~w with ~w",
                         [L, V0, V1]),
             wait_until_root_stable(Mod, Client)
     end.

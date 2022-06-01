@@ -53,16 +53,16 @@
 
 confirm() ->
 
-    lager:info("Testing AAE bucket list - key-ordered parallel store"),
+    logger:info("Testing AAE bucket list - key-ordered parallel store"),
     Cko = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD(leveled_ko)),
     ok = verify_list_buckets(Cko, ?NUM_KEYS),
 
     rt:clean_cluster(Cko),
 
-    lager:info("Testing AAE bucket list - segment-ordered parallel store"),
-    lager:info("This is a repeat test if backend is leveled"),
+    logger:info("Testing AAE bucket list - segment-ordered parallel store"),
+    logger:info("This is a repeat test if backend is leveled"),
     Cso = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD(leveled_so)),
-    lager:info("Testing with less keys as segment-ordered"),
+    logger:info("Testing with less keys as segment-ordered"),
     ok = verify_list_buckets(Cso, ?NUM_KEYS div 10),
 
 
@@ -102,10 +102,10 @@ verify_list_buckets(Nodes, KeyCount) ->
     {TS1, {ok, BL}} =
         timer:tc(ModP, aae_list_buckets, [ClientP, ?DEFAULT_RING_SIZE]),
 
-    lager:info("List bucket queries took ~w ms (nv=1) and ~w ms (nv=8)",
+    logger:info("List bucket queries took ~w ms (nv=1) and ~w ms (nv=8)",
                 [TS0/1000, TS1/1000]),
 
-    lager:info("Testing with HTTP client"),
+    logger:info("Testing with HTTP client"),
     {ok, BL} = ModH:aae_list_buckets(ClientH),
     {ok, BL} = ModH:aae_list_buckets(ClientH, ?DEFAULT_RING_SIZE),
 

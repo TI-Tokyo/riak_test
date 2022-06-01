@@ -90,7 +90,7 @@ make_clusters(UnNormalClusterConfs) ->
                                      ConfAcc ++ AddToAcc
                              end, [], ClusterConfs),
     Nodes = rt:deploy_nodes(DeployList),
-    lager:info("nodes deployed: ~p", [Nodes]),
+    logger:info("nodes deployed: ~p", [Nodes]),
     {NamesAndNodes, []} = lists:foldl(fun
                                           ({Name, Size, _ConnectTo}, {Clusters, NodesLeft}) ->
                                               {ForCluster, NewNodesLeft} = lists:split(Size, NodesLeft),
@@ -222,13 +222,13 @@ write_n_keys(Source, Destination, TestBucket, M, N) ->
     Last = N,
 
     %% Write some objects to the source cluster (A),
-    lager:info("Writing ~p keys to ~p, which should RT repl to ~p",
+    logger:info("Writing ~p keys to ~p, which should RT repl to ~p",
         [Last-First+1, Source, Destination]),
-    lager:debug("Writing to bucket ~p", [TestBucket]),
+    logger:debug("Writing to bucket ~p", [TestBucket]),
     ?assertEqual([], repl_util:do_write(Source, First, Last, TestBucket, 2)),
 
     %% verify data is replicated to B
-    lager:info("Reading ~p keys written from ~p", [Last-First+1, Destination]),
+    logger:info("Reading ~p keys written from ~p", [Last-First+1, Destination]),
     ?assertEqual(0, repl_util:wait_for_reads(Destination, First, Last, TestBucket, 2)).
 
 generate_test_bucket() ->

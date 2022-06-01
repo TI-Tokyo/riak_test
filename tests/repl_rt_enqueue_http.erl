@@ -40,7 +40,7 @@
 confirm() ->
     NumNodes = rt_config:get(num_nodes, 6),
 
-    lager:info("Deploy ~p nodes", [NumNodes]),
+    logger:info("Deploy ~p nodes", [NumNodes]),
     Conf = [
             {riak_repl,
              [
@@ -53,27 +53,27 @@ confirm() ->
     Nodes = rt:deploy_nodes(NumNodes, Conf, [riak_kv, riak_repl]),
     {ANodes, BNodes} = lists:split(3, Nodes),
 
-    lager:info("ANodes: ~p", [ANodes]),
-    lager:info("BNodes: ~p", [BNodes]),
+    logger:info("ANodes: ~p", [ANodes]),
+    logger:info("BNodes: ~p", [BNodes]),
 
-    lager:info("Build cluster A"),
+    logger:info("Build cluster A"),
     repl_util:make_cluster(ANodes),
 
-    lager:info("Build cluster B"),
+    logger:info("Build cluster B"),
     repl_util:make_cluster(BNodes),
 
-    lager:info("waiting for leader to converge on cluster A"),
+    logger:info("waiting for leader to converge on cluster A"),
     ?assertEqual(ok, repl_util:wait_until_leader_converge(ANodes)),
     AFirst = hd(ANodes),
 
-    lager:info("waiting for leader to converge on cluster B"),
+    logger:info("waiting for leader to converge on cluster B"),
     ?assertEqual(ok, repl_util:wait_until_leader_converge(BNodes)),
     BFirst = hd(BNodes),
 
-    lager:info("Naming A"),
+    logger:info("Naming A"),
     repl_util:name_cluster(AFirst, "A"),
 
-    lager:info("Naming B"),
+    logger:info("Naming B"),
     repl_util:name_cluster(BFirst, "B"),
 
     %% create bucket types on both cluster
@@ -102,7 +102,7 @@ run_test_for_buckets(Buckets, ANodes, BNodes) ->
     %% DO the test, for each bucket(type)
     [
      begin
-         lager:info("RTE tests for ~p", [Bucket]),
+         logger:info("RTE tests for ~p", [Bucket]),
          %% write new key to A
          Obj3 = riak_object:new(Bucket, ?KEY((Last+1)), ?VAL((Last+1))),
          WriteRes3 = riak_client:put(Obj3, [{w, 2}], CA),
@@ -116,7 +116,7 @@ run_test_for_buckets(Buckets, ANodes, BNodes) ->
                                                         ?KEY((Last+1)),
                                                         [{r, 3}],
                                                         CB),
-                                   lager:info("waiting for 'realtime repl' to repl"),
+                                   logger:info("waiting for 'realtime repl' to repl"),
                                    BReadRes3 == ok
                            end, 10, 200),
          ?assertEqual(ok, ReplRead),
@@ -136,7 +136,7 @@ run_test_for_buckets(Buckets, ANodes, BNodes) ->
                                                         ?KEY(First),
                                                         [],
                                                         CB),
-                                   lager:info("waiting for touch to repl"),
+                                   logger:info("waiting for touch to repl"),
                                    BReReadResPresent == ok
                            end, 10, 200),
          ?assertEqual(ok, TouchRead),
@@ -152,7 +152,7 @@ run_test_for_buckets(Buckets, ANodes, BNodes) ->
                                                         ?KEY((First+1)),
                                                         [],
                                                         CB),
-                                   lager:info("waiting for touch to repl"),
+                                   logger:info("waiting for touch to repl"),
                                    BReReadResPresent == ok
                            end, 10, 200),
          ?assertEqual(ok, TouchRead2),
@@ -168,7 +168,7 @@ run_test_for_buckets(Buckets, ANodes, BNodes) ->
                                                         ?KEY((First+9)),
                                                         [],
                                                         CB),
-                                   lager:info("waiting for touch to repl"),
+                                   logger:info("waiting for touch to repl"),
                                    BReReadResPresent == ok
                            end, 10, 200),
          ?assertEqual(ok, TouchRead3),
@@ -184,13 +184,13 @@ run_test_for_buckets(Buckets, ANodes, BNodes) ->
 connect_clusters(LeaderA, LeaderB) ->
     {ok, {_IP, Port}} = rpc:call(LeaderB, application, get_env,
                                  [riak_core, cluster_mgr]),
-    lager:info("Connect cluster A:~p to B on port ~p", [LeaderA, Port]),
+    logger:info("Connect cluster A:~p to B on port ~p", [LeaderA, Port]),
     repl_util:connect_cluster(LeaderA, "127.0.0.1", Port).
 
 %% @doc Turn on Realtime replication on the cluster lead by LeaderA.
 %%      The clusters must already have been named and connected.
 enable_rt(LeaderA, ANodes) ->
-    lager:info("Enabling RT replication: ~p ~p.", [LeaderA, ANodes]),
+    logger:info("Enabling RT replication: ~p ~p.", [LeaderA, ANodes]),
     repl_util:enable_realtime(LeaderA, "B"),
     repl_util:start_realtime(LeaderA, "B").
 
@@ -201,13 +201,13 @@ assertAllNotFound(RTSysTestReadRes, Start, End) ->
 
 
 create_bucket_type(ANodes, BNodes) ->
-    lager:info("creating bucket type ~p", [?TEST_BUCKET_TYPE]),
+    logger:info("creating bucket type ~p", [?TEST_BUCKET_TYPE]),
     create_bucket_type(ANodes),
     create_bucket_type(BNodes).
-    %% lager:info("stopping all nodes, for bucket fixups to do the magics"),
+    %% logger:info("stopping all nodes, for bucket fixups to do the magics"),
     %% [rt:stop_and_wait(Node)  || Node <- ANodes ++ BNodes],
     %% [rt:start_and_wait(Node) || Node <- ANodes ++ BNodes],
-    %% lager:info("re-startng all nodes, for bucket fixups to do the magics").
+    %% logger:info("re-startng all nodes, for bucket fixups to do the magics").
 
 create_bucket_type(Cluster) ->
     %% NOTE: the riak repl bucket fixups are _only_ run when the
@@ -222,7 +222,7 @@ create_bucket_type(Cluster) ->
 
 set_up_data(Buckets, _KeyRange={First, Last}, AFirst, BFirst, HTTPCA) ->
     [begin
-         lager:info("Setting up data for ~p", [Bucket]),
+         logger:info("Setting up data for ~p", [Bucket]),
          %% write a bunch of keys to A
          WriteRes = rt:systest_write(AFirst, First, Last, Bucket, 2),
          ?assertEqual([], WriteRes),

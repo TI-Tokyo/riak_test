@@ -59,6 +59,7 @@ run_tests(PvalP1, PvalP2) ->
                   ?PKEY_P1, ?PKEY_P2, ?PKEY_P3,
                   ?PKEY_P1, ?PKEY_P2, ?PKEY_P3,
                   ?PKEY_P1, ?PKEY_P2, ?PKEY_P3]),
+    io:format("Crearing table: ~s", [TableDef]),
     ?assertEqual({ok, {[], []}}, riakc_ts:query(rt:pbc(hd(Cluster)), TableDef)),
 
     %% Make sure data is written to each node

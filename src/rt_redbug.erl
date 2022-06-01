@@ -41,9 +41,9 @@ set_tracing_applied(TracingApplied) when is_boolean(TracingApplied) ->
     end,
     case Enabled of
         true ->
-            lager:warning("Will enable any redbug traces contained in the test");
+            logger:warning("Will enable any redbug traces contained in the test");
         _ ->
-            lager:warning("Will not enable any redbug traces contained in the test")
+            logger:warning("Will not enable any redbug traces contained in the test")
     end,
     rt_config:set(apply_traces, Enabled).
 

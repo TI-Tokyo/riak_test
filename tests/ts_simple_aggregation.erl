@@ -61,13 +61,13 @@ verify_aggregation(ClusterType) ->
     end,
 
     DDL = ts_data:get_ddl(aggregation),
-    lager:info("DDL is ~p", [DDL]),
+    logger:info("DDL is ~p", [DDL]),
 
     Cluster = ts_setup:start_cluster(Size),
     Conn = ts_setup:conn(Cluster),
     Count = 10,
     Data = ts_data:get_valid_aggregation_data(Count),
-    lager:info("Data is ~p", [Data]),
+    logger:info("Data is ~p", [Data]),
     Column4 = [element(?TEMPERATURE_COL_INDEX, X) || X <- Data],
     Column5 = [element(?PRESSURE_COL_INDEX, X) || X <- Data],
     Column6 = [element(?PRECIPITATION_COL_INDEX, X) || X <- Data],

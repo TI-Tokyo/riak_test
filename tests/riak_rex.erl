@@ -41,9 +41,9 @@ deploy_node(_, mixed) ->
 deploy_node(Type) ->
     NumNodes = rt_config:get(num_nodes, 1),
 
-    lager:info("Deploy ~p node", [NumNodes]),
+    logger:info("Deploy ~p node", [NumNodes]),
     Node = deploy_node(NumNodes, Type),
-    lager:info("Node: ~p", [Node]),
+    logger:info("Node: ~p", [Node]),
     hd(Node).
 
 kill_rex(Node) ->

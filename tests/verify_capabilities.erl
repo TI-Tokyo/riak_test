@@ -28,7 +28,7 @@ confirm() ->
     %% Allow listing of buckets and keys for testing
     application:set_env(riakc, allow_listing, true),
 
-    lager:info("Deploying mixed set of nodes"),
+    logger:info("Deploying mixed set of nodes"),
     Legacy = case lists:member(legacy, rt:versions()) of
         true -> legacy;
         _ -> current
@@ -37,8 +37,8 @@ confirm() ->
     Nodes = rt:deploy_nodes([current, previous, Legacy]),
     [CNode, PNode, LNode] = Nodes,
 
-    lager:info("Verifying known capabilities on a Current 1-node cluster"),
-    lager:info("Verify staged_joins == true"),
+    logger:info("Verifying known capabilities on a Current 1-node cluster"),
+    logger:info("Verify staged_joins == true"),
     ?assertEqual(ok, rt:wait_until_capability(CNode, {riak_core, staged_joins}, true)),
 
     CCapabilities = rt:capability(CNode, all),
@@ -65,13 +65,13 @@ confirm() ->
     %% We've got a current-version node only, we should see raw selected as default:
     assert_using(CNode, {riak_kv, handoff_data_encoding}, encode_raw),
 
-    lager:info("Crash riak_core_capability server"),
+    logger:info("Crash riak_core_capability server"),
     restart_capability_server(CNode),
 
-    lager:info("Verify staged_joins == true after crash"),
+    logger:info("Verify staged_joins == true after crash"),
     ?assertEqual(ok, rt:wait_until_capability(CNode, {riak_core, staged_joins}, true)),
 
-    lager:info("Building current + ~s cluster", [Legacy]),
+    logger:info("Building current + ~s cluster", [Legacy]),
     rt:join(LNode, CNode),
     ?assertEqual(ok, rt:wait_until_all_members([CNode], [CNode, LNode])),
     ?assertEqual(ok, rt:wait_until_legacy_ringready(CNode)),
@@ -101,10 +101,10 @@ confirm() ->
             %% We've added a legacy server: we should see zlib selected by the current-version node:
             assert_using(CNode, {riak_kv, handoff_data_encoding}, encode_zlib),
 
-            lager:info("Crash riak_core_capability server"),
+            logger:info("Crash riak_core_capability server"),
             restart_capability_server(CNode),
 
-            lager:info("Adding previous node to cluster"),
+            logger:info("Adding previous node to cluster"),
             rt:join(PNode, LNode),
             ?assertEqual(ok, rt:wait_until_all_members([CNode], [CNode, LNode, PNode])),
             ?assertEqual(ok, rt:wait_until_legacy_ringready(CNode)),
@@ -132,7 +132,7 @@ confirm() ->
             %% We've added a previous version (1.2) we should (still) see zlib selected:
             assert_using(CNode, {riak_kv, handoff_data_encoding}, encode_zlib),
 
-            lager:info("Upgrade Legacy node"),
+            logger:info("Upgrade Legacy node"),
             rt:upgrade(LNode, current),
             ?assertEqual(ok, rt:wait_until_all_members([CNode], [CNode, LNode, PNode])),
             ?assertEqual(ok, rt:wait_until_legacy_ringready(CNode)),
@@ -140,8 +140,8 @@ confirm() ->
             %% We have upgraded the legacy node, but we should see zlib selected (previous node still not upgraded):
             assert_using(CNode, {riak_kv, handoff_data_encoding}, encode_zlib);
         _ ->
-            lager:info("Legacy Riak not available, skipping legacy tests"),
-            lager:info("Adding previous node to cluster"),
+            logger:info("Legacy Riak not available, skipping legacy tests"),
+            logger:info("Adding previous node to cluster"),
             rt:join(PNode, LNode),
             ?assertEqual(ok, rt:wait_until_all_members([CNode], [CNode, LNode, PNode])),
             ?assertEqual(ok, rt:wait_until_legacy_ringready(CNode))
@@ -167,13 +167,13 @@ confirm() ->
     assert_supported(PCap2, {riak_kv, vnode_vclocks}, [true,false]),
     assert_supported(PCap2, {riak_pipe, trace_format}, [ordsets,sets]),
     
-    lager:info("Upgrading Previous node"),
+    logger:info("Upgrading Previous node"),
     rt:upgrade(PNode, current),
 
-    lager:info("Verifying index_backpressue changes to true"),
+    logger:info("Verifying index_backpressue changes to true"),
     ?assertEqual(ok, rt:wait_until_capability(CNode, {riak_kv, index_backpressure}, true)),
 
-    lager:info("Verifying riak_pipe,trace_format changes to ordsets"),
+    logger:info("Verifying riak_pipe,trace_format changes to ordsets"),
     ?assertEqual(ok, rt:wait_until_capability(CNode, {riak_pipe, trace_format}, ordsets)),
 
     CCap2 = rt:capability(CNode, all),
@@ -215,43 +215,43 @@ confirm() ->
                         }]
                end,
 
-    lager:info("Override: (use: legacy), (prefer: proxy)"),
+    logger:info("Override: (use: legacy), (prefer: proxy)"),
     [rt:update_app_config(Node, Override(legacy, proxy)) || Node <- Nodes],
 
-    lager:info("Verify vnode_routing == legacy"),
+    logger:info("Verify vnode_routing == legacy"),
     assert_capability(CNode, {riak_core, vnode_routing}, legacy),
 
-    lager:info("Override: (use: proxy), (prefer: legacy)"),
+    logger:info("Override: (use: proxy), (prefer: legacy)"),
     [rt:update_app_config(Node, Override(proxy, legacy)) || Node <- Nodes],
 
-    lager:info("Verify vnode_routing == proxy"),
+    logger:info("Verify vnode_routing == proxy"),
     assert_capability(CNode, {riak_core, vnode_routing}, proxy),
 
-    lager:info("Override: (prefer: legacy)"),
+    logger:info("Override: (prefer: legacy)"),
     [rt:update_app_config(Node, Override(undefined, legacy)) || Node <- Nodes],
 
-    lager:info("Verify vnode_routing == legacy"),
+    logger:info("Verify vnode_routing == legacy"),
     assert_capability(CNode, {riak_core, vnode_routing}, legacy),
 
     [rt:stop(Node) || Node <- Nodes],
     pass.
 
 assert_capability(CNode, Capability, Value) ->
-    lager:info("Checking Capability Setting ~p =:= ~p on ~p",
+    logger:info("Checking Capability Setting ~p =:= ~p on ~p",
                [Capability, Value, CNode]),
     ?assertEqual(ok, rt:wait_until_capability(CNode, Capability, Value)).
 
 assert_supported(Capabilities, Capability, Value) ->
-    lager:info("Checking Capability Supported Values ~p =:= ~p", [Capability, Value]),
+    logger:info("Checking Capability Supported Values ~p =:= ~p", [Capability, Value]),
     ?assertEqual(Value, proplists:get_value(Capability, proplists:get_value('$supported', Capabilities))).
 
 assert_using(Node, {CapabilityCategory, CapabilityName}, ExpectedCapabilityName) ->
-    lager:info("assert_using ~p =:= ~p", [ExpectedCapabilityName, CapabilityName]),
+    logger:info("assert_using ~p =:= ~p", [ExpectedCapabilityName, CapabilityName]),
     try ExpectedCapabilityName =:= rt:capability(Node, {CapabilityCategory, CapabilityName}) of
         X -> X
     catch
         %% This is for catching a case in which a legacy node doesn't support capabilities at all:
-        exit:Exception -> lager:info("assert_using() caught exception: ~p", [Exception]), 
+        exit:Exception -> logger:info("assert_using() caught exception: ~p", [Exception]), 
                           false
     end.
 

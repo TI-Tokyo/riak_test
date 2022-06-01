@@ -10,31 +10,31 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 setup_repl_clusters(Conf, InterceptSetup) ->
     NumNodes = 6,
-    lager:info("Deploy ~p nodes", [NumNodes]),
+    logger:info("Deploy ~p nodes", [NumNodes]),
 
     Nodes = rt:deploy_nodes(NumNodes, Conf, [riak_kv, riak_repl]),
     InterceptSetup(Nodes),
 
-    lager:info("Nodes = ~p", [Nodes]),
+    logger:info("Nodes = ~p", [Nodes]),
     {[AFirst|_] = ANodes, Rest} = lists:split(2, Nodes),
     {[BFirst|_] = BNodes, [CFirst|_] = CNodes} = lists:split(2, Rest),
 
     %%AllNodes = ANodes ++ BNodes ++ CNodes,
     rt:log_to_nodes(Nodes, "Starting replication2_fullsync test"),
 
-    lager:info("ANodes: ~p", [ANodes]),
-    lager:info("BNodes: ~p", [BNodes]),
-    lager:info("CNodes: ~p", [CNodes]),
+    logger:info("ANodes: ~p", [ANodes]),
+    logger:info("BNodes: ~p", [BNodes]),
+    logger:info("CNodes: ~p", [CNodes]),
 
     rt:log_to_nodes(Nodes, "Building and connecting Clusters"),
 
-    lager:info("Build cluster A"),
+    logger:info("Build cluster A"),
     repl_util:make_cluster(ANodes),
 
-    lager:info("Build cluster B"),
+    logger:info("Build cluster B"),
     repl_util:make_cluster(BNodes),
 
-    lager:info("Build cluster C"),
+    logger:info("Build cluster C"),
     repl_util:make_cluster(CNodes),
 
     repl_util:name_cluster(AFirst, "A"),
@@ -91,7 +91,7 @@ test_multiple_schedules() ->
            ],
     {LeaderA, _ANodes, _BNodes, _CNodes, AllNodes} =
         setup_repl_clusters(Conf, fun install_v3_intercepts/1),
-    lager:info("Waiting for fullsyncs"),
+    logger:info("Waiting for fullsyncs"),
     wait_until_fullsyncs(LeaderA, "B", 5),
     wait_until_fullsyncs(LeaderA, "C", 5),
     rt:clean_cluster(AllNodes),
@@ -110,7 +110,7 @@ test_single_schedule() ->
         setup_repl_clusters(Conf, fun install_v3_intercepts/1),
     rt:log_to_nodes(AllNodes, "Test shared fullsync schedule from A -> [B,C]"),
     %% let some msgs queue up, doesn't matter how long we wait
-    lager:info("Waiting for fullsyncs"),
+    logger:info("Waiting for fullsyncs"),
     wait_until_fullsyncs(LeaderA, "B", 10),
     wait_until_fullsyncs(LeaderA, "C", 10),
     rt:clean_cluster(AllNodes),
@@ -134,16 +134,16 @@ test_mixed_12_13() ->
     repl_util:wait_until_leader_converge(BNodes),
     repl_util:wait_until_leader_converge(CNodes),
 
-    lager:info("Adding repl listener to cluster A"),
+    logger:info("Adding repl listener to cluster A"),
     ListenerArgs = [[atom_to_list(LeaderA), "127.0.0.1", "9010"]],
     Res = rpc:call(LeaderA, riak_repl_console, add_listener, ListenerArgs),
     ?assertEqual(ok, Res),
 
-    lager:info("Adding repl site to cluster B"),
+    logger:info("Adding repl site to cluster B"),
     SiteArgs = ["127.0.0.1", "9010", "rtmixed"],
     Res = rpc:call(BFirst, riak_repl_console, add_site, [SiteArgs]),
 
-    lager:info("Waiting for v2 repl to catch up. Good time to light up a cold can of Tab."),
+    logger:info("Waiting for v2 repl to catch up. Good time to light up a cold can of Tab."),
     wait_until_fullsyncs(LeaderA, "B", 3),
     wait_until_fullsyncs(LeaderA, "C", 3),
     wait_until_12_fs_complete(LeaderA, 9),

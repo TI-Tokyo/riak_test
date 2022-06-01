@@ -95,29 +95,29 @@
 
 confirm() ->
 
-    lager:info("Test with no rebuilds - and no startup skip"),
+    logger:info("Test with no rebuilds - and no startup skip"),
     Nodes1 = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD(true, false)),
     ok = verify_aae_norebuild(Nodes1),
     rt:clean_cluster(Nodes1),
 
-    lager:info("Test with no rebuilds - but with startup skip"),
+    logger:info("Test with no rebuilds - but with startup skip"),
     Nodes2 = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD(true, true)),
     ok = verify_aae_norebuild(Nodes2),
     rt:clean_cluster(Nodes2),
 
-    lager:info("Test with rebuilds"),
+    logger:info("Test with rebuilds"),
     Nodes3 = rt:build_cluster(?NUM_NODES, ?CFG_REBUILD),
     ok = verify_aae_rebuild(Nodes3),
     rt:clean_cluster(Nodes3),
 
-    lager:info("Test with no rebuilds - and AAE on fallbacks"),
+    logger:info("Test with no rebuilds - and AAE on fallbacks"),
     Nodes4 = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD(false, false)),
     ok = verify_aae_norebuild(Nodes4),
     pass.
 
 
 verify_aae_norebuild(Nodes) ->
-    lager:info("Tictac AAE tests without rebuilding trees"),
+    logger:info("Tictac AAE tests without rebuilding trees"),
     Node1 = hd(Nodes),
 
     % Recovery without tree rebuilds
@@ -132,7 +132,7 @@ verify_aae_norebuild(Nodes) ->
     ok.
 
 verify_aae_rebuild(Nodes) ->
-    lager:info("Tictac AAE tests with rebuilding trees"),
+    logger:info("Tictac AAE tests with rebuilding trees"),
     Node1 = hd(Nodes),
 
     % Test recovery from too few replicas written
@@ -151,7 +151,7 @@ verify_aae_rebuild(Nodes) ->
     KV4 = [{K, <<V/binary, "a">>} || {K, V} <- KV3],
     test_less_than_n_mods(Node1, KV4),
 
-    lager:info("Writing 1000 objects"),
+    logger:info("Writing 1000 objects"),
     KV5 = test_data(2001, 3000),
     write_data(Node1, KV5),
 
@@ -165,7 +165,7 @@ verify_aae_rebuild(Nodes) ->
     % Test recovery from losing both AAE and KV data
     test_total_partition_loss(NNuke, PNuke, KV5),
 
-    lager:info("Finished verifying AAE magic"),
+    logger:info("Finished verifying AAE magic"),
     ok.
 
 
@@ -214,7 +214,7 @@ write_data(Node, KVs, Opts) ->
 
 % @doc Verifies that the data is eventually restored to the expected set.
 verify_data(Node, KeyValues) ->
-    lager:info("Verify all replicas are eventually correct"),
+    logger:info("Verify all replicas are eventually correct"),
     PB = rt:pbc(Node),
     CheckFun =
     fun() ->
@@ -226,7 +226,7 @@ verify_data(Node, KeyValues) ->
             case Num == NumGood of
                 true -> true;
                 false ->
-                    lager:info("Data not yet correct: ~p mismatches",
+                    logger:info("Data not yet correct: ~p mismatches",
                                [Num-NumGood]),
                     false
             end
@@ -237,9 +237,9 @@ verify_data(Node, KeyValues) ->
     ok = 
         case rt:wait_until(CheckFun, Retry, Delay) of
             ok ->
-                lager:info("Data is now correct. Yay!");
+                logger:info("Data is now correct. Yay!");
             fail ->
-                lager:error("AAE failed to fix data"),
+                logger:error("AAE failed to fix data"),
                 aae_failed_to_fix_data
         end,
     riakc_pb_socket:stop(PB),
@@ -263,45 +263,45 @@ verify_replicas(Node, B, K, V, N) ->
 
 test_single_partition_loss(Node, Partition, KeyValues)
   when is_atom(Node), is_integer(Partition) ->
-    lager:info("Verify recovery from the loss of partition ~p", [Partition]),
+    logger:info("Verify recovery from the loss of partition ~p", [Partition]),
     wipe_out_partition(Node, Partition),
     restart_vnode(Node, riak_kv, Partition),
     verify_data(Node, KeyValues).
 
 test_aae_partition_loss(Node, Partition, KeyValues)
   when is_atom(Node), is_integer(Partition) ->
-    lager:info("Verify recovery from the loss of AAE data for partition ~p", [Partition]),
+    logger:info("Verify recovery from the loss of AAE data for partition ~p", [Partition]),
     wipe_out_aae_data(Node, Partition),
     restart_vnode(Node, riak_kv, Partition),
     verify_data(Node, KeyValues).
 
 test_total_partition_loss(Node, Partition, KeyValues)
   when is_atom(Node), is_integer(Partition) ->
-    lager:info("Verify recovery from the loss of AAE and KV data for partition ~p", [Partition]),
+    logger:info("Verify recovery from the loss of AAE and KV data for partition ~p", [Partition]),
     wipe_out_partition(Node, Partition),
     wipe_out_aae_data(Node, Partition),
     restart_vnode(Node, riak_kv, Partition),
     verify_data(Node, KeyValues).
 
 test_less_than_n_writes(Node, KeyValues) ->
-    lager:info("Writing ~p objects with N=1, AAE should ensure they end up"
+    logger:info("Writing ~p objects with N=1, AAE should ensure they end up"
                " with ~p replicas", [length(KeyValues), ?N_VAL]),
     write_data(Node, KeyValues, [{n_val, 1}]),
     verify_data(Node, KeyValues).
 
 test_less_than_n_mods(Node, KeyValues) ->
-    lager:info("Modifying only one replica for ~p objects. AAE should ensure"
+    logger:info("Modifying only one replica for ~p objects. AAE should ensure"
                " all replicas end up modified", [length(KeyValues)]),
     write_data(Node, KeyValues, [{n_val, 1}]),
     verify_data(Node, KeyValues).
 
 wipe_out_partition(Node, Partition) ->
-    lager:info("Wiping out partition ~p in node ~p", [Partition, Node]),
+    logger:info("Wiping out partition ~p in node ~p", [Partition, Node]),
     rt:clean_data_dir(Node, dir_for_partition(Partition)),
     ok.
 
 wipe_out_aae_data(Node, Partition) ->
-    lager:info("Wiping out AAE data for partition ~p in node ~p", [Partition, Node]),
+    logger:info("Wiping out AAE data for partition ~p in node ~p", [Partition, Node]),
     rt:clean_data_dir(Node, "tictac_aae/"++integer_to_list(Partition)),
     ok.
 
@@ -323,13 +323,13 @@ restart_vnode(Node, Service, Partition) ->
             ok
     after
         rt_config:get(rt_max_wait_time) ->
-            lager:error("VNode for partition ~p did not die, the bastard",
+            logger:error("VNode for partition ~p did not die, the bastard",
                         [Partition]),
             ?assertEqual(vnode_killed, {failed_to_kill_vnode, Partition})
     end,
     {ok, NewPid} = rpc:call(Node, riak_core_vnode_manager, get_vnode_pid,
                             [Partition, VNodeName]),
-    lager:info("Vnode for partition ~p restarted as ~p",
+    logger:info("Vnode for partition ~p restarted as ~p",
                [Partition, NewPid]).
 
 dir_for_partition(Partition) ->

@@ -55,32 +55,32 @@
 
 confirm() ->
     TS0 = take_timestamp(),
-    lager:info("Deploy some nodes"),
+    logger:info("Deploy some nodes"),
     Nodes = rt:build_cluster(?NUM_NODES, [], [?KV_CONFIG, ?CORE_CONFIG]),
     ClientH = rt:httpc(hd(Nodes)),
     ClientP = rt:pbc(hd(Nodes)),
     
-    lager:info("Create a new typed bucket with allow_mult=false"),
+    logger:info("Create a new typed bucket with allow_mult=false"),
     ok =
         rt:create_activate_and_wait_for_bucket_type(Nodes,
                                                     ?TYPE,
                                                     [{allow_mult, false}]),
 
     TS1 = take_timestamp(),
-    lager:info("Compare on empty databases"),
+    logger:info("Compare on empty databases"),
     ok = verify_aae_compare({rhc, ClientH},
                             {riakc_pb_socket, ClientP},
                             convert_to_modified_range(TS0, TS1)),
 
-    lager:info("Generate initial data"),
+    logger:info("Generate initial data"),
     KVL1 = test_data(1, ?NUM_KEYS_PERBATCH, <<"InitialV">>),
 
-    lager:info("Load initial data"),
+    logger:info("Load initial data"),
     ok = write_data(hd(Nodes), ?BUCKET, KVL1),
     ok = write_data(hd(Nodes), {?TYPE, ?TYPED_BUCKET}, KVL1),
 
     TS2 = take_timestamp(),
-    lager:info("Compare on initial database"),
+    logger:info("Compare on initial database"),
     ok = verify_aae_compare({rhc, ClientH},
                             {riakc_pb_socket, ClientP},
                             convert_to_modified_range(TS1, TS2)),
@@ -90,26 +90,26 @@ confirm() ->
 
 verify_aae_compare({ModH, ClientH}, {ModP, ClientP}, {TSA, TSB}) ->
 
-    lager:info("Find root"),
+    logger:info("Find root"),
     {ok, RootH0} = ModH:aae_merge_root(ClientH, ?N_VAL),
     {ok, RootP0} = ModP:aae_merge_root(ClientP, ?N_VAL),
     ?assertMatch(RootH0, RootP0),
 
-    lager:info("Find branches"),
+    logger:info("Find branches"),
     {ok, BranchesH0} =
         ModH:aae_merge_branches(ClientH, ?N_VAL, lists:seq(100, 128)),
     {ok, BranchesP0} =
         ModP:aae_merge_branches(ClientP, ?N_VAL, lists:seq(100, 128)),
     ?assertMatch(BranchesH0, BranchesP0),
 
-    lager:info("Find clocks by segment"),
+    logger:info("Find clocks by segment"),
     {ok, SegsH0} =
         ModH:aae_fetch_clocks(ClientH, ?N_VAL, lists:seq(200, 300)),
     {ok, SegsP0} =
         ModP:aae_fetch_clocks(ClientP, ?N_VAL, lists:seq(200, 300)),
     ?assertMatch(SegsH0, SegsP0),
 
-    lager:info("Compare range-based trees"),
+    logger:info("Compare range-based trees"),
     {ok, {tree, RawTreeH1}} =
         ModH:aae_range_tree(ClientH, ?BUCKET, all, small, all, all, pre_hash),
     {ok, {tree, RawTreeP1}} =
@@ -142,7 +142,7 @@ verify_aae_compare({ModH, ClientH}, {ModP, ClientP}, {TSA, TSB}) ->
     TreeP2 = leveled_tictac:import_tree(RawTreeP2),
     ?assertMatch([], leveled_tictac:find_dirtyleaves(TreeH2, TreeP2)),
 
-    lager:info("Compare clocks from range-based comparison"),
+    logger:info("Compare clocks from range-based comparison"),
     {ok, ClockRangeH1} =
         ModH:aae_range_clocks(ClientH, ?BUCKET, all, all, all),
     {ok, ClockRangeP1} = 
@@ -165,7 +165,7 @@ verify_aae_compare({ModH, ClientH}, {ModP, ClientP}, {TSA, TSB}) ->
                                 {TSA, TSB}),
     ?assertMatch(ClockRangeH2, ClockRangeP2),
 
-    lager:info("Find Keys"),
+    logger:info("Find Keys"),
     {ok, {keys, SiblingCntsH0}} =
         ModH:aae_find_keys(ClientH, ?BUCKET, all, all,
                             {sibling_count, 1}),
@@ -190,7 +190,7 @@ verify_aae_compare({ModH, ClientH}, {ModP, ClientP}, {TSA, TSB}) ->
                             {sibling_count, 1}),
     ?assertMatch(SiblingCntsH1, SiblingCntsP1),
 
-    lager:info("Object stats"),
+    logger:info("Object stats"),
     CompareFun =
         fun(Stats) ->
             fun({K, V}) ->
@@ -202,7 +202,7 @@ verify_aae_compare({ModH, ClientH}, {ModP, ClientP}, {TSA, TSB}) ->
         ModH:aae_object_stats(ClientH, ?BUCKET, all, all),
     {ok, {stats, ObjectStatsP0}} =
         ModP:aae_object_stats(ClientP, ?BUCKET, all, all),
-    lager:info("Object stats ~p", [ObjectStatsH0]),
+    logger:info("Object stats ~p", [ObjectStatsH0]),
     lists:foreach(CompareFun(ObjectStatsP0), ObjectStatsH0),
     lists:foreach(CompareFun(ObjectStatsH0), ObjectStatsP0),
 
@@ -253,7 +253,7 @@ write_data(Node, Bucket, KVs, Opts) ->
     ok.
 
 take_timestamp() ->
-    lager:info("Taking timestamp"),
+    logger:info("Taking timestamp"),
     TS = os:timestamp(),
     timer:sleep(1000),
     TS.

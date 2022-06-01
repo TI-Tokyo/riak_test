@@ -40,7 +40,7 @@ confirm() ->
     %% Get vnodeids for each primary
     PartitionIdMap = get_vnodeids(PL, Node),
 
-    lager:info("ids = ~p", [PartitionIdMap]),
+    logger:info("ids = ~p", [PartitionIdMap]),
     %% assert each is unique
     {_Idxes, VnodeIds} = lists:unzip(PartitionIdMap),
     ?assertEqual(3,length(PartitionIdMap)),

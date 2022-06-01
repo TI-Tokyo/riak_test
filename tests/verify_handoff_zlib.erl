@@ -32,5 +32,5 @@ confirm() ->
 
     verify_handoff:run_test(TestMode, NTestItems, NTestNodes, encode_zlib),
 
-    lager:info("Test verify_handoff passed."),
+    logger:info("Test verify_handoff passed."),
     pass.

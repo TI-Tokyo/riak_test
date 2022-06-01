@@ -52,7 +52,7 @@ harness_opts() ->
     ].
 
 setup_harness(Test, Args) ->
-    lager:info("Harness setup with args: ~p", [Args]),
+    logger:info("Harness setup with args: ~p", [Args]),
     case getopt:parse(harness_opts(), Args) of
     {ok, {Parsed, []}} ->
         _ = [rt_config:set(prefix(K), V)
@@ -101,7 +101,7 @@ stop(Node) ->
     rtssh:stop(Node).
 
 stop_all(_Hosts) ->
-    lager:info("called stop all, ignoring?").
+    logger:info("called stop all, ignoring?").
 
 start_data_collectors(Nodes) ->
     OSPid = os:getpid(),
@@ -109,7 +109,7 @@ start_data_collectors(Nodes) ->
     file:make_dir(PrepDir),
     {ok, Hostname} = inet:gethostname(),
     P = observer:watch(Nodes, {Hostname, 65001, PrepDir}),
-    lager:info("started data collector: ~p", [P]),
+    logger:info("started data collector: ~p", [P]),
     P.
 
 stop_data_collectors(Collector) ->
@@ -167,7 +167,7 @@ maybe_prepop(Hosts, BinSize, SetSize) ->
             PrepopName = rt_config:get(perf_test_name)++"-"++Vsn++
                 "-prepop"++integer_to_list(BinSize)++"b-"++date_string(),
 
-            lager:info("Target size = ~p", [SetSize]),
+            logger:info("Target size = ~p", [SetSize]),
 
             PrepopConfig =
                         rt_bench:config(
@@ -309,7 +309,7 @@ deploy_nodes(NodeConfig) ->
 
 deploy_nodes(NodeConfig, Hosts) ->
     Path = rtssh:relpath(root),
-    lager:info("Riak path: ~p", [Path]),
+    logger:info("Riak path: ~p", [Path]),
     Nodes = [rtssh:host_to_node(Host) || Host <- Hosts],
     HostMap = lists:zip(Nodes, Hosts),
 
@@ -337,13 +337,13 @@ deploy_nodes(NodeConfig, Hosts) ->
     timer:sleep(500),
 
     rt:pmap(fun({_, default}) ->
-                lager:info("Default configuration detected!"),
+                logger:info("Default configuration detected!"),
                 ok;
                ({Node, {cuttlefish, Config}}) ->
-                lager:info("Cuttlefish configuration detected!"),
+                logger:info("Cuttlefish configuration detected!"),
                 rtssh:set_conf(Node, Config);
                ({Node, Config}) ->
-                lager:info("Legacy configuration detected!"),
+                logger:info("Legacy configuration detected!"),
                 rtssh:update_app_config(Node, Config)
             end,
             lists:zip(Nodes, Configs)),

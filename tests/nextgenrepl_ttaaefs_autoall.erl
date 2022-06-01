@@ -111,7 +111,7 @@ confirm() ->
             {2, ?CONFIG(?B_RING, ?B_NVAL, false)},
             {2, ?CONFIG(?C_RING, ?C_NVAL, false)}]),
 
-    lager:info("Test run using HTTP protocol"),
+    logger:info("Test run using HTTP protocol"),
     test_repl(http, [ClusterAH, ClusterBH, ClusterCH], all),
     
     rt:clean_cluster(ClusterAH),
@@ -124,7 +124,7 @@ confirm() ->
             {2, ?CONFIG(?B_RING, ?B_NVAL, true)},
             {2, ?CONFIG(?C_RING, ?C_NVAL, false)}]),
     
-    lager:info("Test run using PB protocol"),
+    logger:info("Test run using PB protocol"),
     test_repl(pb, [ClusterAP, ClusterBP, ClusterCP], hour),
     
     rt:clean_cluster(ClusterAP),
@@ -137,7 +137,7 @@ confirm() ->
             {2, ?CONFIG(?B_RING, ?B_NVAL, true)},
             {2, ?CONFIG(?C_RING, ?C_NVAL, false)}]),
     
-    lager:info("Test run using PB protocol"),
+    logger:info("Test run using PB protocol"),
     test_repl(pb, [ClusterAP1, ClusterBP1, ClusterCP1], day),
 
 
@@ -194,14 +194,14 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC], SyncCheck) ->
     rt:join_cluster(ClusterB),
     rt:join_cluster(ClusterC),
     
-    lager:info("Waiting for convergence."),
+    logger:info("Waiting for convergence."),
     rt:wait_until_ring_converged(ClusterA),
     rt:wait_until_ring_converged(ClusterB),
     rt:wait_until_ring_converged(ClusterC),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end,
                     ClusterA ++ ClusterB ++ ClusterC),
     
-    lager:info("Write ~w objects into A and read from B and C", [?KEY_COUNT]),
+    logger:info("Write ~w objects into A and read from B and C", [?KEY_COUNT]),
     write_to_cluster(NodeA1, 1, ?KEY_COUNT, new_obj),
     timer:sleep(?REPL_SLEEP),
     0 = 
@@ -217,7 +217,7 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC], SyncCheck) ->
                             0,
                             ?LOOP_COUNT),
     
-    lager:info("Deleting ~w objects from B and read not_found from A and C", [?KEY_COUNT]),
+    logger:info("Deleting ~w objects from B and read not_found from A and C", [?KEY_COUNT]),
     delete_from_cluster(NodeB2, 1, ?KEY_COUNT),
     timer:sleep(?REPL_SLEEP),
     200 =
@@ -233,7 +233,7 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC], SyncCheck) ->
                             ?KEY_COUNT,
                             ?LOOP_COUNT),
     
-    lager:info("Modifying ~w objects from C and then read from A and B", [?KEY_COUNT]),
+    logger:info("Modifying ~w objects from C and then read from A and B", [?KEY_COUNT]),
     write_to_cluster(NodeC1, ?KEY_COUNT + 1, 2 * ?KEY_COUNT, new_obj),
     write_to_cluster(NodeC1, ?KEY_COUNT + 1, 2 * ?KEY_COUNT, ?COMMMON_VAL_MOD),
     timer:sleep(?REPL_SLEEP),
@@ -258,8 +258,8 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC], SyncCheck) ->
 
 %% @doc Write a series of keys and ensure they are all written.
 write_to_cluster(Node, Start, End, CommonValBin) ->
-    lager:info("Writing ~p keys to node ~p.", [End - Start + 1, Node]),
-    lager:warning("Note that only utf-8 keys are used"),
+    logger:info("Writing ~p keys to node ~p.", [End - Start + 1, Node]),
+    logger:warning("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F = 
         fun(N, Acc) ->
@@ -287,12 +287,12 @@ write_to_cluster(Node, Start, End, CommonValBin) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    lager:warning("~p errors while writing: ~p", [length(Errors), Errors]),
+    logger:warning("~p errors while writing: ~p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 delete_from_cluster(Node, Start, End) ->
-    lager:info("Deleting ~p keys from node ~p.", [End - Start + 1, Node]),
-    lager:warning("Note that only utf-8 keys are used"),
+    logger:info("Deleting ~p keys from node ~p.", [End - Start + 1, Node]),
+    logger:warning("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F = 
         fun(N, Acc) ->
@@ -308,13 +308,13 @@ delete_from_cluster(Node, Start, End) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    lager:warning("~p errors while deleting: ~p", [length(Errors), Errors]),
+    logger:warning("~p errors while deleting: ~p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 
 
 read_from_cluster(Node, Start, End, CommonValBin, Errors) ->
-    lager:info("Reading ~p keys from node ~p.", [End - Start + 1, Node]),
+    logger:info("Reading ~p keys from node ~p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
     F = 
         fun(N, Acc) ->
@@ -335,7 +335,7 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors) ->
     ErrorsFound = lists:foldl(F, [], lists:seq(Start, End)),
     case Errors of
         undefined ->
-            lager:info("Errors Found in read_from_cluster ~w",
+            logger:info("Errors Found in read_from_cluster ~w",
                         [length(ErrorsFound)]),
             length(ErrorsFound);
         _ ->
@@ -353,7 +353,7 @@ wait_for_outcome(Module, Func, Args, ExpOutcome, LoopCount, MaxLoops) ->
         ExpOutcome ->
             ExpOutcome;
         NotRightYet ->
-            lager:info("~w not yet ~w ~w", [Func, ExpOutcome, NotRightYet]),
+            logger:info("~w not yet ~w ~w", [Func, ExpOutcome, NotRightYet]),
             timer:sleep(LoopCount * 2000),
             wait_for_outcome(Module, Func, Args, ExpOutcome,
                                 LoopCount + 1, MaxLoops)

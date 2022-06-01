@@ -70,11 +70,11 @@ confirm() ->
                                    [{{<<"set1">>, set}, [<<"a">>, <<"b">>]},
                                     {{<<"set2">>, set}, [ <<"x">>, <<"y">>, <<"z">>]}]),
 
-    lager:info("Partition cluster in two."),
+    logger:info("Partition cluster in two."),
 
     PartInfo = rt:partition([N1], [N2]),
 
-    lager:info("Modify data on side 1"),
+    logger:info("Modify data on side 1"),
     %% Modify one side
     S1_1 = make_set([c, d, e]),
     ok= store_set(P1, S1_1),
@@ -134,7 +134,7 @@ confirm() ->
 
     %% Check both sides
     %% heal
-    lager:info("Heal and check merged values"),
+    logger:info("Heal and check merged values"),
     ok = rt:heal(PartInfo),
     ok = rt:wait_for_cluster_service(Nodes, riak_kv),
 
@@ -198,14 +198,14 @@ create_pb_clients(Nodes) ->
      end || N <- Nodes].
 
 create_bucket_types([N1|_], Types) ->
-    lager:info("Creating bucket types with datatypes: ~p", [Types]),
+    logger:info("Creating bucket types with datatypes: ~p", [Types]),
     [rt:create_and_activate_bucket_type(N1, Name, [{datatype, Type}, {allow_mult, true}])
      || {Name, Type} <- Types ].
 
 bucket_type_ready_fun(Name) ->
     fun(Node) ->
             Res = rpc:call(Node, riak_core_bucket_type, activate, [Name]),
-            lager:info("is ~p ready ~p?", [Name, Res]),
+            logger:info("is ~p ready ~p?", [Name, Res]),
             Res == ok
     end.
 

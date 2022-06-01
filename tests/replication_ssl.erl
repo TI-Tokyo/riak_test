@@ -19,7 +19,7 @@ confirm() ->
     make_certs:endusers(CertDir, "rootCA", ["site3.basho.com", "site4.basho.com"]),
     make_certs:endusers(CertDir, "intCA", ["site1.basho.com", "site2.basho.com"]),
 
-    lager:info("Deploy ~p nodes", [NumNodes]),
+    logger:info("Deploy ~p nodes", [NumNodes]),
     BaseConf = [
             {riak_repl,
              [
@@ -31,7 +31,7 @@ confirm() ->
 
     PrivDir = rt:priv_dir(),
 
-    lager:info("priv dir: ~p -> ~p", [code:priv_dir(riak_test), PrivDir]),
+    logger:info("priv dir: ~p -> ~p", [code:priv_dir(riak_test), PrivDir]),
 
     SSLConfig1 = [
         {riak_repl,
@@ -161,7 +161,7 @@ confirm() ->
             ]}
     ],
 
-    lager:info("===testing basic connectivity"),
+    logger:info("===testing basic connectivity"),
 
     [Node1, Node2] = rt:deploy_nodes(2, BaseConf, [riak_kv, riak_repl]),
 
@@ -176,54 +176,54 @@ confirm() ->
     rt:log_to_nodes([Node1, Node2], "Basic connectivity test"),
     ?assertEqual(ok, replication:wait_until_connection(Node1)),
 
-    lager:info("===testing you can't connect to a server with a cert with the same common name"),
+    logger:info("===testing you can't connect to a server with a cert with the same common name"),
     rt:log_to_nodes([Node1, Node2], "Testing identical cert is disallowed"),
     ?assertMatch({fail, _}, test_connection({Node1, merge_config(SSLConfig1, BaseConf)},
             {Node2, merge_config(SSLConfig1, BaseConf)})),
 
-    lager:info("===testing you can't connect when peer doesn't support SSL"),
+    logger:info("===testing you can't connect when peer doesn't support SSL"),
     rt:log_to_nodes([Node1, Node2], "Testing missing ssl on peer fails"),
     ?assertMatch({fail, _}, test_connection({Node1, merge_config(SSLConfig1, BaseConf)},
             {Node2, BaseConf})),
 
-    lager:info("===testing you can't connect when local doesn't support SSL"),
+    logger:info("===testing you can't connect when local doesn't support SSL"),
     rt:log_to_nodes([Node1, Node2], "Testing missing ssl locally fails"),
     ?assertMatch({fail, _}, test_connection({Node1, BaseConf},
             {Node2, merge_config(SSLConfig2, BaseConf)})),
 
-    lager:info("===testing simple SSL connectivity"),
+    logger:info("===testing simple SSL connectivity"),
     rt:log_to_nodes([Node1, Node2], "Basic SSL test"),
     ?assertEqual(ok, test_connection({Node1, merge_config(SSLConfig1, BaseConf)},
             {Node2, merge_config(SSLConfig2, BaseConf)})),
 
-    lager:info("===testing SSL connectivity with an intermediate CA"),
+    logger:info("===testing SSL connectivity with an intermediate CA"),
     rt:log_to_nodes([Node1, Node2], "Intermediate CA test"),
     ?assertEqual(ok, test_connection({Node1, merge_config(SSLConfig1, BaseConf)},
             {Node2, merge_config(SSLConfig3, BaseConf)})),
 
-    lager:info("===testing disallowing intermediate CAs works"),
+    logger:info("===testing disallowing intermediate CAs works"),
     rt:log_to_nodes([Node1, Node2], "Disallowing intermediate CA test"),
     ?assertEqual(ok, test_connection({Node1, merge_config(SSLConfig3A, BaseConf)},
             {Node2, merge_config(SSLConfig4, BaseConf)})),
 
-    lager:info("===testing disallowing intermediate CAs disallows connections"),
+    logger:info("===testing disallowing intermediate CAs disallows connections"),
     rt:log_to_nodes([Node1, Node2], "Disallowing intermediate CA test 2"),
     ?assertMatch({fail, _}, test_connection({Node1, merge_config(SSLConfig3A, BaseConf)},
             {Node2, merge_config(SSLConfig1, BaseConf)})),
 
-    lager:info("===testing wildcard and strict ACLs"),
+    logger:info("===testing wildcard and strict ACLs"),
     rt:log_to_nodes([Node1, Node2], "wildcard and strict ACL test"),
     ?assertEqual(ok, test_connection({Node1, merge_config(SSLConfig5, BaseConf)},
             {Node2, merge_config(SSLConfig6, BaseConf)})),
 
-    lager:info("===testing expired certificates fail"),
+    logger:info("===testing expired certificates fail"),
     rt:log_to_nodes([Node1, Node2], "expired certificates test"),
     ?assertMatch({fail, _}, test_connection({Node1, merge_config(SSLConfig5, BaseConf)},
             {Node2, merge_config(SSLConfig7, BaseConf)})),
 
-    lager:info("Connectivity tests passed"),
+    logger:info("Connectivity tests passed"),
 
-    lager:info("Re-deploying 6 nodes"),
+    logger:info("Re-deploying 6 nodes"),
 
     Nodes = rt:deploy_nodes(6, BaseConf, [riak_kv, riak_repl]),
 
@@ -231,7 +231,7 @@ confirm() ->
 
     {ANodes, BNodes} = lists:split(ClusterASize, Nodes),
 
-    lager:info("Reconfiguring nodes with SSL options"),
+    logger:info("Reconfiguring nodes with SSL options"),
     [rt:update_app_config(N, merge_config(SSLConfig5, BaseConf)) || N <-
         ANodes],
 
@@ -240,10 +240,10 @@ confirm() ->
 
     [rt:wait_until_pingable(N) || N <- Nodes],
 
-    lager:info("Build cluster A"),
+    logger:info("Build cluster A"),
     repl_util:make_cluster(ANodes),
 
-    lager:info("Build cluster B"),
+    logger:info("Build cluster B"),
     repl_util:make_cluster(BNodes),
 
     replication:replication(ANodes, BNodes, false),

@@ -61,7 +61,7 @@ confirm() ->
     %% Pid of the RT connection. It should change after we stop heartbeats
     %% because the RT connection will restart if all goes well.
     RTConnPid1 = get_rt_conn_pid(LeaderA),
-    lager:info("Suspending HB"),
+    logger:info("Suspending HB"),
     suspend_heartbeat_messages(LeaderA),
 
     %% sleep longer than the HB timeout interval to force re-connection;
@@ -120,17 +120,17 @@ verify_rt(LeaderA, LeaderB) ->
     Last = 200,
 
     %% Write some objects to the source cluster (A),
-    lager:info("Writing ~p keys to ~p, which should RT repl to ~p",
+    logger:info("Writing ~p keys to ~p, which should RT repl to ~p",
                [Last-First+1, LeaderA, LeaderB]),
     ?assertEqual([], repl_util:do_write(LeaderA, First, Last, TestBucket, 2)),
 
     %% verify data is replicated to B
-    lager:info("Reading ~p keys written from ~p", [Last-First+1, LeaderB]),
+    logger:info("Reading ~p keys written from ~p", [Last-First+1, LeaderB]),
     ?assertEqual(0, repl_util:wait_for_reads(LeaderB, First, Last, TestBucket, 2)).
 
 verify_hb_noresponse(LeaderA, LeaderB) ->
 
-    lager:info("Testing heartbeats with no responses, should not crash"),
+    logger:info("Testing heartbeats with no responses, should not crash"),
 
     TestHash =  list_to_binary([io_lib:format("~2.16.0b", [X]) ||
                 <<X>> <= erlang:md5(term_to_binary(os:timestamp()))]),
@@ -143,12 +143,12 @@ verify_hb_noresponse(LeaderA, LeaderB) ->
     suspend_heartbeat_responses(LeaderB),
 
     %% Write some objects to the source cluster (A),
-    lager:info("Writing ~p keys to ~p, which should RT repl to ~p",
+    logger:info("Writing ~p keys to ~p, which should RT repl to ~p",
                [Last-First+1, LeaderA, LeaderB]),
     ?assertEqual([], repl_util:do_write(LeaderA, First, Last, TestBucket, 2)),
 
     %% verify data is replicated to B
-    lager:info("Reading ~p keys written from ~p", [Last-First+1, LeaderB]),
+    logger:info("Reading ~p keys written from ~p", [Last-First+1, LeaderB]),
     timer:sleep(?HB_TIMEOUT + 1000),
     ?assertEqual(0, repl_util:wait_for_reads(LeaderB, First, Last, TestBucket, 2)).
 
@@ -156,7 +156,7 @@ verify_hb_noresponse(LeaderA, LeaderB) ->
 connect_clusters(LeaderA, LeaderB) ->
     {ok, {_IP, Port}} = rpc:call(LeaderB, application, get_env,
                                  [riak_core, cluster_mgr]),
-    lager:info("connect cluster A:~p to B on port ~p", [LeaderA, Port]),
+    logger:info("connect cluster A:~p to B on port ~p", [LeaderA, Port]),
     repl_util:connect_cluster(LeaderA, "127.0.0.1", Port),
     ?assertEqual(ok, repl_util:wait_for_connection(LeaderA, "B")).
 
@@ -166,7 +166,7 @@ make_connected_clusters() ->
     NumNodes = rt_config:get(num_nodes, 6),
     ClusterASize = rt_config:get(cluster_a_size, 3),
 
-    lager:info("Deploy ~p nodes", [NumNodes]),
+    logger:info("Deploy ~p nodes", [NumNodes]),
     Conf = [
             {riak_repl,
              [
@@ -183,22 +183,22 @@ make_connected_clusters() ->
     Nodes = rt:deploy_nodes(NumNodes, Conf, [riak_kv, riak_repl]),
 
     {ANodes, BNodes} = lists:split(ClusterASize, Nodes),
-    lager:info("ANodes: ~p", [ANodes]),
-    lager:info("BNodes: ~p", [BNodes]),
+    logger:info("ANodes: ~p", [ANodes]),
+    logger:info("BNodes: ~p", [BNodes]),
 
-    lager:info("Build cluster A"),
+    logger:info("Build cluster A"),
     repl_util:make_cluster(ANodes),
 
-    lager:info("Build cluster B"),
+    logger:info("Build cluster B"),
     repl_util:make_cluster(BNodes),
 
     %% get the leader for the first cluster
-    lager:info("waiting for leader to converge on cluster A"),
+    logger:info("waiting for leader to converge on cluster A"),
     ?assertEqual(ok, repl_util:wait_until_leader_converge(ANodes)),
     AFirst = hd(ANodes),
 
     %% get the leader for the second cluster
-    lager:info("waiting for leader to converge on cluster B"),
+    logger:info("waiting for leader to converge on cluster B"),
     ?assertEqual(ok, repl_util:wait_until_leader_converge(BNodes)),
     BFirst = hd(BNodes),
 
@@ -221,20 +221,20 @@ load_intercepts(Node) ->
 %% @doc Suspend heartbeats from the source node
 suspend_heartbeat_messages(Node) ->
     %% disable forwarding of the heartbeat function call
-    lager:info("Suspend sending of heartbeats from node ~p", [Node]),
+    logger:info("Suspend sending of heartbeats from node ~p", [Node]),
     rt_intercept:add(Node, {riak_repl2_rtsource_helper,
                             [{{send_heartbeat, 1}, drop_send_heartbeat}]}).
 
 %% @doc Resume heartbeats from the sink node
 resume_heartbeat_messages(Node) ->
     %% enable forwarding of the heartbeat function call
-    lager:info("Resume sending of heartbeats from node ~p", [Node]),
+    logger:info("Resume sending of heartbeats from node ~p", [Node]),
     rt_intercept:add(Node, {riak_repl2_rtsource_helper,
                             [{{send_heartbeat, 1}, forward_send_heartbeat}]}).
 
 suspend_heartbeat_responses(Node) ->
 
-    lager:info("Suspending sending of heartbeat responses from node ~p", [Node]),
+    logger:info("Suspending sending of heartbeat responses from node ~p", [Node]),
     rt_intercept:add(Node, {riak_repl2_rtsink_conn,
                             [{{send_heartbeat, 2}, drop_send_heartbeat_resp}]}).
 
@@ -243,13 +243,13 @@ get_rt_conn_pid(Node) ->
     [{_Remote, Pid}|Rest] = rpc:call(Node, riak_repl2_rtsource_conn_sup, enabled, []),
     case Rest of
         [] -> ok;
-        RR -> lager:info("Other connections: ~p", [RR])
+        RR -> logger:info("Other connections: ~p", [RR])
     end,
     Pid.
 
 %% @doc Verify that heartbeat messages are being ack'd from the RT sink back to source Node
 verify_heartbeat_messages(Node) ->
-    lager:info("Verify heartbeats"),
+    logger:info("Verify heartbeats"),
     Pid = get_rt_conn_pid(Node),
     Status = rpc:call(Node, riak_repl2_rtsource_conn, status, [Pid], ?RPC_TIMEOUT),
     HBRTT = proplists:get_value(hb_rtt, Status),

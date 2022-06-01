@@ -46,32 +46,32 @@ confirm() ->
     rt:wait_for_cluster_service(ANodes, riak_repl),
     rt:wait_for_cluster_service(BNodes, riak_repl),
 
-    lager:info("ANodes: ~p", [ANodes]),
-    lager:info("BNodes: ~p", [BNodes]),
+    logger:info("ANodes: ~p", [ANodes]),
+    logger:info("BNodes: ~p", [BNodes]),
 
     AFirst = hd(ANodes),
     BFirst = hd(BNodes),
 
-    lager:info("Naming clusters."),
+    logger:info("Naming clusters."),
     repl_util:name_cluster(AFirst, "A"),
     repl_util:name_cluster(BFirst, "B"),
 
-    lager:info("Waiting for convergence."),
+    logger:info("Waiting for convergence."),
     rt:wait_until_ring_converged(ANodes),
     rt:wait_until_ring_converged(BNodes),
 
-    lager:info("Waiting for transfers to complete."),
+    logger:info("Waiting for transfers to complete."),
     rt:wait_until_transfers_complete(ANodes),
     rt:wait_until_transfers_complete(BNodes),
 
-    lager:info("Get leaders."),
+    logger:info("Get leaders."),
     LeaderA = repl_util:get_leader(AFirst),
     LeaderB = repl_util:get_leader(BFirst),
 
-    lager:info("Finding connection manager ports."),
+    logger:info("Finding connection manager ports."),
     BPort = repl_util:get_port(LeaderB),
 
-    lager:info("Connecting cluster A to B"),
+    logger:info("Connecting cluster A to B"),
     repl_util:connect_cluster_by_name(LeaderA, BPort, "B"),
 
     %% Write keys prior to fullsync.
@@ -81,7 +81,7 @@ confirm() ->
     repl_util:read_from_cluster(BFirst, 1, ?NUM_KEYS, ?TEST_BUCKET,
                                 ?NUM_KEYS),
 
-    lager:info("Test fullsync from cluster A leader ~p to cluster B",
+    logger:info("Test fullsync from cluster A leader ~p to cluster B",
                [LeaderA]),
     repl_util:enable_fullsync(LeaderA, "B"),
     rt:wait_until_ring_converged(ANodes),
@@ -91,7 +91,7 @@ confirm() ->
                                 my_indices,
                                 [rt:get_ring(LeaderB)])),
 
-    lager:warning("BIndicies: ~p", [BIndicies]),
+    logger:warning("BIndicies: ~p", [BIndicies]),
 
     repl_util:validate_intercepted_fullsync(LeaderB,
                                             {riak_repl2_fs_node_reserver,

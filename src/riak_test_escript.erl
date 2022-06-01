@@ -25,9 +25,9 @@
 -export([add_deps/1]).
 
 add_deps(Path) ->
-    io:format("Adding path ~s~n", [Path]),
+    logger:debug("Adding path ~s", [Path]),
     {ok, Deps} = file:list_dir(Path),
-    [code:add_path(lists:append([Path, "/", Dep, "/ebin"])) || Dep <- Deps],
+    [code:add_path(filename:join([Path, Dep, "ebin"])) || Dep <- Deps],
     ok.
 
 cli_options() ->
@@ -81,8 +81,6 @@ main(Args) ->
     %% ibrowse
     application:load(ibrowse),
     application:start(ibrowse),
-    %% Start Lager
-    application:load(lager),
 
     Config = proplists:get_value(config, ParsedArgs),
     ConfigFile = proplists:get_value(file, ParsedArgs),
@@ -93,6 +91,17 @@ main(Args) ->
     %% Loads from ~/.riak_test.config
     rt_config:load(Config, ConfigFile),
 
+    logger:set_primary_config(level, rt_config:get(logger_level, info)),
+    logger:update_handler_config(
+      default,
+      #{config => #{type => standard_io},
+        formatter => {logger_formatter, #{template => [time," [",level,"] ",msg,"\n"],
+                                          time_designator => $ }
+                     }
+       }
+     ),
+    logger:add_handler_filter(default, no_sasl_please,
+                              {fun logger_filters:domain/2, {stop, sub, [otp, sasl]}}),
     %% Sets up extra paths earlier so that tests can be loadable
     %% without needing the -d flag.
     code:add_paths(rt_config:get(test_paths, [])),
@@ -101,31 +110,9 @@ main(Args) ->
     case file:make_dir(rt_config:get(rt_scratch_dir)) of
         ok -> great;
         {error, eexist} -> great;
-        {ErrorType, ErrorReason} -> lager:error("Could not create scratch dir, {~p, ~p}", [ErrorType, ErrorReason])
+        {ErrorType, ErrorReason} -> logger:error("Could not create scratch dir, {~p, ~p}", [ErrorType, ErrorReason])
     end,
 
-    %% Fileoutput
-    Outdir = proplists:get_value(outdir, ParsedArgs),
-    ConsoleLagerLevel = case Outdir of
-        undefined -> rt_config:get(lager_level, info);
-        _ ->
-            filelib:ensure_dir(Outdir),
-            notice
-    end,
-
-    ConsoleFormatter = lager_default_formatter,
-    ConsoleFormatConfig = [time," [",severity,"] ", pid, " ", message, "\n"],
-    ConsoleBackend =
-        [{level, ConsoleLagerLevel},
-            {formatter, ConsoleFormatter},
-            {formatter_config, ConsoleFormatConfig}],
-    FileBackend = 
-        [{file, "log/test.log"}, {level, ConsoleLagerLevel}],
-    application:set_env(lager, error_logger_hwm, 250), %% helpful for debugging
-    application:set_env(lager, handlers, [{lager_console_backend, ConsoleBackend},
-                                          {lager_file_backend, FileBackend}]),
-    lager:start(),
-    [lager:info("Config ~s = ~p", [K, V]) || {K, V} <- lists:keysort(1, rt_config:get_all())],
     %% Report
     Report = case proplists:get_value(report, ParsedArgs, undefined) of
         undefined -> undefined;
@@ -143,10 +130,10 @@ main(Args) ->
 
     CommandLineTests = parse_command_line_tests(ParsedArgs),
     Tests0 = which_tests_to_run(Report, CommandLineTests),
-    lager:info("Running Tests: ~p", [[TestName || {_, {TestName,_}} <- Tests0]]),
+    logger:info("Running Tests: ~p", [[TestName || {_, {TestName,_}} <- Tests0]]),
     case Tests0 of
         [] ->
-            lager:warning("No tests are scheduled to run"),
+            logger:warning("No tests are scheduled to run"),
             init:stop(1);
         _ -> keep_on_keepin_on
     end,
@@ -169,9 +156,9 @@ main(Args) ->
                                   end,
                     ActualOffset = ((TestCount div Denominator) * Offset) rem (TestCount+1),
                     {TestA, TestB} = lists:split(ActualOffset, Tests0),
-                    lager:info("Offsetting ~b tests by ~b (~b workers, ~b"
-                               " offset)", [TestCount, ActualOffset, Workers,
-                                            Offset]),
+                    logger:info("Offsetting ~b tests by ~b (~b workers, ~b"
+                                " offset)", [TestCount, ActualOffset, Workers,
+                                             Offset]),
                     TestB ++ TestA
             end,
 
@@ -183,12 +170,18 @@ main(Args) ->
     ENode = rt_config:get(rt_nodename, 'riak_test@127.0.0.1'),
     Cookie = rt_config:get(rt_cookie, riak),
     CoverDir = rt_config:get(cover_output, "coverage"),
-    lager:info("ENode ~w Cookie ~w~n", [ENode, Cookie]),
+    logger:info("ENode ~w Cookie ~w~n", [ENode, Cookie]),
     [] = os:cmd("epmd -daemon"),
     net_kernel:start([ENode]),
     erlang:set_cookie(node(), Cookie),
 
-    TestResults = lists:filter(fun results_filter/1, [ run_test(Test, TestType, Outdir, TestMetaData, Report, HarnessArgs, length(Tests)) || {TestType, {Test, TestMetaData}} <- Tests]),
+    Outdir = proplists:get_value(outdir, ParsedArgs, "/tmp/riak_test_log"),
+    filelib:ensure_dir(Outdir),
+
+    TestResults = lists:filter(
+                    fun results_filter/1,
+                    [run_test(Test, TestType, Outdir, TestMetaData, Report, HarnessArgs, length(Tests))
+                     || {TestType, {Test, TestMetaData}} <- Tests]),
     [rt_cover:maybe_import_coverage(proplists:get_value(coverdata, R)) || R <- TestResults],
     Coverage = rt_cover:maybe_write_coverage(all, CoverDir),
 
@@ -199,14 +192,14 @@ main(Args) ->
 
 maybe_teardown(false, TestResults, Coverage, Verbose, _Batch) ->
     print_summary(TestResults, Coverage, Verbose),
-    lager:info("Keeping cluster running as requested");
+    logger:info("Keeping cluster running as requested");
 maybe_teardown(true, TestResults, Coverage, Verbose, Batch) ->
     case {length(TestResults), proplists:get_value(status, hd(TestResults)), Batch} of
         {1, fail, false} ->
             print_summary(TestResults, Coverage, Verbose),
             so_kill_riak_maybe();
         _ ->
-            lager:info("Multiple tests run or no failure"),
+            logger:info("Multiple tests run or no failure"),
             rt:teardown(),
             print_summary(TestResults, Coverage, Verbose)
     end,
@@ -283,8 +276,8 @@ get_test_with_valid_prefix(Test, [FirstPath|Rest]) ->
 which_tests_to_run(undefined, CommandLineTests) ->
     {Tests, NonTests} =
         lists:foldl(fun is_runnable/2, {[], []}, CommandLineTests),
-    lager:info("These modules are not runnable tests: ~p",
-               [[NTMod || {NTMod, _} <- NonTests]]),
+    logger:info("These modules are not runnable tests: ~p",
+                [[NTMod || {NTMod, _} <- NonTests]]),
     Tests;
 which_tests_to_run(Platform, []) -> giddyup:get_suite(Platform);
 which_tests_to_run(Platform, CommandLineTests) ->
@@ -293,8 +286,8 @@ which_tests_to_run(Platform, CommandLineTests) ->
         lists:foldl(fun is_runnable/2, {[], []},
                         lists:foldr(fun filter_merge_tests/2, [], Suite)),
 
-    lager:info("These modules are not runnable tests: ~p",
-               [[NTMod || {NTMod, _} <- NonTests]]),
+    logger:info("These modules are not runnable tests: ~p",
+                [[NTMod || {NTMod, _} <- NonTests]]),
     Tests.
 
 filter_zip_suite(Platform, CommandLineTests) ->
@@ -344,7 +337,6 @@ is_runnable_test({TestModule, _}) ->
     end.
 
 run_test(Test, TestType, Outdir, TestMetaData, Report, HarnessArgs, NumTests) ->
-    io:format("in run_test Test is ~p~n", [Test]),
     rt_cover:maybe_start(Test),
     SingleTestResult = riak_test_runner:confirm(Test, TestType, Outdir, TestMetaData,
                                                 HarnessArgs),

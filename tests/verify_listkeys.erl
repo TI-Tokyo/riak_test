@@ -35,60 +35,60 @@ confirm() ->
     [Node1, Node2, Node3, Node4] = Nodes = rt:deploy_nodes(4),
     ?assertEqual(ok, rt:wait_until_nodes_ready(Nodes)),
 
-    lager:info("Nodes deployed, but not joined."),
+    logger:info("Nodes deployed, but not joined."),
 
-    lager:info("Writing some known data to Node 1"),
+    logger:info("Writing some known data to Node 1"),
     put_keys(Node1, ?BUCKET, ?NUM_KEYS),
     put_buckets(Node1, ?NUM_BUCKETS),
     timer:sleep(2000),
     check_it_all([Node1]),
 
     lists:foldl(fun(Node, [N1|_] = Cluster) ->
-            lager:info("An invitation to this party is cordially extended to ~p.", [Node]),
+            logger:info("An invitation to this party is cordially extended to ~p.", [Node]),
             rt:join(Node, N1),
-            lager:info("Wait until there are no pending changes"),
+            logger:info("Wait until there are no pending changes"),
             Ns = lists:usort([Node|Cluster]),
             rt:wait_until_no_pending_changes(Ns),
             rt:wait_for_cluster_service(Ns, riak_kv),
             ok = rt:wait_until_transfers_complete(Ns),
-            lager:info("Check keys and buckets after transfer"),
+            logger:info("Check keys and buckets after transfer"),
             check_it_all(Ns),
             Ns
         end, [Node1], [Node2, Node3, Node4]),
 
-    lager:info("Checking basic HTTP"),
+    logger:info("Checking basic HTTP"),
     check_it_all(Nodes, http),
 
-    lager:info("Stopping Node1"),
+    logger:info("Stopping Node1"),
     rt:stop(Node1),
     rt:wait_until_unpingable(Node1),
 
     %% Stop current node, restart previous node, verify
     lists:foldl(fun(Node, Prev) ->
-            lager:info("Stopping Node ~p", [Node]),
+            logger:info("Stopping Node ~p", [Node]),
             rt:stop(Node),
             rt:wait_until_unpingable(Node),
 
-            lager:info("Starting Node ~p", [Prev]),
+            logger:info("Starting Node ~p", [Prev]),
             rt:start(Prev),
             UpNodes = Nodes -- [Node],
-            lager:info("Waiting for riak_kv service to be ready in ~p", [Prev]),
+            logger:info("Waiting for riak_kv service to be ready in ~p", [Prev]),
             rt:wait_for_cluster_service(UpNodes, riak_kv),
 
-            lager:info("Check keys and buckets"),
+            logger:info("Check keys and buckets"),
             check_it_all(UpNodes),
             Node
         end, Node1, [Node2, Node3, Node4]),
 
-    lager:info("Stopping Node2"),
+    logger:info("Stopping Node2"),
     rt:stop(Node2),
     rt:wait_until_unpingable(Node2),
 
-    lager:info("Stopping Node3"),
+    logger:info("Stopping Node3"),
     rt:stop(Node3),
     rt:wait_until_unpingable(Node3),
 
-    lager:info("Only Node1 is up, so test should fail!"),
+    logger:info("Only Node1 is up, so test should fail!"),
 
     check_it_all([Node1], pbc, false),
     pass.
@@ -109,7 +109,7 @@ list_keys(Node, Interface, Bucket, Attempt, Num, ShouldPass) ->
             Pid = rt:httpc(Node),
             Mod = rhc
     end,
-    lager:info("Listing keys on ~p using ~p. Attempt #~p",
+    logger:info("Listing keys on ~p using ~p. Attempt #~p",
                [Node, Interface, Attempt]),
     case ShouldPass of
         true ->
@@ -138,7 +138,7 @@ list_keys_for_undefined_bucket_type(Node, Interface, Bucket, Attempt, ShouldPass
             Mod = rhc
     end,
 
-    lager:info("Listing keys using undefined bucket type ~p on ~p using ~p. Attempt #~p",
+    logger:info("Listing keys using undefined bucket type ~p on ~p using ~p. Attempt #~p",
                [?UNDEFINED_BUCKET_TYPE, Node, Interface, Attempt]),
     case ShouldPass of
 	true -> ok;
@@ -171,12 +171,12 @@ list_buckets(Node, Interface, Attempt, Num, ShouldPass) ->
             Pid = rt:httpc(Node),
             Mod = rhc
     end,
-    lager:info("Listing buckets on ~p using ~p. Attempt #~p",
+    logger:info("Listing buckets on ~p using ~p. Attempt #~p",
                [Node, Interface, Attempt]),
 
     {Status, Buckets} = Mod:list_buckets(Pid),
     case Status of
-        error -> lager:info("list buckets error ~p", [Buckets]);
+        error -> logger:info("list buckets error ~p", [Buckets]);
         _ -> ok
     end,
     ?assertEqual(ok, Status),
@@ -189,7 +189,7 @@ list_buckets(Node, Interface, Attempt, Num, ShouldPass) ->
             assert_equal(ExpectedBuckets, ActualBuckets);
         _ ->
             ?assert(length(ActualBuckets) < length(ExpectedBuckets)),
-            lager:info("This case expects inconsistent bucket lists")
+            logger:info("This case expects inconsistent bucket lists")
     end,
     case Interface of
         pbc -> riakc_pb_socket:stop(Pid);
@@ -206,14 +206,14 @@ list_buckets_for_undefined_bucket_type(Node, Interface, Attempt, ShouldPass) ->
 	    Mod = rhc
     end,
 
-    lager:info("Listing buckets on ~p for undefined bucket type ~p using ~p.  Attempt ~p.",
+    logger:info("Listing buckets on ~p for undefined bucket type ~p using ~p.  Attempt ~p.",
 	       [Node, ?UNDEFINED_BUCKET_TYPE, Interface, Attempt]),
 
     case ShouldPass of
 	true -> ok;
 	_ ->
 	    {Status, Message} = Mod:list_buckets(Pid, ?UNDEFINED_BUCKET_TYPE, []),
-	    lager:info("Received status ~p and message ~p", [Status, Message]),
+	    logger:info("Received status ~p and message ~p", [Status, Message]),
 	    ?assertEqual(error, Status),
 	    ?assertEqual(<<"No bucket-type named '880bf69d-5dab-44ee-8762-d24c6f759ce1'">>, Message)
     end,
@@ -227,7 +227,7 @@ list_buckets_for_undefined_bucket_type(Node, Interface, Attempt, ShouldPass) ->
 assert_equal(Expected, Actual) ->
     case Expected -- Actual of
         [] -> ok;
-        Diff -> lager:info("Expected -- Actual: ~p", [Diff])
+        Diff -> logger:info("Expected -- Actual: ~p", [Diff])
     end,
     ?assertEqual(length(Actual), length(Expected)),
     ?assertEqual(Actual, Expected).

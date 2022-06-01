@@ -40,12 +40,11 @@ metadata(Pid) ->
     end.
 
 -spec(confirm(integer(), atom(), riak_test | common_test, [{atom(), term()}], list()) -> [tuple()]).
-%% @doc Runs a module's run/0 function after setting up a log capturing backend for lager.
+%% @doc Runs a module's run/0 function after setting up a log capturing backend for logger.
 %%      It then cleans up that backend and returns the logs as part of the return proplist.
-confirm(TestModule, TestType, Outdir, TestMetaData, HarnessArgs) 
-  when TestType =:= riak_test   orelse
+confirm(TestModule, TestType, Outdir, TestMetaData, HarnessArgs)
+  when TestType =:= riak_test orelse
        TestType =:= common_test ->
-    start_lager_backend(TestModule, Outdir),
     rt:setup_harness(TestModule, HarnessArgs),
     BackendExtras = case proplists:get_value(multi_config, TestMetaData) of
                         undefined -> [];
@@ -53,41 +52,38 @@ confirm(TestModule, TestType, Outdir, TestMetaData, HarnessArgs)
                     end,
     Backend = rt:set_backend(proplists:get_value(backend, TestMetaData), BackendExtras),
     {Mod, Fun} = function_name(TestModule),
-    {Status, Reason} = case check_prereqs(Mod) of
-        true ->
-            lager:notice("Running Test ~s", [TestModule]),
-            execute(TestModule, TestType, {Mod, Fun}, TestMetaData);
-        not_present ->
-            {fail, test_does_not_exist};
-        _ ->
-            {fail, all_prereqs_not_present}
-    end,
+    ThisModLog = filename:join([Outdir, atom_to_list(TestModule) ++ "-test.log"]),
+    logger:add_handler(
+      tested_mod_capture,
+      logger_std_h,
+      #{config => #{type => file,
+                    file => ThisModLog},
+        formatter => {logger_formatter, #{template => [time," [",level,"] ",msg,"\n"],
+                                          time_designator => $ }
+                     }
+       }
+     ),
+    {Status, Reason} =
+        case check_prereqs(Mod) of
+            true ->
+                logger:notice("Running Test ~s", [TestModule]),
+                execute(TestModule, TestType, {Mod, Fun}, TestMetaData);
+            not_present ->
+                {fail, test_does_not_exist};
+            _ ->
+                {fail, all_prereqs_not_present}
+        end,
 
-    lager:notice("~s Test Run Complete ~p", [TestModule, Status]),
-    {ok, Logs} = stop_lager_backend(),
-    Log = unicode:characters_to_binary(Logs),
+    logger:notice("~s Test Run Complete ~p", [TestModule, Status]),
+    {ok, ThisModLogContent} = file:read_file(ThisModLog),
+    file:delete(ThisModLog),
 
-    RetList = [{test, TestModule}, {status, Status}, {log, Log}, {backend, Backend} | proplists:delete(backend, TestMetaData)],
+    RetList = [{test, TestModule}, {status, Status}, {backend, Backend},
+               {logs, ThisModLogContent} | proplists:delete(backend, TestMetaData)],
     case Status of
         fail -> RetList ++ [{reason, iolist_to_binary(io_lib:format("~p", [Reason]))}];
         _ -> RetList
     end.
-
-start_lager_backend(TestModule, Outdir) ->
-    case Outdir of
-        undefined -> ok;
-        _ ->
-            gen_event:add_handler(lager_event, lager_file_backend,
-                {Outdir ++ "/" ++ atom_to_list(TestModule) ++ ".dat_test_output",
-                 rt_config:get(lager_level, info), 10485760, "$D0", 1}),
-            lager:set_loglevel(lager_file_backend, rt_config:get(lager_level, info))
-    end,
-    gen_event:add_handler(lager_event, riak_test_lager_backend, [rt_config:get(lager_level, info), false]),
-    lager:set_loglevel(riak_test_lager_backend, rt_config:get(lager_level, info)).
-
-stop_lager_backend() ->
-    gen_event:delete_handler(lager_event, lager_file_backend, []),
-    gen_event:delete_handler(lager_event, riak_test_lager_backend, []).
 
 %% does some group_leader swapping, in the style of EUnit.
 execute(TestModule, TestType, {Mod, Fun}, TestMetaData) ->
@@ -97,7 +93,7 @@ execute(TestModule, TestType, {Mod, Fun}, TestMetaData) ->
     group_leader(NewGroupLeader, self()),
 
     UName = os:cmd("uname -a"),
-    lager:info("Test Runner `uname -a` : ~s", [UName]),
+    logger:info("Test Runner `uname -a` : ~s", [UName]),
 
     Pid = case TestType of
               riak_test   -> spawn_link(?MODULE, return_to_exit, [Mod, Fun, []]);
@@ -124,7 +120,7 @@ execute(TestModule, TestType, {Mod, Fun}, TestMetaData) ->
                 " failure stack trace =====================",
             ErrorFooter = [ $= || _X <- lists:seq(1,length(ErrorHeader))],
             Error = io_lib:format("~n~s~n~p~n~s~n", [ErrorHeader, Reason, ErrorFooter]),
-            lager:error(Error);
+            logger:error(Error);
         _ -> meh
     end,
     {Status, Reason}.
@@ -183,7 +179,7 @@ rec_loop(Pid, TestModule, TestMetaData) ->
             rec_loop(Pid, TestModule, TestMetaData);
         {'EXIT', Pid, normal} -> {pass, undefined};
         {'EXIT', Pid, Error} ->
-            lager:warning("~s failed: ~p", [TestModule, Error]),
+            logger:warning("~s failed: ~p", [TestModule, Error]),
             {fail, Error}
     end.
 
@@ -206,8 +202,8 @@ check_prereqs(Module) ->
         Attrs ->
             Prereqs = proplists:get_all_values(prereq, Attrs),
             P2 = [ {Prereq, rt_local:which(Prereq)} || Prereq <- Prereqs],
-            lager:info("~s prereqs: ~p", [Module, P2]),
-            [ lager:warning("~s prereq '~s' not installed.", [Module, P]) || {P, false} <- P2],
+            logger:info("~s prereqs: ~p", [Module, P2]),
+            [ logger:warning("~s prereq '~s' not installed.", [Module, P]) || {P, false} <- P2],
             lists:all(fun({_, Present}) -> Present end, P2)
     catch
         _DontCare:_Really ->

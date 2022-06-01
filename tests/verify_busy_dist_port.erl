@@ -48,34 +48,34 @@
 
 confirm() ->
     [Node1, Node2] = rt:build_cluster(2),
-    lager:info("deployed 2 nodes"),
+    logger:info("deployed 2 nodes"),
 
     rt:load_modules_on_nodes([cause_bdp, verify_bdp_event_handler,
                              riak_test_lager_backend], [Node1]),
     Res = rpc:call(Node1, verify_bdp_event_handler, add_handler, [self()]),
     ok = rpc:call(Node1, gen_event, add_handler, [lager_event, riak_test_lager_backend, [info, false]]),
     ok = rpc:call(Node1, lager, set_loglevel, [riak_test_lager_backend, info]),
-    lager:info("RES: ~p", [Res]),
+    logger:info("RES: ~p", [Res]),
 
     OsPid = rpc:call(Node2, os, getpid, []),
-    lager:info("pausing node 2 (~p) pid ~s", [Node2, OsPid]),
+    logger:info("pausing node 2 (~p) pid ~s", [Node2, OsPid]),
     %% must use cast here, call will never return
     rpc:cast(Node2, os, cmd, [lists:flatten(io_lib:format("kill -STOP ~s", [OsPid]))]),
 
-    lager:info("flooding node 2 (paused) with messages from node 1"),
+    logger:info("flooding node 2 (paused) with messages from node 1"),
     rpc:call(Node1, cause_bdp, spam_nodes, [[Node2]]),
 
 
     receive
         go ->
-            lager:info("busy_dist_port event fired on node 1 (~p), checking logs", [Node1])
+            logger:info("busy_dist_port event fired on node 1 (~p), checking logs", [Node1])
     after
         rt_config:get(rt_max_wait_time) ->
-            lager:error("no busy_dist_port event fired on node 1. test is borked",
+            logger:error("no busy_dist_port event fired on node 1. test is borked",
                         [])
     end,
 
-    lager:info("Verifying busy_dist_port message ended up in the log"),
+    logger:info("Verifying busy_dist_port message ended up in the log"),
     CheckLogFun = fun(Node) ->
             Logs = rpc:call(Node, riak_test_lager_backend, get_logs, []),
             try case re:run(Logs, "monitor busy_dist_port .*#Port", []) of
@@ -84,21 +84,21 @@ confirm() ->
                 end
             catch
                 Err:Reason ->
-                    lager:error("busy_dist_port re:run failed w/ ~p: ~p", [Err, Reason]),
+                    logger:error("busy_dist_port re:run failed w/ ~p: ~p", [Err, Reason]),
                     false
             end
     end,
 
     Success = case rt:wait_until(Node1, CheckLogFun) of
         ok ->
-            lager:info("found busy_dist_port message in log", []),
+            logger:info("found busy_dist_port message in log", []),
             true;
         _ ->
-            lager:error("busy_dist_port message not found in log", []),
+            logger:error("busy_dist_port message not found in log", []),
             false
     end,
 
-    lager:info("continuing node 2 (~p) pid ~s", [Node2, OsPid]),
+    logger:info("continuing node 2 (~p) pid ~s", [Node2, OsPid]),
     %% NOTE: this call must be executed on the OS running Node2 in order to unpause it
     %%       and not break future test runs. The command cannot be executed via
     %%       rpc:cast(Node2, os, cmd, ...) because Node2 is paused and will never process the

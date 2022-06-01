@@ -87,7 +87,7 @@ self_sink() ->
              chashfun=sink}.
 
 assert_no_zombies(Nodes) ->
-    lager:info("Verify no zombie pipe processes"),
+    logger:info("Verify no zombie pipe processes"),
     ?assertEqual([], zombies(Nodes)).
 
 %% @doc Find transient pipe processes sticking around. Should be run

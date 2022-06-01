@@ -54,13 +54,13 @@ confirm() ->
             rt:load_modules_on_nodes([?MODULE], Nodes),
 
             TestingTime = rt_config:get(eqc_testing_time, 120),
-            lager:info("Running vnode proxy overload property for ~p seconds\n",
-                       [TestingTime]),
+            logger:info("Running vnode proxy overload property for ~p seconds\n",
+                        [TestingTime]),
             ?assertEqual(true, rpc:call(Node1, ?MODULE, rtrun, [TestingTime])),
             pass;
         _ ->
-            lager:warning("EQC was unavailable on this machine - PASSing "
-                          "the test, but it did not run. Wish we could skip.\n", []),
+            logger:warning("EQC was unavailable on this machine - PASSing "
+                           "the test, but it did not run. Wish we could skip.\n", []),
             pass
     end.
 
@@ -449,7 +449,7 @@ setup_eqc(Nodes) ->
         add_eqc_apps(Nodes)
     catch
         _:Err ->
-            lager:info("EQC unavailable: ~p\n", [Err]),
+            logger:info("EQC unavailable: ~p\n", [Err]),
             {error, unavailable}
     end.
 
@@ -486,7 +486,7 @@ wait_for_vnode_change(VPid0, Index) ->
 -export([confirm/0]).
 
 confirm() ->
-    lager:info("EQC not enabled, skipping test"),
+    logger:info("EQC not enabled, skipping test"),
     pass.
 
 -endif.

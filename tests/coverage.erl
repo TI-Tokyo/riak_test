@@ -146,7 +146,7 @@ all_keys_present(Count, Keys, WhichTest) ->
                                 true ->
                                     true;
                                 false ->
-                                    lager:error("Missing ~s from ~s", [Key, WhichTest]),
+                                    logger:error("Missing ~s from ~s", [Key, WhichTest]),
                                     false
                             end
                   end, lists:seq(0, Count-1)),

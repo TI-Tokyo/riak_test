@@ -38,12 +38,12 @@ confirm() ->
     job_enable_common:set_enabled(Nodes, ?TOKEN_OLD_SEARCH, true),
 
     Path = rt_config:get(rt_scratch_dir),
-    lager:info("Creating scratch dir if necessary at ~s", [Path]),
+    logger:info("Creating scratch dir if necessary at ~s", [Path]),
     ?assertMatch({0, _}, rt:cmd("mkdir -p " ++ Path)),
     SearchRepoDir = filename:join(Path, "riak_search"),
-    lager:info("Deleting any previous riak_search repo ~s", [SearchRepoDir]),
+    logger:info("Deleting any previous riak_search repo ~s", [SearchRepoDir]),
     ?assertMatch({0, _}, rt:cmd("rm -rf " ++ SearchRepoDir)),
-    lager:info("Cloning riak_search repo within scratch dir"),
+    logger:info("Cloning riak_search repo within scratch dir"),
     ?assertMatch({0, _}, rt:cmd("git clone --depth 1 "++?SEARCH_REPO,
                                  [{cd, Path}])),
     BaseDir = filename:join([Path, "riak_search", "tests", "riak_search"]),
@@ -53,7 +53,7 @@ confirm() ->
     ?assert(is_list(TestDirs)),
     Run =
         fun(Dir) ->
-            lager:info("Running test in directory ~s", [Dir]),
+            logger:info("Running test in directory ~s", [Dir]),
             ?assertMatch(ok,
                          rpc:call(Node0, riak_search_test, test, [Dir]))
         end,

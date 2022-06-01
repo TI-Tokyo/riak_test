@@ -56,7 +56,7 @@
 -define(DELTA_COUNT, 10).
 
 confirm() ->
-    lager:info("Testing without rebuilds - using http api"),
+    logger:info("Testing without rebuilds - using http api"),
     Nodes0 = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD),
     ClientHeadHTTP = rt:httpc(hd(Nodes0)),
     ClientTailHTTP = rt:httpc(lists:last(Nodes0)),
@@ -65,7 +65,7 @@ confirm() ->
 
     rt:clean_cluster(Nodes0),
     
-    lager:info("Testing without rebuilds - using pb api"),
+    logger:info("Testing without rebuilds - using pb api"),
     Nodes1 = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD),
     ClientHeadPB = rt:pbc(hd(Nodes1)),
     ClientTailPB = rt:pbc(lists:last(Nodes1)),
@@ -77,7 +77,7 @@ confirm() ->
 
 verify_aae_fold(Nodes, Mod, CH, CT) ->
 
-    lager:info("Fold for empty tree range"),
+    logger:info("Fold for empty tree range"),
 
     {ok, {tree, RH0Mochi}} =
         Mod:aae_range_tree(CH, ?BUCKET, all, small, all, all, pre_hash),
@@ -87,7 +87,7 @@ verify_aae_fold(Nodes, Mod, CH, CT) ->
     RH0 = leveled_tictac:import_tree(RH0Mochi),
     RT0 = leveled_tictac:import_tree(RT0Mochi),
 
-    lager:info("Commencing object load"),
+    logger:info("Commencing object load"),
     KeyLoadFun =
         fun(Node, KeyCount) ->
             KVs = test_data(KeyCount + 1,
@@ -98,9 +98,9 @@ verify_aae_fold(Nodes, Mod, CH, CT) ->
         end,
 
     lists:foldl(KeyLoadFun, 1, Nodes),
-    lager:info("Loaded ~w objects", [?NUM_KEYS_PERNODE * length(Nodes)]),
+    logger:info("Loaded ~w objects", [?NUM_KEYS_PERNODE * length(Nodes)]),
 
-    lager:info("Fold for busy tree"),
+    logger:info("Fold for busy tree"),
     {ok, {tree, RH1Mochi}} =
         Mod:aae_range_tree(CH, ?BUCKET, all, small, all, all, pre_hash),
     {ok, {tree, RT1Mochi}} =
@@ -115,7 +115,7 @@ verify_aae_fold(Nodes, Mod, CH, CT) ->
 
     ?assertEqual([], aae_exchange:compare_trees(RH1, RT1)),
 
-    lager:info("Make ~w changes", [?DELTA_COUNT]),
+    logger:info("Make ~w changes", [?DELTA_COUNT]),
     Changes2 = test_data(1, ?DELTA_COUNT, list_to_binary("U2")),
     ok = write_data(hd(Nodes), Changes2),
 
@@ -125,16 +125,16 @@ verify_aae_fold(Nodes, Mod, CH, CT) ->
 
     DirtySegments1 = aae_exchange:compare_trees(RH1, RH2),
 
-    lager:info("Found ~w mismatched segments", [length(DirtySegments1)]),
+    logger:info("Found ~w mismatched segments", [length(DirtySegments1)]),
     ?assertMatch(N when N >= ?DELTA_COUNT, length(DirtySegments1)),
 
     {ok, {keysclocks, KCL1}} =
         Mod:aae_range_clocks(CH, ?BUCKET, all, {DirtySegments1, small}, all),
 
-    lager:info("Found ~w mismatched keys", [length(KCL1)]),
+    logger:info("Found ~w mismatched keys", [length(KCL1)]),
 
     ?assertMatch(N when N >= ?DELTA_COUNT, length(KCL1)),
-    lager:info("Checking all mismatched keys in result"),
+    logger:info("Checking all mismatched keys in result"),
     MatchFun =
         fun(I) ->
                 K = to_key(I),
@@ -144,7 +144,7 @@ verify_aae_fold(Nodes, Mod, CH, CT) ->
         end,
     lists:foreach(MatchFun, lists:seq(1, ?DELTA_COUNT)),
 
-    lager:info("Stopping a node - query results should be unchanged"),
+    logger:info("Stopping a node - query results should be unchanged"),
     rt:stop_and_wait(hd(tl(Nodes))),
 
     {ok, {keysclocks, KCL2}} =

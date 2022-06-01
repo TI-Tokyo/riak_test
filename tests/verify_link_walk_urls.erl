@@ -36,7 +36,7 @@ confirm() ->
     [Node0 | _] = rt:build_cluster(?NUM_NODES),
     Pbc = rt:pbc(Node0),
 
-    lager:info("Inserting linked graph"),
+    logger:info("Inserting linked graph"),
     %%               (deleted)        (b/4,v4b) <-> (b/5,v5b)
     %%                  |            /
     %% (a/1,v1) <-> (a/2,v2) <-> (a/3,v3) <-> (a/4,v4) <-> (a/5,v5)  >
@@ -52,7 +52,7 @@ confirm() ->
 
     Config = get_config(Node0),
 
-    lager:info("Verifying link walk queries"),
+    logger:info("Verifying link walk queries"),
 
     verify_query(Config, "a", "1", "_,next,1",
                  ["v2"]),
@@ -93,12 +93,12 @@ confirm() ->
     verify_query(Config, "a", "5", "_,_,1",
                  ["v1", "v4"]),
 
-    lager:info("Au revoir mes amies"),
+    logger:info("Au revoir mes amies"),
     riakc_pb_socket:stop(Pbc),
     pass.
 
 verify_query(Cfg, Bucket, Key, Query, Expected) ->
-    lager:info("Verifying (~p,~p) '~s' -> ~p", [Bucket, Key, Query, Expected]),
+    logger:info("Verifying (~p,~p) '~s' -> ~p", [Bucket, Key, Query, Expected]),
     ?assertEqual(Expected, link_query(Cfg, Bucket, Key, Query)).
 
 

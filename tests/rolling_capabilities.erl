@@ -57,19 +57,19 @@ confirm() ->
         _ -> []
     end,
     
-    lager:info("Deploying Riak ~p cluster", [OldVsn]),
+    logger:info("Deploying Riak ~p cluster", [OldVsn]),
     Nodes = rt:build_cluster([OldVsn || _ <- lists:seq(1,Count)]),
     lists:foldl(fun(Node, Upgraded) ->
                         rt:upgrade(Node, current),
                         Upgraded2 = Upgraded ++ [Node],
-                        lager:info("Verifying rolling/old capabilities"),
+                        logger:info("Verifying rolling/old capabilities"),
                         (Upgraded2 == Nodes)
                             orelse check_capabilities(Upgraded2, ExpectedOld),
                         Upgraded2
                 end, [], Nodes),
-    lager:info("Verifying final/upgraded capabilities"),
+    logger:info("Verifying final/upgraded capabilities"),
     check_capabilities(Nodes, ExpectedCurrent),
-    lager:info("Test ~p passed", [?MODULE]),
+    logger:info("Test ~p passed", [?MODULE]),
     pass.
 
 check_capabilities(Nodes, Expected) ->
@@ -85,5 +85,5 @@ check_capabilities(Nodes, Expected) ->
 
 verify_capability({ExpProj, ExpCap}, ExpVal, Caps) ->
     CurVal = proplists:get_value({ExpProj, ExpCap}, Caps),
-    lager:info("Verifying: ~p ~p ~p ~p", [ExpProj, ExpCap, ExpVal, CurVal]),
+    logger:info("Verifying: ~p ~p ~p ~p", [ExpProj, ExpCap, ExpVal, CurVal]),
     CurVal =:=  ExpVal.

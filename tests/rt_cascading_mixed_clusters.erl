@@ -47,7 +47,7 @@ confirm() ->
 
     case rt_config:config_or_os_env(run_rt_cascading_1_3_tests, false) of
         false ->
-            lager:info("mixed_version_clusters_test_ not configured to run!");
+            logger:info("mixed_version_clusters_test_ not configured to run!");
         _ ->
             State = mixed_version_clusters_setup(),
             _ = mixed_version_clusters_tests(State)
@@ -212,7 +212,7 @@ mixed_version_clusters_tests(Nodes) ->
                        end,
             NodeTests = [MakeTest(Node, N) || Node <- Nodes, N <- lists:seq(1, 3)],
             lists:foreach(fun({Name, Eval}) ->
-                lager:info("===== mixed version cluster: upgrade world: ~s =====", [Name]),
+                logger:info("===== mixed version cluster: upgrade world: ~s =====", [Name]),
                 Eval()
                           end, NodeTests)
                                                       end},
@@ -223,6 +223,6 @@ mixed_version_clusters_tests(Nodes) ->
 
     ],
     lists:foreach(fun({Name, Eval}) ->
-        lager:info("===== mixed version cluster: ~p =====", [Name]),
+        logger:info("===== mixed version cluster: ~p =====", [Name]),
         Eval()
                   end, Tests).

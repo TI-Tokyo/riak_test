@@ -79,13 +79,13 @@ run_test(Config, AsyncWrites) ->
     %%
     %% Deploy 2 nodes based on config.  Wait for K/V to start on each node.
     %%
-    lager:info("Deploying 2 nodes..."),
+    logger:info("Deploying 2 nodes..."),
     Cluster = [RootNode, NewNode] = rt:deploy_nodes(2, Config),
     [rt:wait_for_service(Node, riak_kv) || Node <- [RootNode, NewNode]],
     %%
     %% Set up the intercepts
     %%
-    lager:info("Setting up intercepts..."),
+    logger:info("Setting up intercepts..."),
     make_intercepts_tab(RootNode),
     % This intercept will tell the backround process (below) to send an event for each
     % vnode that is being handed off (there will be 4 such vnodes, in this test case)
@@ -106,7 +106,7 @@ run_test(Config, AsyncWrites) ->
     %%
     %% Seed the root node with some data
     %%
-    lager:info("Populating root node..."),
+    logger:info("Populating root node..."),
     rt:create_and_activate_bucket_type(RootNode, ?BUCKET_TYPE, [{write_once, true}, {n_val, 1}]),
     NTestItems = 100,
     RingSize = proplists:get_value(ring_creation_size, proplists:get_value(riak_core, Config)),
@@ -114,7 +114,7 @@ run_test(Config, AsyncWrites) ->
     %%
     %% Start an asynchronous proc which will send puts into riak during handoff.
     %%
-    lager:info("Joining new node with cluster..."),
+    logger:info("Joining new node with cluster..."),
     start_proc(RootNode, NTestItems, RingSize div 2),
     rt:join(NewNode, RootNode),
     TotalSent = wait_until_async_writes_complete(),
@@ -125,13 +125,13 @@ run_test(Config, AsyncWrites) ->
     %%
     %% Verify the results
     %%
-    lager:info("Validating data after handoff..."),
+    logger:info("Validating data after handoff..."),
     Results2 = rt:systest_read(NewNode, 1, TotalSent, ?BUCKET, 1),
     ?assertMatch([], Results2),
-    lager:info("Read ~p entries.", [TotalSent]),
+    logger:info("Read ~p entries.", [TotalSent]),
     [{_, Count}] = rpc:call(RootNode, ets, lookup, [intercepts_tab, w1c_put_counter]),
     ?assertEqual(RingSize div 2, Count),
-    lager:info("We handled ~p write_once puts during handoff.", [Count]),
+    logger:info("We handled ~p write_once puts during handoff.", [Count]),
     [{_, W1CAsyncReplies}] = rpc:call(RootNode, ets, lookup, [intercepts_tab, w1c_async_replies]),
     [{_, W1CSyncReplies}]  = rpc:call(RootNode, ets, lookup, [intercepts_tab, w1c_sync_replies]),
     case AsyncWrites of
@@ -192,7 +192,7 @@ loop(#state{node=Node, sender=Sender, k=K, pids=Pids, expected=Expected, init=In
                     %% point, we are done, so we can tell the test to proceed and wait for handoff to complete.
                     %%
                     [] = rt:systest_write(Node, K + 1, K + Expected, ?BUCKET, 1),
-                    lager:info(
+                    logger:info(
                         "Asynchronously wrote entries [~p..~p] during handoff.  Sending ok's back to ~p waiting vnode(s)...",
                         [K + 1, K + Expected, NumPids]
                     ),

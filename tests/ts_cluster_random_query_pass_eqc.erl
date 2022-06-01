@@ -41,10 +41,10 @@ prop_ts(ClusterConn) ->
 run_query(ClusterConn, NVal, NPuts, Q, NSpans) ->
 
     Bucket = "Bucket_" ++ timestamp(),
-    lager:debug("Bucket is ~p~n", [Bucket]),
+    logger:debug("Bucket is ~p~n", [Bucket]),
 
     DDL = get_ddl(Bucket, Q),
-    lager:debug("DDL is ~p~n", [DDL]),
+    logger:debug("DDL is ~p~n", [DDL]),
 
     Data = make_data(NPuts, Q, NSpans),
     Query = make_query(Bucket, Q, NSpans),

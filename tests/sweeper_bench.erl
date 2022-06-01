@@ -53,13 +53,13 @@ bench(Name, BenchAction, Sweep) ->
 
     [Node] = Nodes = rt:build_cluster(1, Config),
     disable_sweep_scheduling(Nodes),
-    lager:info("Start ttl loading bench"),
+    logger:info("Start ttl loading bench"),
     start_basho_bench(Nodes, "putttl", BenchAction),
 
     BenchDuration =
         rt_config:get(basho_bench_duration, ?DEFAULT_BENCH_DURATION),
     timer:sleep(timer:minutes(trunc(BenchDuration) + 2)),
-    lager:info("Start normal bench"),
+    logger:info("Start normal bench"),
 
      start_basho_bench(Nodes, Name, [{put, 1},
                                      {update, 1},
@@ -119,16 +119,16 @@ bacho_bench_config(HostList, Operations) ->
 
 
 disable_sweep_scheduling(Nodes) ->
-    lager:info("disable sweep scheduling"),
+    logger:info("disable sweep scheduling"),
     {Succ, Fail} = rpc:multicall(Nodes, riak_kv_sweeper, stop_all_sweeps, []),
     BadResults = [Res || Res <- Succ, not is_integer(Res)],
     ?assertEqual([], BadResults),
     ?assertEqual([], Fail).
 
 %% enable_sweep_scheduling(Nodes) ->
-%%     lager:info("enable sweep scheduling"),
+%%     logger:info("enable sweep scheduling"),
 %%     rpc:multicall(Nodes, riak_kv_sweeper, enable_sweep_scheduling, []).
 
 manual_sweep(Node, Partition) ->
-   lager:info("Manual sweep index ~p", [Partition]),
+   logger:info("Manual sweep index ~p", [Partition]),
    rpc:call(Node, riak_kv_sweeper, sweep, [Partition]).

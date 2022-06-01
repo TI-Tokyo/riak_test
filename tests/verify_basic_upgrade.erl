@@ -54,7 +54,7 @@ confirm() ->
         rt:build_clusters([{4, OldVsn, ?CONFIG(8, 3)}]),
     [Node1|_] = Nodes,
 
-    lager:info("Writing ~w keys to ~p", [?NUM_KEYS, Node1]),
+    logger:info("Writing ~w keys to ~p", [?NUM_KEYS, Node1]),
     rt:systest_write(Node1, ?NUM_KEYS, 3),
     ?assertEqual([], rt:systest_read(Node1, ?NUM_KEYS, 1)),
 
@@ -65,9 +65,9 @@ confirm() ->
     pass.
 
 upgrade(Node, NewVsn) ->
-    lager:info("Upgrading ~p to ~p", [Node, NewVsn]),
+    logger:info("Upgrading ~p to ~p", [Node, NewVsn]),
     rt:upgrade(Node, NewVsn),
     rt:wait_for_service(Node, riak_kv),
-    lager:info("Ensuring keys still exist"),
+    logger:info("Ensuring keys still exist"),
     ?assertEqual([], rt:systest_read(Node, ?NUM_KEYS, 1)),
     ok.

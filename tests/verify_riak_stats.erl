@@ -42,15 +42,15 @@ confirm() ->
     KVBackend = proplists:get_value(backend, TestMetaData),
     HeadSupport = has_head_support(KVBackend),
 
-    lager:info("Verifying that all expected stats keys are present from the HTTP endpoint"),
+    logger:info("Verifying that all expected stats keys are present from the HTTP endpoint"),
     ok = verify_stats_keys_complete(Node1, Stats1),
 
     AdminStats1 = get_console_stats(Node1),
-    lager:info("Verifying that the stats keys in riak admin status and HTTP match"),
+    logger:info("Verifying that the stats keys in riak admin status and HTTP match"),
     ok = compare_http_and_console_stats(Stats1, AdminStats1),
 
     %% make sure a set of stats have valid values
-    lager:info("Verifying that the system and ring stats have valid values"),
+    logger:info("Verifying that the system and ring stats have valid values"),
     verify_nz(Stats1,[<<"cpu_nprocs">>,
                       <<"mem_total">>,
                       <<"mem_allocated">>,
@@ -71,8 +71,8 @@ confirm() ->
                       <<"memory_ets">>]),
 
 
-    lager:info("perform 5 x  PUT and a GET to increment the stats"),
-    lager:info("as the stat system only does calcs for > 5 readings"),
+    logger:info("perform 5 x  PUT and a GET to increment the stats"),
+    logger:info("as the stat system only does calcs for > 5 readings"),
 
     C = rt:httpc(Node1),
     [rt:httpc_write(C, <<"systest">>, <<X>>, <<"12345">>) || X <- lists:seq(1, 5)],
@@ -124,7 +124,7 @@ confirm() ->
                        <<"node_put_fsm_time_99">>,
                        <<"node_put_fsm_time_100">>]),
 
-    lager:info("Make PBC Connection"),
+    logger:info("Make PBC Connection"),
     Pid = rt:pbc(Node1),
 
     Stats3 = get_stats(Node1),
@@ -137,7 +137,7 @@ confirm() ->
 
 
 
-    lager:info("Force Read Repair"),
+    logger:info("Force Read Repair"),
     rt:pbc_write(Pid, <<"testbucket">>, <<"1">>, <<"blah!">>),
     rt:pbc_set_bucket_prop(Pid, <<"testbucket">>, [{n_val, 4}]),
 
@@ -154,19 +154,19 @@ confirm() ->
 
     _ = do_datatypes(Pid),
 
-    lager:info("Verifying datatype stats are non-zero."),
+    logger:info("Verifying datatype stats are non-zero."),
 
     Stats6 = get_stats(Node1),
     [
      begin
-         lager:info("~s: ~p (expected non-zero)", [S, proplists:get_value(S, Stats6)]),
+         logger:info("~s: ~p (expected non-zero)", [S, proplists:get_value(S, Stats6)]),
          verify_nz(Stats6, [S])
      end || S <- datatype_stats() ],
 
     _ = do_pools(Node1),
 
     Stats7 = get_stats(Node1),
-    lager:info("Verifying pool stats are incremented"),
+    logger:info("Verifying pool stats are incremented"),
 
     verify_inc(Stats6, Stats7, inc_by_one(dscp_totals())),
 
@@ -176,7 +176,7 @@ verify_inc(Prev, Props, Keys) ->
     [begin
          Old = proplists:get_value(Key, Prev, 0),
          New = proplists:get_value(Key, Props, 0),
-         lager:info("~s: ~p -> ~p (expected ~p)", [Key, Old, New, Old + Inc]),
+         logger:info("~s: ~p -> ~p (expected ~p)", [Key, Old, New, Old + Inc]),
          ?assertEqual(New, (Old + Inc))
      end || {Key, Inc} <- Keys].
 
@@ -193,12 +193,12 @@ get_stats(Node) ->
 
 get_stats(Node, Wait) ->
     timer:sleep(Wait),
-    lager:info("Retrieving stats from node ~s", [Node]),
+    logger:info("Retrieving stats from node ~s", [Node]),
     StatsCommand = io_lib:format("curl -s -S ~s/stats", [rt:http_url(Node)]),
-    lager:debug("Retrieving stats using command ~s", [StatsCommand]),
+    logger:debug("Retrieving stats using command ~s", [StatsCommand]),
     StatString = os:cmd(StatsCommand),
     {struct, Stats} = mochijson2:decode(StatString),
-    %%lager:debug(StatString),
+    %%logger:debug(StatString),
     Stats.
 
 get_console_stats(Node) ->
@@ -213,7 +213,7 @@ get_console_stats(Node) ->
             N = rtdev:node_id(Node),
             Path = rtdev:relpath(rtdev:node_version(N)),
             Cmd = rtdev:riak_admin_cmd(Path, N, ["status"]),
-            lager:info("Cmd = ~p~n", [lists:flatten(Cmd)]),
+            logger:info("Cmd = ~p~n", [lists:flatten(Cmd)]),
             os:cmd(Cmd);
         _ ->
             rt:admin(Node, "status")
@@ -223,7 +223,7 @@ get_console_stats(Node) ->
            || L <- tl(tl(string:tokens(Stats, "\n")))]]
     catch
 	    ?_exception_(Error, Reason, StackToken) ->
-	    lager:info("riak admin status ~p: ~p~n~p~n",
+	    logger:info("riak admin status ~p: ~p~n~p~n",
 		       [Error, Reason, ?_get_stacktrace_(StackToken)]),
 	    []
     end.
@@ -256,7 +256,7 @@ diff_lists(List, ThatList) ->
 maybe_log_stats_keys(StatsKeys, _Description) when length(StatsKeys) == 0 ->
     ok;
 maybe_log_stats_keys(StatsKeys, Description) ->
-    lager:info("~s: ~s", [Description, pretty_print_stats_keys(StatsKeys)]).
+    logger:info("~s: ~s", [Description, pretty_print_stats_keys(StatsKeys)]).
 
 -spec pretty_print_stats_keys([binary()]) -> string().
 pretty_print_stats_keys(StatsKeys) ->
@@ -1102,7 +1102,7 @@ do_pool(Node, Pool) ->
     FinishFun = fun(ok) -> ok end,
     Work = {fold, WorkFun, FinishFun},
     Res = rpc:call(Node, riak_core_node_worker_pool, handle_work, [Pool, Work, undefined]),
-    lager:info("Pool ~p returned ~p", [Pool, Res]).
+    logger:info("Pool ~p returned ~p", [Pool, Res]).
 
 inc_by_one(StatNames) ->
     inc_by(StatNames, 1).

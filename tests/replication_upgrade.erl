@@ -6,22 +6,22 @@
 confirm() ->
 
     OrigDelay = rt_config:get(rt_retry_delay, 1000),
-    lager:info("Original rt_retry_delay is ~p", [OrigDelay]),
+    logger:info("Original rt_retry_delay is ~p", [OrigDelay]),
     rt_config:set(rt_retry_delay, OrigDelay*5),
     NewDelay = rt_config:get(rt_retry_delay),
-    lager:info("New rt_retry_delay is ~p", [NewDelay]),
+    logger:info("New rt_retry_delay is ~p", [NewDelay]),
 
     TestMetaData = riak_test_runner:metadata(),
     FromVersion = proplists:get_value(upgrade_version, TestMetaData, previous),
 
-    lager:info("Doing rolling replication upgrade test from ~p to ~p",
+    logger:info("Doing rolling replication upgrade test from ~p to ~p",
         [FromVersion, "current"]),
 
     NumNodes = rt_config:get(num_nodes, 6),
 
     UpgradeOrder = rt_config:get(repl_upgrade_order, "forwards"),
 
-    lager:info("Deploy ~p nodes", [NumNodes]),
+    logger:info("Deploy ~p nodes", [NumNodes]),
     Conf = [
             {riak_repl,
              [
@@ -47,31 +47,31 @@ confirm() ->
             %% halfass randomization
             lists:sort(fun(_, _) -> rand:uniform(100) < 50 end, Nodes);
         Other ->
-            lager:error("Invalid upgrade ordering ~p", [Other]),
+            logger:error("Invalid upgrade ordering ~p", [Other]),
             erlang:exit()
     end,
 
     ClusterASize = rt_config:get(cluster_a_size, 3),
     {ANodes, BNodes} = lists:split(ClusterASize, Nodes),
-    lager:info("ANodes: ~p", [ANodes]),
-    lager:info("BNodes: ~p", [BNodes]),
+    logger:info("ANodes: ~p", [ANodes]),
+    logger:info("BNodes: ~p", [BNodes]),
 
-    lager:info("Build cluster A"),
+    logger:info("Build cluster A"),
     repl_util:make_cluster(ANodes),
 
-    lager:info("Build cluster B"),
+    logger:info("Build cluster B"),
     repl_util:make_cluster(BNodes),
 
-    lager:info("Replication First pass...homogenous cluster"),
+    logger:info("Replication First pass...homogenous cluster"),
 
     %% initial replication run, homogeneous cluster
     replication:replication(ANodes, BNodes, false),
 
-    lager:info("Upgrading nodes in order: ~p", [NodeUpgrades]),
+    logger:info("Upgrading nodes in order: ~p", [NodeUpgrades]),
     rt:log_to_nodes(Nodes, "Upgrading nodes in order: ~p", [NodeUpgrades]),
     %% upgrade the nodes, one at a time
     ok = lists:foreach(fun(Node) ->
-                               lager:info("Upgrade node: ~p", [Node]),
+                               logger:info("Upgrade node: ~p", [Node]),
                                rt:log_to_nodes(Nodes, "Upgrade node: ~p", [Node]),
                                rt:upgrade(Node, current, fun replication2_upgrade:remove_jmx_from_conf/1),
                                rt:wait_until_pingable(Node),
@@ -96,10 +96,10 @@ confirm() ->
                                    false ->
                                        ok
                                end,
-                               lager:info("Replication with upgraded node: ~p", [Node]),
+                               logger:info("Replication with upgraded node: ~p", [Node]),
                                rt:log_to_nodes(Nodes, "Replication with upgraded node: ~p", [Node]),
                                replication:replication(ANodes, BNodes, true)
                        end, NodeUpgrades),
-    lager:info("Resetting rt_retry_delay to ~p", [OrigDelay]),
+    logger:info("Resetting rt_retry_delay to ~p", [OrigDelay]),
     rt_config:set(rt_retry_delay, OrigDelay),
     pass.

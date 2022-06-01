@@ -28,7 +28,7 @@ confirm() ->
     NVal = 5,
 
     Config = ensemble_util:fast_config(NVal, false),
-    lager:info("Building cluster with consensus enabled and AAE disabled. Waiting for ensemble to stablize ..."),
+    logger:info("Building cluster with consensus enabled and AAE disabled. Waiting for ensemble to stablize ..."),
 
     _ = ensemble_util:build_cluster_without_quorum(NumNodes, Config),
     pass.

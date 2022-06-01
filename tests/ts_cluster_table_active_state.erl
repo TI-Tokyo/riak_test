@@ -40,7 +40,7 @@ confirm() ->
 run(_PBPid, _Cluster, _MaxWait, _Run=0, _Runs) ->
     pass;
 run(PBPid, Cluster, MaxWait, Run, Runs) ->
-    lager:info("Run ~p/~p", [Run, Runs]),
+    logger:info("Run ~p/~p", [Run, Runs]),
     Waits = [ case Div of
                   0 -> 0;
                   _ -> MaxWait div Div

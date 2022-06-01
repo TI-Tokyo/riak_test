@@ -7,7 +7,7 @@
 
 confirm() ->
     application:start(inets),
-    lager:info("Deploy some nodes"),
+    logger:info("Deploy some nodes"),
     Nodes = rt:build_cluster(4),
 
     %% calculate the preflist for foo/bar
@@ -17,11 +17,11 @@ confirm() ->
                 <<"bar">>}]),
     N = 3,
     Preflist2 = riak_core_apl:get_apl_ann(DocIdx, N, Ring, UpNodes),
-    lager:info("Preflist is ~p", [Preflist2]),
+    logger:info("Preflist is ~p", [Preflist2]),
     PLNodes = [Node || {{_Index, Node}, _Status} <- Preflist2],
-    lager:info("Nodes in preflist ~p", [PLNodes]),
+    logger:info("Nodes in preflist ~p", [PLNodes]),
     [SafeNode] = Nodes -- PLNodes,
-    lager:info("Node not involved in this preflist ~p", [SafeNode]),
+    logger:info("Node not involved in this preflist ~p", [SafeNode]),
     %% connect to the only node in the preflist we won't break, to avoid
     %% random put forwarding
     {ok, C} = riak:client_connect(hd(PLNodes)),
@@ -58,7 +58,7 @@ confirm() ->
     rt_intercept:add(Node, {riak_kv_vnode,  [{{do_get,4}, drop_do_get},
                                                 {{do_head, 4}, drop_do_head},
                                                 {{do_put, 7}, drop_do_put}]}),
-    lager:info("disabling do_get and do_head for index ~p on ~p", [Index, Node]),
+    logger:info("disabling do_get and do_head for index ~p on ~p", [Index, Node]),
     rt:log_to_nodes(Nodes, "disabling do_get and do_head for index ~p on ~p", [Index, Node]),
     timer:sleep(100),
 
@@ -96,7 +96,7 @@ confirm() ->
     rt_intercept:add(Node2, {riak_kv_vnode,  [{{do_get,4}, drop_do_get},
                                                 {{do_head, 4}, drop_do_head},
                                                 {{do_put, 7}, drop_do_put}]}),
-    lager:info("disabling do_get, do_put and do_head for index ~p on ~p", [Index2, Node2]),
+    logger:info("disabling do_get, do_put and do_head for index ~p on ~p", [Index2, Node2]),
     rt:log_to_nodes(Nodes, "disabling do_get, do_put and do_head for index ~p on ~p", [Index2, Node2]),
     timer:sleep(100),
 
@@ -135,7 +135,7 @@ confirm() ->
     %% make a vnode start to fail puts
     make_intercepts_tab(Node2, Index2),
     rt_intercept:add(Node2, {riak_kv_vnode,  [{{do_put, 7}, error_do_put}]}),
-    lager:info("failing do_put for index ~p on ~p", [Index2, Node2]),
+    logger:info("failing do_put for index ~p on ~p", [Index2, Node2]),
     rt:log_to_nodes(Nodes, "failing do_put for index ~p on ~p", [Index2, Node2]),
     timer:sleep(100),
 

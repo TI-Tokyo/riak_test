@@ -50,11 +50,11 @@ confirm() ->
 
 
 verify_siblingmerge(Cluster) ->
-    lager:info("Select two different nodes that are primaries"),
+    logger:info("Select two different nodes that are primaries"),
     {Node1A, Node2A} =
         select_two_different_primarynodes(Cluster, ?AMT_BUCKET, to_key(1)),
 
-    lager:info("Testing allow_mult = true"),
+    logger:info("Testing allow_mult = true"),
     AMTopts = [{allow_mult, true}],
     ok = set_bucket(Node1A, ?AMT_BUCKET, AMTopts),
     ok = rt:wait_until_bucket_props(Cluster, ?AMT_BUCKET, AMTopts),
@@ -65,7 +65,7 @@ verify_siblingmerge(Cluster) ->
     ExpectedValsBoth = [<<1:8/integer>>, <<2:8/integer>>],
     test_replicas(Node1A, ?AMT_BUCKET, to_key(1), ExpectedValsBoth),
 
-    lager:info("Testing allow_mult = false"),
+    logger:info("Testing allow_mult = false"),
     {Node1B, Node2B} =
         select_two_different_primarynodes(Cluster, ?AMF_BUCKET, to_key(1)),
     ok = set_bucket(Node1B, ?AMF_BUCKET, [{allow_mult, false}]),
@@ -135,7 +135,7 @@ get_replica(Node, Bucket, Key, I, N) ->
             Reply
     after
         60000 ->
-            lager:error("Replica ~p get for ~p/~p timed out",
+            logger:error("Replica ~p get for ~p/~p timed out",
                         [I, Bucket, Key]),
             ?assert(false)
     end.

@@ -32,7 +32,7 @@ confirm() ->
     NVal = ?NVAL,
     _Quorum = NVal div 2 + 1,
     Config = config(),
-    lager:info("Building cluster and waiting for ensemble to stablize"),
+    logger:info("Building cluster and waiting for ensemble to stablize"),
     Nodes = ensemble_util:build_cluster(NumNodes, Config, NVal),
     vnode_util:load(Nodes),
     Node = hd(Nodes),
@@ -46,7 +46,7 @@ confirm() ->
 
     {ok, PL} = get_preflist(Node, Bucket, Key, NVal),
     ?assertEqual(NVal, length(PL)),
-    lager:info("PREFERENCE LIST: ~n  ~p", [PL]),
+    logger:info("PREFERENCE LIST: ~n  ~p", [PL]),
 
     PBC = rt:pbc(Node),
 
@@ -113,7 +113,7 @@ test_lose_all_but_one_partition(PBC, Bucket, Key, Val, PL) ->
     Wiped = tl(PL),
     {{Idx0, Node0}, primary} = hd(PL),
     Ensemble = {kv, Idx0, 5},
-    lager:info("Wiping Data on Following Vnodes: ~p", [Wiped]),
+    logger:info("Wiping Data on Following Vnodes: ~p", [Wiped]),
     wipe_partitions(Wiped),
     ensemble_util:wait_until_quorum(Node0, Ensemble),
     assert_valid_read(PBC, Bucket, Key, Val).
@@ -124,7 +124,7 @@ test_lose_one_node_one_partition(PBC, Bucket, Key, Val, PL) ->
     Leader = ensemble_util:get_leader_pid(Node0, Ensemble),
     LeaderNode = node(Leader),
     LeaderIdx = get_leader_idx(PL, LeaderNode),
-    lager:info("Wiping Idx ~p data on LeaderNode ~p", [LeaderIdx, LeaderNode]),
+    logger:info("Wiping Idx ~p data on LeaderNode ~p", [LeaderIdx, LeaderNode]),
     wipe_partition(LeaderIdx, LeaderNode),
     ensemble_util:wait_until_quorum(LeaderNode, Ensemble),
     assert_valid_read(PBC, Bucket, Key, Val).
@@ -180,7 +180,7 @@ test_backup_restore_data_not_trees(Bucket, Key, _Val, PL) ->
 test_lose_all_data(PBC, Bucket, Key, PL) ->
     wipe_partitions(PL),
     {error, _}=E = riakc_pb_socket:get(PBC, Bucket, Key, []),
-    lager:info("All data loss error = ~p", [E]).
+    logger:info("All data loss error = ~p", [E]).
 
 assert_valid_read(PBC, Bucket, Key, Val) ->
     ReadFun = fun() ->
@@ -193,9 +193,9 @@ assert_failed_read(PBC, Bucket, Key) ->
     ?assertMatch({error, _}, riakc_pb_socket:get(PBC, Bucket, Key, [])).
 
 normal_write_and_read(PBC, Bucket, Key, Val) ->
-    lager:info("Writing a consistent key"),
+    logger:info("Writing a consistent key"),
     ok = rt:pbc_write(PBC, Bucket, Key, Val),
-    lager:info("Read key to verify it exists"),
+    logger:info("Read key to verify it exists"),
     assert_valid_read(PBC, Bucket, Key, Val).
 
 stop_nodes(PL) ->
@@ -217,7 +217,7 @@ backup_node(Node, N) ->
     Path = data_path(Node),
     BackupPath = backup_path(Node, N),
     Cmd = "cp -R "++Path++" "++BackupPath,
-    lager:info("~p", [os:cmd(Cmd)]).
+    logger:info("~p", [os:cmd(Cmd)]).
 
 restore_data(N, PL) ->
     [restore_node(Node, N) || {{_, Node}, _} <- PL].
@@ -254,7 +254,7 @@ kill_peers(Ensemble, Nodes) ->
     Node = hd(Nodes),
     {_, [View | _]} = rpc:call(Node, riak_ensemble_manager, get_views, [Ensemble]),
     Peers = [P || P={_Id, N} <- View, lists:member(N, Nodes)],
-    lager:info("Killing Peers: ~p", [Peers]),
+    logger:info("Killing Peers: ~p", [Peers]),
     Pids = [rpc:call(Node, riak_ensemble_manager, get_peer_pid,
                      [Ensemble, Peer]) || Peer <- Peers],
     [exit(Pid, kill) || Pid <- Pids, Pid =/= undefined].
@@ -270,7 +270,7 @@ wipe_tree(Ensemble, Idx, Node) ->
     {_, [View | _]} = rpc:call(Node, riak_ensemble_manager, get_views, [Ensemble]),
     [Peer] = [P || P={_Id, N} <- View, Node =:= N],
     Pid = rpc:call(Node, riak_ensemble_manager, get_peer_pid, [Ensemble, Peer]),
-    lager:info("Peer= ~p, Pid = ~p", [Peer, Pid]),
+    logger:info("Peer= ~p, Pid = ~p", [Peer, Pid]),
     exit(Pid, kill).
 
 wipe_partition(Idx, Node) ->
@@ -305,7 +305,7 @@ get_preflist(Node, Bucket, Key, NVal) ->
     {ok, PL}.
 
 create_strong_bucket_type(Node, NVal) ->
-    lager:info("Creating/activating 'strong' bucket type"),
+    logger:info("Creating/activating 'strong' bucket type"),
     rt:create_and_activate_bucket_type(Node, <<"strong">>,
                                        [{consistent, true}, {n_val, NVal}]),
     ensemble_util:wait_until_stable(Node, NVal).

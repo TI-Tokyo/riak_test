@@ -50,7 +50,7 @@ confirm() ->
     rt:load_modules_on_nodes([?MODULE], Nodes),
 
     [ begin
-          lager:info("Running test ~p", [T]),
+          logger:info("Running test ~p", [T]),
           ?MODULE:T(Nodes)
       end
       || T<- [synchronous,

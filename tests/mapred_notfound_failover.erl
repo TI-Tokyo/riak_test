@@ -49,7 +49,7 @@ confirm() ->
     load_test_data(Nodes),
 
     [ begin
-          lager:info("Running test ~p", [T]),
+          logger:info("Running test ~p", [T]),
           run_test(Nodes, T)
       end
       || T <- [actual_notfound,
@@ -58,7 +58,7 @@ confirm() ->
 
 load_test_data([Node|_]) ->
     %% creates foonum/1..?NUM_INTS - this is what populates ?INTS_BUCKET
-    lager:info("Filling INTS_BUCKET (~s)", [?INTS_BUCKET]),
+    logger:info("Filling INTS_BUCKET (~s)", [?INTS_BUCKET]),
     ok = rpc:call(Node, riak_kv_mrc_pipe, example_setup, [?NUM_INTS]).
 
 rpcmr(Node, Inputs, Query) ->

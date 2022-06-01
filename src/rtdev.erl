@@ -54,7 +54,7 @@ riak_debug_cmd(Path, N) ->
     lists:flatten(io_lib:format("~s/dev/dev~b/riak/bin/~s-debug", [Path, N, ExecName])).
 
 run_riak(N, Path, Cmd) ->
-    lager:info("Running: ~s", [riakcmd(Path, N, Cmd)]),
+    logger:info("Running: ~s", [riakcmd(Path, N, Cmd)]),
     R = os:cmd(riakcmd(Path, N, Cmd)),
     case Cmd of
         "start" ->
@@ -79,7 +79,7 @@ riak_data(N) when is_integer(N) ->
     lists:flatten(io_lib:format("~s/dev/dev~b/data", [relpath(current), N])).
 
 run_riak_repl(N, Path, Cmd) ->
-    lager:info("Running: ~s", [riakcmd(Path, N, Cmd)]),
+    logger:info("Running: ~s", [riakcmd(Path, N, Cmd)]),
     os:cmd(riakreplcmd(Path, N, Cmd)).
     %% don't mess with intercepts and/or coverage,
     %% they should already be setup at this point
@@ -92,7 +92,7 @@ setup_harness(_Test, _Args) ->
     %% Stop all discoverable nodes, not just nodes we'll be using for this test.
     rt:pmap(fun(X) -> stop_all(X ++ "/dev") end, devpaths()),
 
-    lager:info("Cleaning up lingering pipe directories"),
+    logger:info("Cleaning up lingering pipe directories"),
     rt:pmap(fun(Dir) ->
                     %% when joining two absolute paths, filename:join intentionally
                     %% throws away the first one. ++ gets us around that, while
@@ -103,7 +103,7 @@ setup_harness(_Test, _Args) ->
                     os:cmd("rm -rf " ++ PipeDir)
             end, devpaths()),
 
-    lager:info("Cleaning up data dirs"),
+    logger:info("Cleaning up data dirs"),
     lists:map(fun(X) -> clean_data_dir_all(X) end,
               devpaths()),
 
@@ -136,7 +136,7 @@ upgrade(Node, NewVersion, UpgradeCallback) when is_function(UpgradeCallback) ->
 upgrade(Node, NewVersion, Config, UpgradeCallback) ->
     N = node_id(Node),
     Version = node_version(N),
-    lager:info("Upgrading ~p : ~p -> ~p", [Node, Version, NewVersion]),
+    logger:info("Upgrading ~p : ~p -> ~p", [Node, Version, NewVersion]),
     stop(Node),
     rt:wait_until_unpingable(Node),
     OldPath = relpath(Version),
@@ -151,7 +151,7 @@ upgrade(Node, NewVersion, Config, UpgradeCallback) ->
                        [OldPath, N, NewPath, N])
     ],
     [ begin
-        lager:info("Running: ~s", [Cmd]),
+        logger:info("Running: ~s", [Cmd]),
         os:cmd(Cmd)
     end || Cmd <- Commands],
     VersionMap = orddict:store(N, NewVersion, rt_config:get(rt_versions)),
@@ -178,7 +178,7 @@ upgrade(Node, NewVersion, Config, UpgradeCallback) ->
 
 -spec copy_conf(integer(), atom() | string(), atom() | string()) -> ok.
 copy_conf(NumNodes, FromVersion, ToVersion) ->
-    lager:info("Copying config from ~p to ~p", [FromVersion, ToVersion]),
+    logger:info("Copying config from ~p to ~p", [FromVersion, ToVersion]),
 
     FromPath = relpath(FromVersion),
     ToPath = relpath(ToVersion),
@@ -193,7 +193,7 @@ copy_node_conf(NodeNum, FromPath, ToPath) ->
 
 -spec set_conf(atom() | string(), [{string(), string()}]) -> ok.
 set_conf(all, NameValuePairs) ->
-    lager:info("rtdev:set_conf(all, ~p)", [NameValuePairs]),
+    logger:info("rtdev:set_conf(all, ~p)", [NameValuePairs]),
     [ set_conf(DevPath, NameValuePairs) || DevPath <- devpaths()],
     ok;
 set_conf(Node, NameValuePairs) when is_atom(Node) ->
@@ -205,7 +205,7 @@ set_conf(DevPath, NameValuePairs) ->
     ok.
 
 set_advanced_conf(all, NameValuePairs) ->
-    lager:info("rtdev:set_advanced_conf(all, ~p)", [NameValuePairs]),
+    logger:info("rtdev:set_advanced_conf(all, ~p)", [NameValuePairs]),
     [ set_advanced_conf(DevPath, NameValuePairs) || DevPath <- devpaths()],
     ok;
 set_advanced_conf(Node, NameValuePairs) when is_atom(Node) ->
@@ -219,14 +219,14 @@ set_advanced_conf(DevPath, NameValuePairs) ->
                         Confs ->
                             Confs
                     end,
-    lager:info("AdvancedConfs = ~p~n", [AdvancedConfs]),
+    logger:info("AdvancedConfs = ~p~n", [AdvancedConfs]),
     [update_app_config_file(RiakConf, NameValuePairs) || RiakConf <- AdvancedConfs],
     ok.
 
 make_advanced_confs(DevPath) ->
     case filelib:is_dir(DevPath) of
         false ->
-            lager:error("Failed generating advanced.conf ~p is not a directory.", [DevPath]),
+            logger:error("Failed generating advanced.conf ~p is not a directory.", [DevPath]),
             [];
         true ->
             Wildcard = io_lib:format("~s/dev/dev*/riak/etc", [DevPath]),
@@ -234,7 +234,7 @@ make_advanced_confs(DevPath) ->
             [
              begin
                  AC = filename:join(Path, "advanced.config"),
-                 lager:debug("writing advanced.conf to ~p", [AC]),
+                 logger:debug("writing advanced.conf to ~p", [AC]),
                  file:write_file(AC, io_lib:fwrite("~p.\n",[[]])),
                  AC
              end || Path <- ConfDirs]
@@ -262,7 +262,7 @@ all_the_files(DevPath, File) ->
             Wildcard = io_lib:format("~s/dev/dev*/riak/~s", [DevPath, File]),
             filelib:wildcard(Wildcard);
         _ ->
-            lager:debug("~s is not a directory.", [DevPath]),
+            logger:debug("~s is not a directory.", [DevPath]),
             []
     end.
 
@@ -277,7 +277,7 @@ all_the_app_configs(DevPath) ->
     end.
 
 update_app_config(all, Config) ->
-    lager:info("rtdev:update_app_config(all, ~p)", [Config]),
+    logger:info("rtdev:update_app_config(all, ~p)", [Config]),
     [ update_app_config(DevPath, Config) || DevPath <- devpaths()];
 update_app_config(Node, Config) when is_atom(Node) ->
     N = node_id(Node),
@@ -298,7 +298,7 @@ update_app_config(DevPath, Config) ->
     [update_app_config_file(AppConfig, Config) || AppConfig <- all_the_app_configs(DevPath)].
 
 update_app_config_file(ConfigFile, Config) ->
-    lager:info("rtdev:update_app_config_file(~s, ~p)", [ConfigFile, Config]),
+    logger:info("rtdev:update_app_config_file(~s, ~p)", [ConfigFile, Config]),
 
     BaseConfig = case file:consult(ConfigFile) of
         {ok, [ValidConfig]} ->
@@ -327,7 +327,7 @@ get_backends(DevPath) ->
     rt:pmap(fun get_backend/1, all_the_app_configs(DevPath)).
 
 get_backend(AppConfig) ->
-    lager:info("get_backend(~s)", [AppConfig]),
+    logger:info("get_backend(~s)", [AppConfig]),
     Tokens = lists:reverse(filename:split(AppConfig)),
     ConfigFile = case Tokens of
         ["app.config"| _ ] ->
@@ -349,9 +349,9 @@ get_backend(AppConfig) ->
 
             case Files of
                 [] -> %% No file generated by chkconfig. this isn't great
-                    lager:error("Cuttlefish Failure."),
-                    lager:info("chkconfig:"),
-                    [ lager:info("~s", [Line]) || Line <- ChkConfigOutput ],
+                    logger:error("Cuttlefish Failure."),
+                    logger:info("chkconfig:"),
+                    [ logger:info("~s", [Line]) || Line <- ChkConfigOutput ],
                     ?assert(false);
                 _ ->
                     File = hd(Files),
@@ -367,7 +367,7 @@ get_backend(AppConfig) ->
         {ok, [Config]} ->
             rt:get_backend(Config);
         E ->
-            lager:error("Error reading ~s, ~p", [ConfigFile, E]),
+            logger:error("Error reading ~s, ~p", [ConfigFile, E]),
             error
     end.
 
@@ -389,7 +389,7 @@ clean_data_dir(Nodes, SubDir) when is_list(Nodes) ->
     lists:foreach(fun rm_dir/1, DataDirs).
 
 rm_dir(Dir) ->
-    lager:info("Removing directory ~s", [Dir]),
+    logger:info("Removing directory ~s", [Dir]),
     ?assertCmd("rm -rf " ++ Dir),
     ?assertEqual(false, filelib:is_dir(Dir)).
 
@@ -398,7 +398,7 @@ restore_data_dir(Nodes, BackendFldr, BackupFldr) when is_list(Nodes) ->
         fun(Node) ->
             Backend = node_path(Node) ++ "/data/" ++ BackendFldr,
             Backup = node_path(Node) ++ "/data/" ++ BackupFldr,
-            lager:info("Restoring Node ~s from ~s", [Backend, Backup]),
+            logger:info("Restoring Node ~s from ~s", [Backend, Backup]),
             ?assertCmd("mkdir -p " ++ Backend),
             ?assertCmd("cp -R " ++ Backup ++ "/* " ++ Backend)
         end,
@@ -413,7 +413,7 @@ add_default_node_config(Nodes) ->
                     end, Nodes),
             ok;
         BadValue ->
-            lager:error("Invalid value for rt_default_config : ~p", [BadValue]),
+            logger:error("Invalid value for rt_default_config : ~p", [BadValue]),
             throw({invalid_config, {rt_default_config, BadValue}})
     end.
 
@@ -436,7 +436,7 @@ deploy_clusters(ClusterConfigs) ->
 
 deploy_nodes(NodeConfig) ->
     Path = relpath(root),
-    lager:info("Riak path: ~p", [Path]),
+    logger:info("Riak path: ~p", [Path]),
     NumNodes = length(NodeConfig),
     NodesN = lists:seq(1, NumNodes),
     Nodes = [?DEV(N) || N <- NodesN],
@@ -479,7 +479,7 @@ deploy_nodes(NodeConfig) ->
     [ok = rt:check_singleton_node(?DEV(N)) || {N, Version} <- VersionMap,
                                               Version /= "0.14.2"],
 
-    lager:info("Deployed nodes: ~p", [Nodes]),
+    logger:info("Deployed nodes: ~p", [Nodes]),
     Nodes.
 
 gen_stop_fun(Timeout) ->
@@ -487,8 +487,8 @@ gen_stop_fun(Timeout) ->
             net_kernel:hidden_connect_node(Node),
             case rpc:call(Node, os, getpid, []) of
                 PidStr when is_list(PidStr) ->
-                    lager:info("Preparing to stop node ~p (process ID ~s) with init:stop/0...",
-                               [Node, PidStr]),
+                    logger:info("Preparing to stop node ~p (process ID ~s) with init:stop/0...",
+                                [Node, PidStr]),
                     rpc:call(Node, init, stop, []),
                     %% If init:stop/0 fails here, the wait_for_pid/2 call
                     %% below will timeout and the process will get cleaned
@@ -496,8 +496,8 @@ gen_stop_fun(Timeout) ->
                     wait_for_pid(PidStr, Timeout);
                 BadRpc ->
                     Cmd = C ++ "/bin/riak stop",
-                    lager:info("RPC to node ~p returned ~p, will try stop anyway... ~s",
-                               [Node, BadRpc, Cmd]),
+                    logger:info("RPC to node ~p returned ~p, will try stop anyway... ~s",
+                                [Node, BadRpc, Cmd]),
                     Output = os:cmd(Cmd),
                     Status = case Output of
                                  "ok\n" ->
@@ -512,7 +512,7 @@ gen_stop_fun(Timeout) ->
                                  _ ->
                                      "wasn't running"
                              end,
-                    lager:info("Stopped node ~p, stop status: ~s.", [Node, Status])
+                    logger:info("Stopped node ~p, stop status: ~s.", [Node, Status])
             end
     end.
 
@@ -525,14 +525,14 @@ kill_stragglers(DevPath, Timeout) ->
                        nomatch ->
                            Acc;
                        {match,[Pid]} ->
-                           lager:info("Process ~s still running, killing...",
-                                      [Pid]),
+                           logger:info("Process ~s still running, killing...",
+                                       [Pid]),
                            os:cmd("kill -15 "++Pid),
                            case wait_for_pid(Pid, Timeout) of
                                ok -> ok;
                                fail ->
-                                   lager:info("Process ~s still hasn't stopped, "
-                                              "resorting to kill -9...", [Pid]),
+                                   logger:info("Process ~s still hasn't stopped, "
+                                               "resorting to kill -9...", [Pid]),
                                    os:cmd("kill -9 "++Pid)
                            end,
                            [Pid|Acc]
@@ -562,16 +562,16 @@ stop_all(DevPath) ->
                 {error,{already_started,_}} ->
                     ok
             end,
-            lager:info("Trying to obtain node shutdown_time via RPC..."),
+            logger:info("Trying to obtain node shutdown_time via RPC..."),
             Tmout = case rpc:call(hd(Nodes), init, get_argument, [shutdown_time]) of
                         {ok,[[Tm]]} -> list_to_integer(Tm)+10000;
                         _ -> 20000
                     end,
-            lager:info("Using node shutdown_time of ~w", [Tmout]),
+            logger:info("Using node shutdown_time of ~w", [Tmout]),
             rt:pmap(gen_stop_fun(Tmout), lists:zip(Devs, Nodes)),
             kill_stragglers(DevPath, Tmout);
         _ ->
-            lager:info("~s is not a directory.", [DevPath])
+            logger:info("~s is not a directory.", [DevPath])
     end,
     ok.
 
@@ -604,8 +604,8 @@ interactive(Node, Command, Exp) ->
     N = node_id(Node),
     Path = relpath(node_version(N)),
     Cmd = riakcmd(Path, N, Command),
-    lager:info("Opening a port for riak ~s.", [Command]),
-    lager:debug("Calling open_port with cmd ~s", [binary_to_list(iolist_to_binary(Cmd))]),
+    logger:info("Opening a port for riak ~s.", [Command]),
+    logger:debug("Calling open_port with cmd ~s", [binary_to_list(iolist_to_binary(Cmd))]),
     P = open_port({spawn, binary_to_list(iolist_to_binary(Cmd))},
                   [stream, use_stdio, exit_status, binary, stderr_to_stdout]),
     interactive_loop(P, Exp).
@@ -616,7 +616,7 @@ interactive_loop(Port, Expected) ->
             %% We've gotten some data, so the port isn't done executing
             %% Let's break it up by newline and display it.
             Tokens = string:tokens(binary_to_list(Data), "\n"),
-            [lager:debug("~s", [Text]) || Text <- Tokens],
+            [logger:debug("~s", [Text]) || Text <- Tokens],
 
             %% Now we're going to take hd(Expected) which is either {expect, X}
             %% or {send, X}. If it's {expect, X}, we foldl through the Tokenized
@@ -679,9 +679,9 @@ admin(Node, Args, Options) ->
     N = node_id(Node),
     Path = relpath(node_version(N)),
     Cmd = riak_admin_cmd(Path, N),
-    lager:info("Running: ~ts with args: ~p", [Cmd, Args]),
+    logger:info("Running: ~ts with args: ~p", [Cmd, Args]),
     Result = execute_admin_cmd(Cmd, Options ++ [{args, Args}]),
-    lager:info("~ts", [Result]),
+    logger:info("~ts", [Result]),
     {ok, Result}.
 
 execute_admin_cmd(Cmd, Options) ->
@@ -697,7 +697,7 @@ riak(Node, Args) ->
     N = node_id(Node),
     Path = relpath(node_version(N)),
     Result = run_riak(N, Path, Args),
-    lager:info("~s", [Result]),
+    logger:info("~s", [Result]),
     {ok, Result}.
 
 
@@ -705,7 +705,7 @@ riak_repl(Node, Args) ->
     N = node_id(Node),
     Path = relpath(node_version(N)),
     Result = run_riak_repl(N, Path, Args),
-    lager:info("~s", [Result]),
+    logger:info("~s", [Result]),
     {ok, Result}.
 
 node_id(Node) ->
@@ -756,7 +756,7 @@ get_cmd_result(Port, Acc) ->
 check_node({_N, Version}) ->
     case rt_util:find_atom_or_string(Version, rt_config:get(rtdev_path)) of
         undefined ->
-            lager:error("You don't have Riak ~s installed or configured", [Version]),
+            logger:error("You don't have Riak ~s installed or configured", [Version]),
             erlang:error(lists:flatten(io_lib:format("You don't have Riak ~p installed or configured", [Version])));
         _ -> ok
     end.
@@ -765,7 +765,7 @@ set_backend(Backend) ->
     set_backend(Backend, []).
 
 set_backend(Backend, OtherOpts) ->
-    lager:info("rtdev:set_backend(~p, ~p)", [Backend, OtherOpts]),
+    logger:info("rtdev:set_backend(~p, ~p)", [Backend, OtherOpts]),
     Opts = [{storage_backend, Backend} | OtherOpts],
     update_app_config(all, [{riak_kv, Opts}]),
     get_backends().
@@ -846,7 +846,7 @@ get_node_debug_logs({_Node, NodeNum}, Acc) ->
     Args = ["--logs"],
     Cmd = riak_debug_cmd(Path, NodeNum),
     {ExitCode, Result} = wait_for_cmd(spawn_cmd(Cmd, [{args, Args}])),
-    lager:info("~p ExitCode ~p, Result = ~p", [Cmd, ExitCode, Result]),
+    logger:info("~p ExitCode ~p, Result = ~p", [Cmd, ExitCode, Result]),
     case filelib:is_file(DebugLogFile) of
         true ->
             {ok, Binary} = file:read_file(DebugLogFile),

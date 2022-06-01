@@ -102,6 +102,6 @@ circle_tests(Nodes) ->
                            end}
     ],
     lists:foreach(fun({Name, Eval}) ->
-        lager:info("===== circle: ~s =====", [Name]),
+        logger:info("===== circle: ~s =====", [Name]),
         Eval()
                   end, Tests).

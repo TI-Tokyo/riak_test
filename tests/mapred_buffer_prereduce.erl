@@ -40,7 +40,7 @@ confirm() ->
     load_test_data(Nodes),
     
     [ begin
-          lager:info("Running test ~s (m:~p, r:~p)",
+          logger:info("Running test ~s (m:~p, r:~p)",
                      [T, M, R]),
           test_batch(Nodes, M, R)
       end
@@ -58,7 +58,7 @@ confirm() ->
 
 load_test_data([Node|_]) ->
     %% creates foonum/1..5 - this is what populates ?INTS_BUCKET
-    lager:info("Filling INTS_BUCKET (~s)", [?INTS_BUCKET]),
+    logger:info("Filling INTS_BUCKET (~s)", [?INTS_BUCKET]),
     ok = rpc:call(Node, riak_kv_mrc_pipe, example_setup, [?NUM_INTS]).
 
 rpcmr(Node, Inputs, Query) ->

@@ -62,14 +62,14 @@ confirm() ->
     rt:join_cluster(ClusterB),
     rt:join_cluster(ClusterC),
     
-    lager:info("Waiting for convergence."),
+    logger:info("Waiting for convergence."),
     rt:wait_until_ring_converged(ClusterA),
     rt:wait_until_ring_converged(ClusterB),
     rt:wait_until_ring_converged(ClusterC),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end,
                     ClusterA ++ ClusterB ++ ClusterC),
     
-    lager:info("Ready for test."),
+    logger:info("Ready for test."),
     setup_replqueues(ClusterA, [cluster_b, cluster_c]),
     setup_replqueues(ClusterB, [cluster_a, cluster_c]),
     setup_replqueues(ClusterC, [cluster_b, cluster_a]),
@@ -78,7 +78,7 @@ confirm() ->
     NodeB = hd(ClusterB),
     NodeC = hd(ClusterC),
 
-    lager:info("Test empty clusters don't show any differences"),
+    logger:info("Test empty clusters don't show any differences"),
     [{http, {IPA, PortAH}}, {pb, {IPA, PortAP}}] = rt:connection_info(NodeA),
     [{http, {IPB, PortBH}}, {pb, {IPB, PortBP}}] = rt:connection_info(NodeB),
     [{http, {IPC, PortCH}}, {pb, {IPC, PortCP}}] = rt:connection_info(NodeC),
@@ -93,7 +93,7 @@ confirm() ->
 
     ok = setup_snkreplworkers(ClusterA, ClusterB, cluster_b),
 
-    lager:info("Test 5000 key difference and resolve"),
+    logger:info("Test 5000 key difference and resolve"),
     % Write keys to cluster A, verify B and C do not have them.
     FunMod:write_to_cluster(NodeA, 1, 5000, ?TEST_BUCKET, true, ?VAL_INIT),
     FunMod:read_from_cluster(NodeB, 1, 5000, 5000, ?TEST_BUCKET, ?VAL_INIT),
@@ -116,7 +116,7 @@ confirm() ->
     FunMod:read_from_cluster(NodeB, 1, 5000, 0, ?TEST_BUCKET, ?VAL_INIT),
     FunMod:read_from_cluster(NodeC, 1, 5000, 5000, ?TEST_BUCKET, ?VAL_INIT),
 
-    lager:info("Replicate a range of 900 keys within the bucket"),
+    logger:info("Replicate a range of 900 keys within the bucket"),
     ok = setup_snkreplworkers(ClusterB, ClusterC, cluster_c),
     StrK = FunMod:key(3001),
     EndK = FunMod:key(3900),
@@ -134,7 +134,7 @@ confirm() ->
     FunMod:read_from_cluster(NodeC, 1, 3000, 3000, ?TEST_BUCKET, ?VAL_INIT),
     FunMod:read_from_cluster(NodeC, 3901, 5000, 1100, ?TEST_BUCKET, ?VAL_INIT),
     
-    lager:info("Replicate puts based on modified date range"),
+    logger:info("Replicate puts based on modified date range"),
     {MegaB4, SecsB4, _} = os:timestamp(),
     SWbefore = MegaB4 * 1000000 + SecsB4,
     timer:sleep(1000),
@@ -176,7 +176,7 @@ confirm() ->
                             0,
                             5),
     
-    lager:info("Complete all necessary replications using all"),
+    logger:info("Complete all necessary replications using all"),
     
     {ok, KC5} =
         range_repl_compare(SrcHTTPCB, SrcPBCB,
@@ -196,7 +196,7 @@ confirm() ->
                                 ?TEST_BUCKET, ?VAL_MOD],
                             3900,
                             5),
-    lager:info("Replicate back to cluster A changes from B"),
+    logger:info("Replicate back to cluster A changes from B"),
     ok = setup_snkreplworkers(ClusterB, ClusterA, cluster_a),
     {ok, KC6} =
         range_repl_compare(SrcHTTPCB, SrcPBCB,
@@ -217,7 +217,7 @@ confirm() ->
                             3900,
                             5),
 
-    lager:info("Final validation everything is sync'd"),
+    logger:info("Final validation everything is sync'd"),
     {root_compare, 0} = fullsync_check(RefA, RefB, no_repair),
     {root_compare, 0} = fullsync_check(RefB, RefC, no_repair),
     {root_compare, 0} = fullsync_check(RefC, RefA, no_repair),
@@ -262,7 +262,7 @@ wait_for_outcome(Module, Func, Args, ExpOutcome, Loops) ->
         ExpOutcome ->
             ExpOutcome;
         NotRightYet ->
-            lager:info("~w not yet ~w ~w", [Func, ExpOutcome, NotRightYet]),
+            logger:info("~w not yet ~w ~w", [Func, ExpOutcome, NotRightYet]),
             timer:sleep(1000),
             wait_for_outcome(Module, Func, Args, ExpOutcome, Loops - 1)
     end.
@@ -281,5 +281,5 @@ range_repl_compare(RHC, PBC, B, KR, MR, QN) ->
     RH = rhc:aae_range_replkeys(RHC, B, KR, MR, QN),
     RP = riakc_pb_socket:aae_range_replkeys(PBC, B, KR, MR, QN),
     ?assertEqual(RH, RP),
-    lager:info("Range repl answers - HTTP ~p PB ~p", [RH, RP]),
+    logger:info("Range repl answers - HTTP ~p PB ~p", [RH, RP]),
     RH.

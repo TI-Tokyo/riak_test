@@ -91,7 +91,7 @@ confirm() ->
     ok = create_bucket_type(Nodes, ?WRITE_ONCE_TYPE, [{write_once, true}, {n_val, 1}]),
 
     Key = generate_key(),
-    lager:info("Generated overload test key ~p", [Key]),
+    logger:info("Generated overload test key ~p", [Key]),
 
     NormalBKV = {?NORMAL_BUCKET, Key, ?VALUE},
     ConsistentBKV = {?CONSISTENT_BUCKET, Key, ?VALUE},
@@ -106,7 +106,7 @@ confirm() ->
              test_fsm_protection],
 
     [begin
-         lager:info("Starting Test ~p for ~p~n", [Test, BKV]),
+         logger:info("Starting Test ~p for ~p~n", [Test, BKV]),
          ok = erlang:apply(?MODULE, Test, [Nodes, BKV])
      end || Test <- Tests,
             BKV <- [NormalBKV,
@@ -131,11 +131,11 @@ setup() ->
 test_no_overload_protection(_Nodes, {?CONSISTENT_BUCKET, _, _}) ->
     ok;
 test_no_overload_protection(Nodes, BKV) ->
-    lager:info("Setting default configuration for no overload protection test."),
+    logger:info("Setting default configuration for no overload protection test."),
     rt:pmap(fun(Node) ->
         rt:update_app_config(Node, default_config())
     end, Nodes),
-    lager:info("Testing with no overload protection"),
+    logger:info("Testing with no overload protection"),
     ProcFun = build_predicate_eq(test_no_overload_protection, ?NUM_REQUESTS,
                                   "ProcFun", "Procs"),
     QueueFun = build_predicate_eq(test_no_overload_protection, ?NUM_REQUESTS,
@@ -154,9 +154,9 @@ test_vnode_protection(Nodes, BKV) ->
     %% This allows us to artificially raise vnode queue lengths with dummy
     %% messages instead of having to go through the vnode path for coverage
     %% query overload testing.
-    lager:info("Testing with vnode queue protection enabled"),
-    lager:info("Setting vnode overload threshold to ~b", [?THRESHOLD]),
-    lager:info("Setting vnode check interval to 1"),
+    logger:info("Testing with vnode queue protection enabled"),
+    logger:info("Setting vnode overload threshold to ~b", [?THRESHOLD]),
+    logger:info("Setting vnode check interval to 1"),
     Config = default_config(#config{vnode_overload_threshold=?THRESHOLD, vnode_check_interval=1}),
     rt:pmap(fun(Node) ->
                     rt:update_app_config(Node, Config)
@@ -168,12 +168,12 @@ test_vnode_protection(Nodes, BKV) ->
     [Node1 | _] = Nodes,
     CheckInterval = ?THRESHOLD div 2,
     Dropped = read_until_success(Node1),
-    lager:info("Unnecessary dropped requests: ~b", [Dropped]),
+    logger:info("Unnecessary dropped requests: ~b", [Dropped]),
     ?assert(Dropped =< CheckInterval),
 
     Victim = get_victim(Node1, BKV),
 
-    lager:info("Suspending vnode proxy for ~p", [Victim]),
+    logger:info("Suspending vnode proxy for ~p", [Victim]),
     Pid = suspend_vnode_proxy(Victim),
     ProcFun2 = build_predicate_gte("test_vnode_protection after suspend",
                                    (?NUM_REQUESTS), "ProcFun", "Procs"),
@@ -193,8 +193,8 @@ test_fsm_protection(_, {?WRITE_ONCE_BUCKET, _, _}) ->
     ok;
 
 test_fsm_protection(Nodes, BKV) ->
-    lager:info("Testing with coordinator protection enabled"),
-    lager:info("Setting FSM limit to ~b", [?THRESHOLD]),
+    logger:info("Testing with coordinator protection enabled"),
+    logger:info("Setting FSM limit to ~b", [?THRESHOLD]),
     %% Set FSM limit and reset other changes from previous tests.
     Config = default_config(#config{fsm_limit=?THRESHOLD}),
     rt:pmap(fun(Node) ->
@@ -224,7 +224,7 @@ get_calculated_sj_limit(Node, ResourceName, Retries) when Retries > 0 ->
     CallResult = rpc:call(Node, erlang, apply, [fun() -> ResourceName:width() * ResourceName:worker_limit() end, []]),
     Result = case CallResult of
         {badrpc, Reason} ->
-            lager:info("Failed to retrieve sidejob limit from ~p for ~p: ~p", [Node, ResourceName, Reason]),
+            logger:info("Failed to retrieve sidejob limit from ~p for ~p: ~p", [Node, ResourceName, Reason]),
             timer:sleep(1000),
             get_calculated_sj_limit(Node, ResourceName, Retries-1);
         R -> {ok, R}
@@ -235,9 +235,9 @@ get_calculated_sj_limit(Node, ResourceName, Retries) when Retries == 0 ->
     {error, io_lib:format("Failed to retrieve sidejob limit from ~p for resource ~p. Giving up.", [Node, ResourceName])}.
 
 test_cover_queries_overload(Nodes) ->
-    lager:info("Testing cover queries with vnode queue protection enabled"),
-    lager:info("Setting vnode overload threshold to ~b", [?THRESHOLD]),
-    lager:info("Setting vnode check interval to 1"),
+    logger:info("Testing cover queries with vnode queue protection enabled"),
+    logger:info("Setting vnode overload threshold to ~b", [?THRESHOLD]),
+    logger:info("Setting vnode check interval to 1"),
 
     Config = default_config(#config{vnode_overload_threshold=?THRESHOLD,
                            vnode_check_request_interval=2,
@@ -251,53 +251,53 @@ test_cover_queries_overload(Nodes) ->
 
     [Node1, Node2, Node3, Node4, Node5] = Nodes,
     Pids = [begin
-                lager:info("Suspending all kv vnodes on ~p", [N]),
+                logger:info("Suspending all kv vnodes on ~p", [N]),
                 suspend_and_overload_all_kv_vnodes(N)
             end || N <- [Node2, Node3, Node4, Node5]],
 
     [?assertEqual({error, <<"mailbox_overload">>}, KeysRes) ||
         KeysRes <- [list_keys(Node1) || _ <- lists:seq(1, 3)]],
 
-    lager:info("list_keys correctly handled overload"),
+    logger:info("list_keys correctly handled overload"),
 
     [?assertEqual({error, mailbox_overload}, BucketsRes) ||
         BucketsRes <- [list_buckets(Node1) || _ <- lists:seq(1, 3)]],
-    lager:info("list_buckets correctly handled overload"),
+    logger:info("list_buckets correctly handled overload"),
 
-    lager:info("Resuming all kv vnodes"),
+    logger:info("Resuming all kv vnodes"),
     [resume_all_vnodes(Pid) || Pid <- Pids],
 
-    lager:info("Waiting for vnode queues to empty"),
+    logger:info("Waiting for vnode queues to empty"),
     wait_for_all_vnode_queues_empty(Node2).
 
 run_test(Nodes, BKV) ->
     [Node1 | _RestNodes] = Nodes,
     rt:wait_for_cluster_service(Nodes, riak_kv),
-    lager:info("Sleeping for 5s to let process count stablize"),
+    logger:info("Sleeping for 5s to let process count stablize"),
     timer:sleep(5000),
     rt:load_modules_on_nodes([?MODULE], Nodes),
     overload_proxy:start_link(),
     rt_intercept:add(Node1, {riak_kv_get_fsm, [{{start, 4}, count_start_4}]}),
 
     Victim = get_victim(Node1, BKV),
-    lager:info("Suspending vnode ~p/~p",
+    logger:info("Suspending vnode ~p/~p",
                [element(1, Victim), element(2, Victim)]),
     Suspended = suspend_vnode(Victim),
 
     NumProcs1 = overload_proxy:get_count(),
 
-    lager:info("Initial process count on ~p: ~b", [Node1, NumProcs1]),
-    lager:info("Sending ~b read requests", [?NUM_REQUESTS]),
+    logger:info("Initial process count on ~p: ~b", [Node1, NumProcs1]),
+    logger:info("Sending ~b read requests", [?NUM_REQUESTS]),
     Reads = spawn_reads(Node1, BKV, ?NUM_REQUESTS),
 
     rt:wait_until(fun() ->
                           overload_proxy:is_settled(20)
                   end, 5, 500),
     NumProcs2 = overload_proxy:get_count(),
-    lager:info("Final process count on ~p: ~b", [Node1, NumProcs2]),
+    logger:info("Final process count on ~p: ~b", [Node1, NumProcs2]),
 
     QueueLen = vnode_gets_in_queue(Victim),
-    lager:info("Final vnode queue length for ~p: ~b",
+    logger:info("Final vnode queue length for ~p: ~b",
                [Victim, QueueLen]),
 
     resume_vnode(Suspended),
@@ -324,7 +324,7 @@ ring_manager_check_fun(Node) ->
     end.
 
 create_bucket_type(Nodes, Type, Props) ->
-    lager:info("Create bucket type ~p, wait for propagation", [Type]),
+    logger:info("Create bucket type ~p, wait for propagation", [Type]),
     rt:create_and_activate_bucket_type(hd(Nodes), Type, Props),
     rt:wait_until_bucket_type_status(Type, active, Nodes),
     rt:wait_until_bucket_props(Nodes, {Type, <<"bucket">>}, Props),
@@ -342,11 +342,11 @@ node_overload_check(Pid) ->
     end.
 
 list_keys(Node) ->
-    lager:info("Connecting to node ~p~n", [Node]),
+    logger:info("Connecting to node ~p~n", [Node]),
     Pid = rt:pbc(Node),
-    lager:info("Listing keys on node ~p~n", [Node]),
+    logger:info("Listing keys on node ~p~n", [Node]),
     Res = riakc_pb_socket:list_keys(Pid, {<<"normal_type">>, ?BUCKET}, 10000),
-    lager:info("List keys on node ~p completed with result ~p~n", [Node, Res]),
+    logger:info("List keys on node ~p completed with result ~p~n", [Node, Res]),
     riakc_pb_socket:stop(Pid),
     Res.
 
@@ -370,7 +370,7 @@ remote_vnode_queues_empty() ->
               end, riak_core_vnode_manager:all_vnodes()).
 
 write_once(Node, {Bucket, Key, Value}) ->
-    lager:info("Writing to node ~p", [Node]),
+    logger:info("Writing to node ~p", [Node]),
     PBC = rt:pbc(Node, [{auto_reconnect, true}, {queue_if_disconnected, true}]),
     rt:pbc_write(PBC, Bucket, Key, Value),
     riakc_pb_socket:stop(PBC).
@@ -404,23 +404,23 @@ pb_get_fun(Node, Bucket, Key, TestPid) ->
             PBC = rt:pbc(Node),
             Result = case catch riakc_pb_socket:get(PBC, Bucket, Key) of
                          {error, <<"overload">>} ->
-                             lager:debug("overload detected in pb_get, continuing..."),
+                             logger:debug("overload detected in pb_get, continuing..."),
                              true;
                          %% we expect timeouts in this test as we've shut down a vnode - return true in this case
                          {error, timeout} ->
-                             lager:debug("timeout detected in pb_get, continuing..."),
+                             logger:debug("timeout detected in pb_get, continuing..."),
                              true;
                          {error, <<"timeout">>} ->
-                             lager:debug("timeout detected in pb_get, continuing..."),
+                             logger:debug("timeout detected in pb_get, continuing..."),
                              true;
                          {ok, Res} ->
-                             lager:debug("riakc_pb_socket:get(~p, ~p, ~p) succeeded, Res:~p", [PBC, Bucket, Key, Res]),
+                             logger:debug("riakc_pb_socket:get(~p, ~p, ~p) succeeded, Res:~p", [PBC, Bucket, Key, Res]),
                              true;
                          {error, Type} ->
-                             lager:error("riakc_pb_socket threw error ~p reading {~p, ~p}, retrying...", [Type, Bucket, Key]),
+                             logger:error("riakc_pb_socket threw error ~p reading {~p, ~p}, retrying...", [Type, Bucket, Key]),
                              false;
                          {'EXIT', Type} ->
-                             lager:info("riakc_pb_socket threw error ~p reading {~p, ~p}, retrying...", [Type, Bucket, Key]),
+                             logger:info("riakc_pb_socket threw error ~p reading {~p, ~p}, retrying...", [Type, Bucket, Key]),
                              false
                      end,
             case Result of
@@ -436,11 +436,11 @@ kill_pids(Pids) ->
     [exit(Pid, kill) || Pid <- Pids].
 
 suspend_and_overload_all_kv_vnodes(Node) ->
-    lager:info("Suspending vnodes on ~p", [Node]),
+    logger:info("Suspending vnodes on ~p", [Node]),
     Pid = rpc:call(Node, ?MODULE, remote_suspend_and_overload, []),
     Pid ! {overload, self()},
     receive {overloaded, Pid} ->
-        lager:info("Received overloaded message from ~p", [Pid]),
+        logger:info("Received overloaded message from ~p", [Pid]),
         Pid
     end,
     rt:wait_until(node_overload_check(Pid)),
@@ -450,7 +450,7 @@ remote_suspend_and_overload() ->
     spawn(fun() ->
                   Vnodes = riak_core_vnode_manager:all_vnodes(),
                   [begin
-                       lager:info("Suspending vnode pid: ~p~n", [Pid]),
+                       logger:info("Suspending vnode pid: ~p~n", [Pid]),
                        erlang:suspend_process(Pid)
                    end || {riak_kv_vnode, _, Pid} <- Vnodes],
                   wait_for_input(Vnodes)
@@ -459,9 +459,9 @@ remote_suspend_and_overload() ->
 wait_for_input(Vnodes) ->
     receive
         {overload, From} ->
-            lager:info("Overloading vnodes.", []),
+            logger:info("Overloading vnodes.", []),
             [overload(Vnodes, Pid) || {riak_kv_vnode, _, Pid} <- Vnodes],
-            lager:info("Sending overloaded message back to test.", []),
+            logger:info("Sending overloaded message back to test.", []),
             From ! {overloaded, self()},
             wait_for_input(Vnodes);
         {verify_overload, From} ->
@@ -469,7 +469,7 @@ wait_for_input(Vnodes) ->
             From ! OverloadCheck,
             wait_for_input(Vnodes);
         resume ->
-            lager:info("Resuming vnodes~n"),
+            logger:info("Resuming vnodes~n"),
             [erlang:resume_process(Pid) || {riak_kv_vnode, _, Pid}
                                                <- Vnodes]
     end.
@@ -513,7 +513,7 @@ suspend_vnode(Node, Idx) ->
 remote_suspend_vnode(Idx) ->
     spawn(fun() ->
                   {ok, Pid} = riak_core_vnode_manager:get_vnode_pid(Idx, riak_kv_vnode),
-                  lager:info("Suspending vnode pid: ~p", [Pid]),
+                  logger:info("Suspending vnode pid: ~p", [Pid]),
                   erlang:suspend_process(Pid),
                   receive resume ->
                           erlang:resume_process(Pid)
@@ -561,7 +561,7 @@ get_fsm_active_stat(Node) ->
 
 run_count(Node) ->
     timer:sleep(500),
-    lager:info("fsm count:~p", [get_num_running_gen_fsm(Node)]),
+    logger:info("fsm count:~p", [get_num_running_gen_fsm(Node)]),
     run_count(Node).
 
 get_num_running_gen_fsm(Node) ->
@@ -576,7 +576,7 @@ remote_vnode_gets_in_queue(Idx) ->
     {ok, Pid} = riak_core_vnode_manager:get_vnode_pid(Idx, riak_kv_vnode),
     {messages, AllMessages} = process_info(Pid, messages),
     GetMessages = lists:filter(fun is_get_req/1, AllMessages),
-    lager:info("Get requests (~p): ~p", [Idx, length(GetMessages)]),
+    logger:info("Get requests (~p): ~p", [Idx, length(GetMessages)]),
     length(GetMessages).
 
 %% This is not the greatest thing ever, since we're coupling this test pretty
@@ -599,7 +599,7 @@ is_get_req(_) ->
 %% at least ?NUM_REQUESTS (queue entries) are handled.
 build_predicate_gte(Test, Metric, Label, ValueLabel) ->
     fun (X) ->
-            lager:info("in test ~p ~p, ~p:~p, expected no overload, Metric:>=~p",
+            logger:info("in test ~p ~p, ~p:~p, expected no overload, Metric:>=~p",
                        [Test, Label, ValueLabel, X, Metric]),
             X >= Metric
     end.
@@ -608,7 +608,7 @@ build_predicate_gte(Test, Metric, Label, ValueLabel) ->
 %% exactly ?NUM_REQUESTS (processes entries) are handled.
 build_predicate_eq(Test, Metric, Label, ValueLabel) ->
     fun (X) ->
-        lager:info("in test ~p ~p, ~p:~p, expected no overload, Metric:==~p",
+        logger:info("in test ~p ~p, ~p:~p, expected no overload, Metric:==~p",
             [Test, Label, ValueLabel, X, Metric]),
         X == Metric
     end.
@@ -618,7 +618,7 @@ build_predicate_eq(Test, Metric, Label, ValueLabel) ->
 %% less than ?NUM_REQUESTS.
 build_predicate_lt(Test, Metric, Label, ValueLabel) ->
     fun (X) ->
-            lager:info("in test ~p ~p, ~p:~p, expected overload, Metric:<~p",
+            logger:info("in test ~p ~p, ~p:~p, expected overload, Metric:<~p",
                        [Test, Label, ValueLabel, X, Metric]),
             X < Metric
     end.
@@ -628,7 +628,7 @@ build_predicate_lt(Test, Metric, Label, ValueLabel) ->
 %% less than ?NUM_REQUESTS.
 build_predicate_lte(Test, Metric, Label, ValueLabel) ->
     fun (X) ->
-        lager:info("in test ~p ~p, ~p:~p, expected overload, Metric:=<~p",
+        logger:info("in test ~p ~p, ~p:~p, expected overload, Metric:=<~p",
             [Test, Label, ValueLabel, X, Metric]),
         X =< Metric
     end.

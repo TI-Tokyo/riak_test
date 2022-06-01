@@ -208,17 +208,17 @@ priv_dir() ->
         "riak_test", [{return, list}]),
     PrivDir = case {filelib:is_dir(LocalPrivDir), filelib:is_dir(DepPrivDir)} of
         {true, _} ->
-            lager:debug("Local ./priv detected, using that..."),
+            logger:debug("Local ./priv detected, using that..."),
             %% we want an absolute path!
             filename:absname(LocalPrivDir);
         {false, true} ->
-            lager:debug("riak_test dependency priv_dir detected, using that..."),
+            logger:debug("riak_test dependency priv_dir detected, using that..."),
             DepPrivDir;
         _ ->
             error(bad_priv_dir)
     end,
 
-    lager:info("priv dir: ~p -> ~p", [code:priv_dir(riak_test), PrivDir]),
+    logger:info("priv dir: ~p -> ~p", [code:priv_dir(riak_test), PrivDir]),
     ?assert(filelib:is_dir(PrivDir)),
     PrivDir.
 
@@ -348,7 +348,7 @@ deploy_nodes(NumNodes, InitialConfig) when is_integer(NumNodes) ->
 deploy_nodes(Versions, Services) ->
     NodeConfig = [ version_to_config(Version) || Version <- Versions ],
     Nodes = ?HARNESS:deploy_nodes(NodeConfig),
-    lager:info("Waiting for services ~p to start on ~p.", [Services, Nodes]),
+    logger:info("Waiting for services ~p to start on ~p.", [Services, Nodes]),
     [ ok = wait_for_service(Node, Service) || Node <- Nodes,
                                               Service <- Services ],
     Nodes.
@@ -377,7 +377,7 @@ build_clusters(Settings) ->
     Clusters = deploy_clusters(Settings),
     [begin
          join_cluster(Nodes),
-         lager:info("Cluster built: ~p", [Nodes])
+         logger:info("Cluster built: ~p", [Nodes])
      end || Nodes <- Clusters],
     Clusters.
 
@@ -395,7 +395,7 @@ async_start(Node) ->
 
 %% @doc Stop the specified Riak `Node'.
 stop(Node) ->
-    lager:info("Stopping riak on ~p", [Node]),
+    logger:info("Stopping riak on ~p", [Node]),
     timer:sleep(10000), %% I know, I know!
     ?HARNESS:stop(Node).
     %%rpc:call(Node, init, stop, []).
@@ -432,14 +432,14 @@ upgrade(Node, NewVersion, Config, UpgradeCallback) ->
 %% @doc Upgrade a Riak node to a specific version using the alternate
 %%      leave/upgrade/rejoin approach
 slow_upgrade(Node, NewVersion, Nodes) ->
-    lager:info("Perform leave/upgrade/join upgrade on ~p", [Node]),
-    lager:info("Leaving ~p", [Node]),
+    logger:info("Perform leave/upgrade/join upgrade on ~p", [Node]),
+    logger:info("Leaving ~p", [Node]),
     leave(Node),
     ?assertEqual(ok, rt:wait_until_unpingable(Node)),
     upgrade(Node, NewVersion),
-    lager:info("Rejoin ~p", [Node]),
+    logger:info("Rejoin ~p", [Node]),
     join(Node, hd(Nodes -- [Node])),
-    lager:info("Wait until all nodes are ready and there are no pending changes"),
+    logger:info("Wait until all nodes are ready and there are no pending changes"),
     ?assertEqual(ok, wait_until_nodes_ready(Nodes)),
     ?assertEqual(ok, wait_until_no_pending_changes(Nodes)),
     ok.
@@ -457,10 +457,10 @@ join_with_retry(Fun) ->
 join_retry(ok, _Fun, _Retry, _Delay) ->
     ok;
 join_retry({error, node_still_starting}, _Fun, 0, _Delay) ->
-    lager:warning("Too many retries, join failed"),
+    logger:warning("Too many retries, join failed"),
     {error, too_many_retries};
 join_retry({error, node_still_starting}, Fun, RetryCount, Delay) ->
-    lager:warning("Join error because node is not yet ready, retrying after ~Bms", [Delay]),
+    logger:warning("Join error because node is not yet ready, retrying after ~Bms", [Delay]),
     timer:sleep(Delay),
     join_retry(Fun(), Fun, RetryCount - 1, Delay);
 join_retry(Error, _Fun, _Retry, _Delay) ->
@@ -469,7 +469,7 @@ join_retry(Error, _Fun, _Retry, _Delay) ->
 %% @doc Have `Node' send a join request to `PNode'
 join(Node, PNode) ->
     Fun = fun() -> rpc:call(Node, riak_core, join, [PNode]) end,
-    lager:info("[join] ~p to (~p)", [Node, PNode]),
+    logger:info("[join] ~p to (~p)", [Node, PNode]),
     ?assertEqual(ok, join_with_retry(Fun)),
     ok.
 
@@ -478,39 +478,39 @@ staged_join(Node, PNode) ->
     %% `riak_core:staged_join/1' can now return an `{error,
     %% node_still_starting}' tuple which indicates retry.
     Fun = fun() -> rpc:call(Node, riak_core, staged_join, [PNode]) end,
-    lager:info("[join] ~p to (~p)", [Node, PNode]),
+    logger:info("[join] ~p to (~p)", [Node, PNode]),
     ?assertEqual(ok, join_with_retry(Fun)),
     ok.
 
 plan_and_commit(Node) ->
     timer:sleep(1000),
-    lager:info("planning cluster change"),
+    logger:info("planning cluster change"),
     case rpc:call(Node, riak_core_claimant, plan, []) of
         {error, ring_not_ready} ->
-            lager:info("plan: ring not ready"),
+            logger:info("plan: ring not ready"),
             timer:sleep(100),
             plan_and_commit(Node);
         {ok, _, _} ->
-            lager:info("plan: done"),
+            logger:info("plan: done"),
             do_commit(Node)
     end.
 
 do_commit(Node) ->
-    lager:info("planning cluster commit"),
+    logger:info("planning cluster commit"),
     case rpc:call(Node, riak_core_claimant, commit, []) of
         {error, plan_changed} ->
-            lager:info("commit: plan changed"),
+            logger:info("commit: plan changed"),
             timer:sleep(100),
             maybe_wait_for_changes(Node),
             plan_and_commit(Node);
         {error, ring_not_ready} ->
-            lager:info("commit: ring not ready"),
+            logger:info("commit: ring not ready"),
             timer:sleep(100),
             maybe_wait_for_changes(Node),
             do_commit(Node);
         {error, nothing_planned} ->
             %% Assume plan actually committed somehow
-            lager:info("commit: nothing planned"),
+            logger:info("commit: nothing planned"),
             ok;
         ok ->
             ok
@@ -520,8 +520,8 @@ maybe_wait_for_changes(Node) ->
     Ring = get_ring(Node),
     Changes = riak_core_ring:pending_changes(Ring),
     Joining = riak_core_ring:members(Ring, [joining]),
-    lager:info("maybe_wait_for_changes, changes: ~p joining: ~p",
-               [Changes, Joining]),
+    logger:info("maybe_wait_for_changes, changes: ~p joining: ~p",
+                [Changes, Joining]),
     if Changes =:= [] ->
             ok;
        Joining =/= [] ->
@@ -533,7 +533,7 @@ maybe_wait_for_changes(Node) ->
 %% @doc Have the `Node' leave the cluster
 leave(Node) ->
     R = rpc:call(Node, riak_core, leave, []),
-    lager:info("[leave] ~p: ~p", [Node, R]),
+    logger:info("[leave] ~p: ~p", [Node, R]),
     ?assertEqual(ok, R),
     ok.
 
@@ -624,16 +624,16 @@ stream_cmd_loop(Port, Buffer, NewLineBuffer, Time={_MegaSecs, Secs, _MicroSecs})
             {_, Now, _} = os:timestamp(),
             NewNewLineBuffer = case Now > Secs of
                 true ->
-                    lager:info(NewLineBuffer),
+                    logger:info(NewLineBuffer),
                     "";
                 _ ->
                     NewLineBuffer
             end,
             case rt:str(Data, "\n") of
                 true ->
-                    lager:info(NewNewLineBuffer),
+                    logger:info(NewNewLineBuffer),
                     Tokens = string:tokens(Data, "\n"),
-                    [ lager:info(Token) || Token <- Tokens ],
+                    [ logger:info(Token) || Token <- Tokens ],
                     stream_cmd_loop(Port, Buffer ++ NewNewLineBuffer ++ Data, "", Time);
                 _ ->
                     stream_cmd_loop(Port, Buffer, NewNewLineBuffer ++ Data, os:timestamp())
@@ -656,7 +656,7 @@ load_modules_on_nodes([Module | MoreModules], Nodes)
     case code:get_object_code(Module) of
         {Module, Bin, File} ->
             {ResList, []} = rpc:multicall(Nodes, code, load_binary, [Module, File, Bin]),
-            lager:info("Loading modules on Nodes ~p, results were ~p", [Nodes, ResList]);
+            logger:info("Loading modules on Nodes ~p, results were ~p", [Nodes, ResList]);
         error ->
             error(lists:flatten(io_lib:format("unable to get_object_code(~s)", [Module])))
     end,
@@ -748,13 +748,13 @@ wait_until(Fun, Retry, Delay) when Retry > 0 ->
 %%      states. A ready node is guaranteed to have current preflist/ownership
 %%      information.
 wait_until_ready(Node) ->
-    lager:info("Wait until ~p ready", [Node]),
+    logger:info("Wait until ~p ready", [Node]),
     ?assertEqual(ok, wait_until(Node, fun is_ready/1)),
     ok.
 
 %% @doc Wait until status can be read from riak_kv_console
 wait_until_status_ready(Node) ->
-    lager:info("Wait until status ready in ~p", [Node]),
+    logger:info("Wait until status ready in ~p", [Node]),
     ?assertEqual(ok, wait_until(Node,
                                 fun(_) ->
                                         case rpc:call(Node, riak_kv_console, status, [[]]) of
@@ -769,12 +769,12 @@ wait_until_status_ready(Node) ->
 %% on-going or pending ownership transfers.
 -spec wait_until_no_pending_changes([node()]) -> ok | fail.
 wait_until_no_pending_changes(Nodes) ->
-    lager:info("Wait until no pending changes on ~p", [Nodes]),
+    logger:info("Wait until no pending changes on ~p", [Nodes]),
     F = 
         fun() ->
             case no_pending_changes(Nodes) of
                 true ->
-                    lager:info("No pending changes - sleep then confirm"),
+                    logger:info("No pending changes - sleep then confirm"),
                     % Some times there may be no pending changes, just because
                     % changes haven't triggered yet
                     timer:sleep(2000),
@@ -802,9 +802,8 @@ no_pending_changes(Nodes) ->
             NodesWithChanges =
                 [Node ||
                     {Node, false} <- lists:zip(Nodes -- BadNodes, Changes)],
-            lager:info("Changes not yet complete, or bad nodes. "
-                        ++ 
-                        "BadNodes=~p, Nodes with Pending Changes=~p~n",
+            logger:info("Changes not yet complete, or bad nodes. "
+                        "BadNodes: ~p, Nodes with Pending Changes: ~p",
                         [BadNodes, NodesWithChanges]),
             false
     end.
@@ -813,10 +812,10 @@ no_pending_changes(Nodes) ->
 %% riak_core_status:transfers().
 -spec wait_until_transfers_complete([node()]) -> ok | fail.
 wait_until_transfers_complete([Node0|_]) ->
-    lager:info("Wait until transfers complete ~p", [Node0]),
+    logger:info("Wait until transfers complete ~p", [Node0]),
     F = fun(Node) ->
                 {DownNodes, Transfers} = rpc:call(Node, riak_core_status, transfers, []),
-                lager:info("DownNodes: ~p Transfers: ~p", [DownNodes, Transfers]),
+                logger:info("DownNodes: ~p Transfers: ~p", [DownNodes, Transfers]),
                 DownNodes =:= [] andalso Transfers =:= []
         end,
     ?assertEqual(ok, wait_until(Node0, F)),
@@ -824,10 +823,10 @@ wait_until_transfers_complete([Node0|_]) ->
 
 %% @doc Waits until hinted handoffs from `Node0' are complete
 wait_until_node_handoffs_complete(Node0) ->
-    lager:info("Wait until Node's transfers complete ~p", [Node0]),
+    logger:info("Wait until Node's transfers complete ~p", [Node0]),
     F = fun(Node) ->
                 Handoffs = rpc:call(Node, riak_core_handoff_manager, status, [{direction, outbound}]),
-                lager:info("Handoffs: ~p", [Handoffs]),
+                logger:info("Handoffs: ~p", [Handoffs]),
                 Handoffs =:= []
         end,
     ?assertEqual(ok, wait_until(Node0, F)),
@@ -839,7 +838,7 @@ wait_for_service(Node, Services) when is_list(Services) ->
                     {badrpc, Error} ->
                         {badrpc, Error};
                     CurrServices when is_list(CurrServices) ->
-                        lager:info("Waiting for services ~p: on node ~p. Current services: ~p", [Services, Node, CurrServices]),
+                        logger:info("Waiting for services ~p: on node ~p. Current services: ~p", [Services, Node, CurrServices]),
                         lists:all(fun(Service) -> lists:member(Service, CurrServices) end, Services);
                     Res ->
                         Res
@@ -851,7 +850,7 @@ wait_for_service(Node, Service) ->
     wait_for_service(Node, [Service]).
 
 wait_for_cluster_service(Nodes, Service) ->
-    lager:info("Wait for cluster service ~p in ~p", [Service, Nodes]),
+    logger:info("Wait for cluster service ~p in ~p", [Service, Nodes]),
     F = fun(N) ->
                 UpNodes = rpc:call(N, riak_core_node_watcher, nodes, [Service]),
                 (Nodes -- UpNodes) == []
@@ -862,7 +861,7 @@ wait_for_cluster_service(Nodes, Service) ->
 %% @doc Given a list of nodes, wait until all nodes are considered ready.
 %%      See {@link wait_until_ready/1} for definition of ready.
 wait_until_nodes_ready(Nodes) ->
-    lager:info("Wait until nodes are ready : ~p", [Nodes]),
+    logger:info("Wait until nodes are ready : ~p", [Nodes]),
     [?assertEqual(ok, wait_until(Node, fun is_ready/1)) || Node <- Nodes],
     ok.
 
@@ -874,7 +873,7 @@ wait_until_all_members(Nodes) ->
 %% @doc Wait until all nodes in the list `Nodes' believes all nodes in the
 %%      list `Members' are members of the cluster.
 wait_until_all_members(Nodes, ExpectedMembers) ->
-    lager:info("Wait until all members ~p ~p", [Nodes, ExpectedMembers]),
+    logger:info("Wait until all members ~p ~p", [Nodes, ExpectedMembers]),
     S1 = ordsets:from_list(ExpectedMembers),
     F = fun(Node) ->
                 case members_according_to(Node) of
@@ -891,12 +890,12 @@ wait_until_all_members(Nodes, ExpectedMembers) ->
 %% @doc Given a list of nodes, wait until all nodes believe the ring has
 %%      converged (ie. `riak_core_ring:is_ready' returns `true').
 wait_until_ring_converged(Nodes) ->
-    lager:info("Wait until ring converged on ~p", [Nodes]),
+    logger:info("Wait until ring converged on ~p", [Nodes]),
     [?assertEqual(ok, wait_until(Node, fun is_ring_ready/1)) || Node <- Nodes],
     ok.
 
 wait_until_legacy_ringready(Node) ->
-    lager:info("Wait until legacy ring ready on ~p", [Node]),
+    logger:info("Wait until legacy ring ready on ~p", [Node]),
     rt:wait_until(Node,
                   fun(_) ->
                           case rpc:call(Node, riak_kv_status, ringready, []) of
@@ -909,7 +908,7 @@ wait_until_legacy_ringready(Node) ->
 
 %% @doc wait until each node in Nodes is disterl connected to each.
 wait_until_connected(Nodes) ->
-    lager:info("Wait until connected ~p", [Nodes]),
+    logger:info("Wait until connected ~p", [Nodes]),
     NodeSet = sets:from_list(Nodes),
     F = fun(Node) ->
                 Connected = rpc:call(Node, erlang, nodes, []),
@@ -920,7 +919,7 @@ wait_until_connected(Nodes) ->
 
 %% @doc Wait until the specified node is pingable
 wait_until_pingable(Node) ->
-    lager:info("Wait until ~p is pingable", [Node]),
+    logger:info("Wait until ~p is pingable", [Node]),
     F = fun(N) ->
                 net_adm:ping(N) =:= pong
         end,
@@ -929,7 +928,7 @@ wait_until_pingable(Node) ->
 
 %% @doc Wait until the specified node is no longer pingable
 wait_until_unpingable(Node) ->
-    lager:info("Wait until ~p is not pingable", [Node]),
+    logger:info("Wait until ~p is not pingable", [Node]),
     _OSPidToKill = rpc:call(Node, os, getpid, []),
     F = fun() -> net_adm:ping(Node) =:= pang end,
     %% riak stop will kill -9 after 5 mins, so we try to wait at least that
@@ -939,14 +938,14 @@ wait_until_unpingable(Node) ->
     case wait_until(F, Retry, Delay) of
         ok -> ok;
         _ ->
-            lager:error("Timed out waiting for node ~p to shutdown", [Node]),
+            logger:error("Timed out waiting for node ~p to shutdown", [Node]),
             ?assert(node_shutdown_timed_out)
     end.
 
 
 % Waits until a certain registered name pops up on the remote node.
 wait_until_registered(Node, Name) ->
-    lager:info("Wait until ~p is up on ~p", [Name, Node]),
+    logger:info("Wait until ~p is up on ~p", [Name, Node]),
 
     F = 
         fun() ->
@@ -961,21 +960,21 @@ wait_until_registered(Node, Name) ->
         ok ->
             ok;
         _ ->
-            lager:info("The server with the name ~p on ~p is not coming up.",
-                       [Name, Node]),
+            logger:info("The server with the name ~p on ~p is not coming up.",
+                        [Name, Node]),
             ?assert(registered_name_timed_out)
     end.
 
 
 %% Waits until the cluster actually detects that it is partitioned.
 wait_until_partitioned(P1, P2) ->
-    lager:info("Waiting until partition acknowledged: ~p ~p", [P1, P2]),
+    logger:info("Waiting until partition acknowledged: ~p ~p", [P1, P2]),
     [ begin
-          lager:info("Waiting for ~p to be partitioned from ~p", [Node, P2]),
+          logger:info("Waiting for ~p to be partitioned from ~p", [Node, P2]),
           wait_until(fun() -> is_partitioned(Node, P2) end)
       end || Node <- P1 ],
     [ begin
-          lager:info("Waiting for ~p to be partitioned from ~p", [Node, P1]),
+          logger:info("Waiting for ~p to be partitioned from ~p", [Node, P1]),
           wait_until(fun() -> is_partitioned(Node, P1) end)
       end || Node <- P2 ].
 
@@ -986,7 +985,7 @@ is_partitioned(Node, Peers) ->
 % when you just can't wait
 brutal_kill(Node) ->
     rt_cover:maybe_stop_on_node(Node),
-    lager:info("Killing node ~p", [Node]),
+    logger:info("Killing node ~p", [Node]),
     OSPidToKill = rpc:call(Node, os, getpid, []),
     %% try a normal kill first, but set a timer to
     %% kill -9 after 5 seconds just in case
@@ -1007,7 +1006,7 @@ wait_until_capability(Node, Capability, Value) ->
     rt:wait_until(Node,
                   fun(_) ->
                       Cap = capability(Node, Capability),
-                      lager:info("Capability on node ~p is ~p~n",[Node, Cap]),
+                      logger:info("Capability on node ~p is ~p~n",[Node, Cap]),
                       cap_equal(Value, Cap)
                   end).
 
@@ -1015,7 +1014,7 @@ wait_until_capability(Node, Capability, Value, Default) ->
     rt:wait_until(Node,
                   fun(_) ->
                           Cap = capability(Node, Capability, Default),
-                          lager:info("Capability on node ~p is ~p~n",[Node, Cap]),
+                          logger:info("Capability on node ~p is ~p~n",[Node, Cap]),
                           cap_equal(Value, Cap)
                   end).
 
@@ -1024,7 +1023,7 @@ wait_until_capability_contains(Node, Capability, Value) ->
     rt:wait_until(Node,
                 fun(_) ->
                     Cap = capability(Node, Capability),
-                    lager:info("Capability on node ~p is ~p~n",[Node, Cap]),
+                    logger:info("Capability on node ~p is ~p~n",[Node, Cap]),
                     cap_subset(Value, Cap)
                 end).
 
@@ -1045,13 +1044,13 @@ wait_until_owners_according_to(Node, Nodes) ->
     ok.
 
 wait_until_nodes_agree_about_ownership(Nodes) ->
-    lager:info("Wait until nodes agree about ownership ~p", [Nodes]),
+    logger:info("Wait until nodes agree about ownership ~p", [Nodes]),
     Results = [ wait_until_owners_according_to(Node, Nodes) || Node <- Nodes ],
     ?assert(lists:all(fun(X) -> ok =:= X end, Results)).
 
 %% AAE support
 wait_until_aae_trees_built(Nodes) ->
-    lager:info("Wait until AAE builds all partition trees across ~p", [Nodes]),
+    logger:info("Wait until AAE builds all partition trees across ~p", [Nodes]),
     BuiltFun = fun() -> lists:foldl(aae_tree_built_fun(), true, Nodes) end,
     ?assertEqual(ok, wait_until(BuiltFun)),
     ok.
@@ -1096,7 +1095,7 @@ get_aae_tree_info(Node) ->
         {badrpc, _} ->
             {error, {badrpc, Node}};
         Info  ->
-            lager:debug("Entropy table on node ~p : ~p", [Node, Info]),
+            logger:debug("Entropy table on node ~p : ~p", [Node, Info]),
             {ok, Info}
     end.
 
@@ -1134,7 +1133,7 @@ index_built_fun(Node) ->
 %% @doc Ensure that the specified node is a singleton node/cluster -- a node
 %%      that owns 100% of the ring.
 check_singleton_node(Node) ->
-    lager:info("Check ~p is a singleton", [Node]),
+    logger:info("Check ~p is a singleton", [Node]),
     {ok, Ring} = rpc:call(Node, riak_core_ring_manager, get_raw_ring, []),
     Owners = lists:usort([Owner || {_Idx, Owner} <- riak_core_ring:all_owners(Ring)]),
     ?assertEqual([Node], Owners),
@@ -1250,7 +1249,7 @@ build_cluster(NumNodes, Versions, InitialConfig) ->
         end,
 
     join_cluster(Nodes),
-    lager:info("Cluster built: ~p", [Nodes]),
+    logger:info("Cluster built: ~p", [Nodes]),
     Nodes.
 
 join_cluster(Nodes) ->
@@ -1297,7 +1296,7 @@ try_nodes_ready(Nodes) ->
     try_nodes_ready(Nodes, 10, 500).
 
 try_nodes_ready([Node1 | _Nodes], 0, _SleepMs) ->
-    lager:info("Nodes not ready after initial plan/commit, retrying"),
+    logger:info("Nodes not ready after initial plan/commit, retrying"),
     plan_and_commit(Node1);
 try_nodes_ready(Nodes, N, SleepMs) ->
     ReadyNodes = [Node || Node <- Nodes, is_ready(Node) =:= true],
@@ -1331,7 +1330,7 @@ restore_data_dir(Nodes, BackendFldr, BackupFldr) ->
 %% @doc Shutdown every node, this is for after a test run is complete.
 teardown() ->
     %% stop all connected nodes, 'cause it'll be faster that
-    %%lager:info("RPC stopping these nodes ~p", [nodes()]),
+    %%logger:info("RPC stopping these nodes ~p", [nodes()]),
     %%[ rt:stop(Node) || Node <- nodes()],
     %% Then do the more exhaustive harness thing, in case something was up
     %% but not connected.
@@ -1486,11 +1485,11 @@ object_value(1, Obj, _SquashSiblings) ->
 object_value(_ValueCount, Obj, false) ->
     riak_object:get_value(Obj);
 object_value(_ValueCount, Obj, true) ->
-    lager:debug("Siblings detected for ~p:~p~n~p", [riak_object:bucket(Obj), riak_object:key(Obj), Obj]),
+    logger:debug("Siblings detected for ~p:~p~n~p", [riak_object:bucket(Obj), riak_object:key(Obj), Obj]),
     Contents = riak_object:get_contents(Obj),
     case lists:foldl(fun sibling_compare/2, {true, undefined}, Contents) of
         {true, {_, _, _, Value}} ->
-            lager:debug("Siblings determined to be a single value"),
+            logger:debug("Siblings determined to be a single value"),
             Value;
         {false, _} ->
             {error, siblings}
@@ -1550,8 +1549,8 @@ get_replica(Node, Bucket, Key, I, N) ->
             Reply
     after
         60000 ->
-            lager:error("Replica ~p get for ~p/~p timed out",
-                        [I, Bucket, Key]),
+            logger:error("Replica ~p get for ~p/~p timed out",
+                         [I, Bucket, Key]),
             ?assert(false)
     end.
 
@@ -1682,7 +1681,7 @@ pbc_put_file(Pid, Bucket, Key, Filename) ->
 %% @doc Puts all files in the given directory into the given bucket using the
 %% filename as a key and assuming a plain text content type.
 pbc_put_dir(Pid, Bucket, Dir) ->
-    lager:info("Putting files from dir ~p into bucket ~p", [Dir, Bucket]),
+    logger:info("Putting files from dir ~p into bucket ~p", [Dir, Bucket]),
     {ok, Files} = file:list_dir(Dir),
     [pbc_put_file(Pid, Bucket, list_to_binary(F), filename:join([Dir, F]))
      || F <- Files].
@@ -1817,7 +1816,7 @@ copy_conf(NumNodes, FromVersion, ToVersion) ->
 %%     in the cluster may be used as the change is propagated via the
 %%     Ring.
 enable_search_hook(Node, Bucket) when is_binary(Bucket) ->
-    lager:info("Installing search hook for bucket ~p", [Bucket]),
+    logger:info("Installing search hook for bucket ~p", [Bucket]),
     ?assertEqual(ok, rpc:call(Node, riak_search_kv_hook, install, [Bucket])).
 
 %%%===================================================================
@@ -1850,7 +1849,7 @@ set_backend(Backend, _) when Backend == riak_kv_bitcask_backend;
 		             Backend == riak_kv_eleveldb_backend;
 			     Backend == riak_kv_memory_backend;
 			     Backend == riak_kv_leveled_backend ->
-    lager:info("rt:set_backend(~p)", [Backend]),
+    logger:info("rt:set_backend(~p)", [Backend]),
     update_app_config(all, [{riak_kv, [{storage_backend, Backend}]}]),
     get_backends();
 set_backend(Backend, Extras) when Backend == riak_kv_multi_backend ->
@@ -1859,7 +1858,7 @@ set_backend(Backend, Extras) when Backend == riak_kv_multi_backend ->
     update_app_config(all, [{riak_kv, Config}]),
     get_backends();
 set_backend(Other, _) ->
-    lager:warning("rt:set_backend doesn't recognize ~p as a legit backend, using the default.", [Other]),
+    logger:warning("rt:set_backend doesn't recognize ~p as a legit backend, using the default.", [Other]),
     get_backends().
 
 make_multi_backend_config(default) ->
@@ -1876,7 +1875,7 @@ make_multi_backend_config(indexmix) ->
                       {<<"memory1">>, riak_kv_memory_backend, []},
                       {<<"leveled1">>, riak_kv_leveled_backend, []}]}];
 make_multi_backend_config(Other) ->
-    lager:warning("rt:set_multi_backend doesn't recognize ~p as legit multi-backend config, using default", [Other]),
+    logger:warning("rt:set_multi_backend doesn't recognize ~p as legit multi-backend config, using default", [Other]),
     make_multi_backend_config(default).
 
 get_backends() ->
@@ -1933,19 +1932,19 @@ get_ip(Node) ->
 
 %% @doc Log a message to the console of the specified test nodes.
 %%      Messages are prefixed by the string "---riak_test--- "
-%%      Uses lager:info/1 'Fmt' semantics
+%%      Uses logger:info/1 'Fmt' semantics
 log_to_nodes(Nodes, Fmt) ->
     log_to_nodes(Nodes, Fmt, []).
 
 %% @doc Log a message to the console of the specified test nodes.
 %%      Messages are prefixed by the string "---riak_test--- "
-%%      Uses lager:info/2 'LFmt' and 'LArgs' semantics
+%%      Uses logger:info/2 'LFmt' and 'LArgs' semantics
 log_to_nodes(Nodes0, LFmt, LArgs) ->
     %% This logs to a node's info level, but if riak_test is running
     %% at debug level, we want to know when we send this and what
     %% we're saying
     Nodes = lists:flatten(Nodes0),
-    lager:debug("log_to_nodes: " ++ LFmt, LArgs),
+    logger:debug("log_to_nodes: " ++ LFmt, LArgs),
     Module = lager,
     Function = log,
     Meta = [],
@@ -1993,14 +1992,14 @@ check_ibrowse() ->
         {status, _Pid, {module, gen_server} ,_} -> ok
     catch
         Throws ->
-            lager:error("ibrowse error ~p", [Throws]),
-            lager:error("Restarting ibrowse"),
+            logger:error("ibrowse error ~p", [Throws]),
+            logger:error("Restarting ibrowse"),
             application:stop(ibrowse),
             application:start(ibrowse)
     end.
 
 post_result(TestResult, #rt_webhook{url=URL, headers=HookHeaders, name=Name}) ->
-    lager:info("Posting result to ~s ~s", [Name, URL]),
+    logger:info("Posting result to ~s ~s", [Name, URL]),
     try ibrowse:send_req(URL,
             [{"Content-Type", "application/json"}],
             post,
@@ -2011,19 +2010,19 @@ post_result(TestResult, #rt_webhook{url=URL, headers=HookHeaders, name=Name}) ->
         {ok, RC=[$2|_], Headers, _Body} ->
             {ok, RC, Headers};
         {ok, ResponseCode, Headers, Body} ->
-            lager:info("Test Result did not generate the expected 2XX HTTP response code."),
-            lager:debug("Post"),
-            lager:debug("Response Code: ~p", [ResponseCode]),
-            lager:debug("Headers: ~p", [Headers]),
-            lager:debug("Body: ~p", [Body]),
+            logger:info("Test Result did not generate the expected 2XX HTTP response code."),
+            logger:debug("Post"),
+            logger:debug("Response Code: ~p", [ResponseCode]),
+            logger:debug("Headers: ~p", [Headers]),
+            logger:debug("Body: ~p", [Body]),
             error;
         X ->
-            lager:warning("Some error POSTing test result: ~p", [X]),
+            logger:warning("Some error POSTing test result: ~p", [X]),
             error
     catch
         Class:Reason ->
-            lager:error("Error reporting to ~s. ~p:~p", [Name, Class, Reason]),
-            lager:error("Payload: ~p", [TestResult]),
+            logger:error("Error reporting to ~s. ~p:~p", [Name, Class, Reason]),
+            logger:error("Payload: ~p", [TestResult]),
             error
     end.
 
@@ -2122,14 +2121,14 @@ expect_in_log(Node, Pattern) ->
 expect_in_log(Node, Pattern, Retry, Delay) ->
     CheckLogFun = fun() ->
             Logs = rpc:call(Node, riak_test_lager_backend, get_logs, []),
-            lager:info("looking for pattern ~s in logs for ~p",
-                       [Pattern, Node]),
+            logger:info("looking for pattern ~s in logs for ~p",
+                        [Pattern, Node]),
             case re:run(Logs, Pattern, []) of
                 {match, _} ->
-                    lager:info("Found match"),
+                    logger:info("Found match"),
                     true;
                 nomatch    ->
-                    lager:info("No match"),
+                    logger:info("No match"),
                     false
             end
     end,
@@ -2157,7 +2156,7 @@ expect_not_in_logs(Node, Pattern) ->
 %% to ensure that the routes have been added by the supervisor.
 %%
 wait_for_control(_Vsn, Node) when is_atom(Node) ->
-    lager:info("Waiting for riak_control to start on node ~p.", [Node]),
+    logger:info("Waiting for riak_control to start on node ~p.", [Node]),
 
     %% Wait for the gen_server.
     rt:wait_until(Node, fun(N) ->
@@ -2168,7 +2167,7 @@ wait_for_control(_Vsn, Node) when is_atom(Node) ->
                     {ok, _} ->
                         true;
                     Error ->
-                        lager:info("Error was ~p.", [Error]),
+                        logger:info("Error was ~p.", [Error]),
                         false
                 end
         end),
@@ -2177,11 +2176,11 @@ wait_for_control(_Vsn, Node) when is_atom(Node) ->
     wait_for_any_webmachine_route(Node, [admin_gui, riak_control_wm_gui]).
 
 wait_for_any_webmachine_route(Node, Routes) ->
-    lager:info("Waiting for routes ~p to be added to webmachine.", [Routes]),
+    logger:info("Waiting for routes ~p to be added to webmachine.", [Routes]),
     rt:wait_until(Node, fun(N) ->
         case rpc:call(N, webmachine_router, get_routes, []) of
             {badrpc, Error} ->
-                lager:info("Error was ~p.", [Error]),
+                logger:info("Error was ~p.", [Error]),
                 false;
             RegisteredRoutes ->
                 case is_any_route_loaded(Routes, RegisteredRoutes) of
@@ -2274,8 +2273,8 @@ get_call_count(Cluster, MFA) when is_list(Cluster) ->
 %%      traces.
 -spec count_calls([node()], [{atom(), atom(), non_neg_integer()}]) -> ok.
 count_calls(Cluster, MFAs) when is_list(Cluster) ->
-    lager:info("count all calls to MFA ~p across the cluster ~p",
-               [MFAs, Cluster]),
+    logger:info("count all calls to MFA ~p across the cluster ~p",
+                [MFAs, Cluster]),
     RiakTestNode = node(),
     maybe_create_ets(),
     dbg:tracer(process, {fun trace_count/2, {RiakTestNode, Cluster}}),
@@ -2300,7 +2299,7 @@ maybe_create_ets() ->
 %% @doc Stop dbg tracing.
 -spec stop_tracing() -> ok.
 stop_tracing() ->
-    lager:info("stop all dbg tracing"),
+    logger:info("stop all dbg tracing"),
     dbg:stop_clear(),
     ok.
 
@@ -2323,15 +2322,15 @@ trace_count({trace, _Pid, return_from, MFA, _Result}, {RTNode, Cluster}) ->
 
 -spec assert_capability(node(), capability(), atom()) -> ok.
 assert_capability(CNode, Capability, Value) ->
-    lager:info("Checking Capability Setting ~p =:= ~p on ~p",
-               [Capability, Value, CNode]),
+    logger:info("Checking Capability Setting ~p =:= ~p on ~p",
+                [Capability, Value, CNode]),
     ?assertEqual(ok, rt:wait_until_capability(CNode, Capability, Value)),
     ok.
 
 -spec assert_supported([capability()], capability(), atom()|[atom()]) -> ok.
 assert_supported(Capabilities, Capability, Value) ->
-    lager:info("Checking Capability Supported Values ~p =:= ~p",
-               [Capability, Value]),
+    logger:info("Checking Capability Supported Values ~p =:= ~p",
+                [Capability, Value]),
     ?assertEqual(Value, proplists:get_value(
                           Capability,
                           proplists:get_value('$supported', Capabilities))),

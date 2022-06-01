@@ -126,12 +126,12 @@ install_probes(Nodes, W=#watcher{collector=Collector, nodes=AllNodes, probes=Pro
     W#watcher{probes=Probes3}.
 
 start(Master, Rate, Collector, Nodes, Fun) ->
-    lager:info("In start: ~p~n", [node()]),
+    logger:info("In start: ~p~n", [node()]),
     Pid = spawn(?MODULE, init, [Master, Rate, Collector, Nodes, Fun]),
     {node(), Pid}.
 
 init(Master, Rate, {Host, Port, _Dir}, Nodes, Fun) ->
-    lager:info("In init: ~p ~p~n", [node(), Host]),
+    logger:info("In init: ~p ~p~n", [node(), Host]),
     {ok, Sock} = gen_tcp:connect(Host, Port,
                                  [binary, {packet, 2},
 				 {send_timeout, 500}]),

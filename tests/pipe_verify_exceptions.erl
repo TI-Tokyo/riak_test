@@ -49,7 +49,7 @@
 
 %% @doc riak_test callback
 confirm() ->
-    lager:info("Build ~b node cluster", [?NODE_COUNT]),
+    logger:info("Build ~b node cluster", [?NODE_COUNT]),
     Nodes = rt:build_cluster(?NODE_COUNT),
 
     [rt:wait_for_service(Node, riak_pipe) || Node <- Nodes],
@@ -75,7 +75,7 @@ confirm() ->
 
     rt_pipe:assert_no_zombies(Nodes),
 
-    lager:info("~s: PASS", [atom_to_list(?MODULE)]),
+    logger:info("~s: PASS", [atom_to_list(?MODULE)]),
     pass.
 
 %%% TESTS
@@ -88,7 +88,7 @@ xbad1(Pipe) ->
     riak_pipe:eoi(Pipe).
 
 verify_xbad1([RN|_]) ->
-    lager:info("Verify correct error message from worker (xbad1)"),
+    logger:info("Verify correct error message from worker (xbad1)"),
 
     {eoi, Res, Trace} =
         rpc:call(RN, riak_pipe, generic_transform,
@@ -111,7 +111,7 @@ xbad2(Pipe) ->
     exit({success_so_far, riak_pipe:collect_results(Pipe, 100)}).
 
 verify_xbad2([RN|_]) ->
-    lager:info("Verify work done before crashing without eoi (xbad2)"),
+    logger:info("Verify work done before crashing without eoi (xbad2)"),
 
     %% we get a badrpc because the code exits, but it includes the
     %% test data we want
@@ -130,7 +130,7 @@ tail_worker_crash(Pipe) ->
     riak_pipe:eoi(Pipe).
 
 verify_tail_worker_crash([RN|_]) ->
-    lager:info("Verify work done before tail worker crash"),
+    logger:info("Verify work done before tail worker crash"),
 
     {eoi, Res, Trace} =
         rpc:call(RN, riak_pipe, generic_transform,
@@ -159,7 +159,7 @@ vnode_crash(Pipe) ->
     riak_pipe:eoi(Pipe).
 
 verify_vnode_crash([RN|_]) ->
-    lager:info("Verify eoi still flows through after vnodes crash"),
+    logger:info("Verify eoi still flows through after vnodes crash"),
     {eoi, Res, Trace} =
         rpc:call(RN, riak_pipe, generic_transform,
                  [fun rt_pipe:decr_or_crash/1,
@@ -181,7 +181,7 @@ head_fitting_crash(Pipe) ->
     exit({success_so_far, riak_pipe:collect_results(Pipe, 100)}).
 
 verify_head_fitting_crash([RN|_]) ->
-    lager:info("Verify errors during head fitting crash"),
+    logger:info("Verify errors during head fitting crash"),
 
     %% we get a badrpc because the code exits, but it includes the
     %% test data we want
@@ -231,7 +231,7 @@ middle_fitting_normal(Pipe) ->
     exit({success_so_far, riak_pipe:collect_results(Pipe, 100)}).
 
 verify_middle_fitting_normal([RN|_]) ->
-    lager:info("Verify middle fitting normal"),
+    logger:info("Verify middle fitting normal"),
 
     {badrpc, {'EXIT', {success_so_far, {timeout, Res, Trace}}}} =
         rpc:call(RN, riak_pipe, generic_transform,
@@ -270,7 +270,7 @@ middle_fitting_crash(Pipe) ->
     receive
         {'DOWN', BuilderMonitor, process, Builder, _} -> ok
     after 5000 ->
-            lager:warning("timed out waiting for builder to exit"),
+            logger:warning("timed out waiting for builder to exit"),
             demonitor(BuilderMonitor, [flush])
     end,
 
@@ -281,7 +281,7 @@ middle_fitting_crash(Pipe) ->
     exit({success_so_far, riak_pipe:collect_results(Pipe, 100)}).
 
 verify_middle_fitting_crash([RN|_]) ->
-    lager:info("Verify pipe tears down when a fitting crashes (middle)"),
+    logger:info("Verify pipe tears down when a fitting crashes (middle)"),
 
     {badrpc, {'EXIT', {success_so_far, {timeout, Res, Trace}}}} =
         rpc:call(RN, riak_pipe, generic_transform,
@@ -318,7 +318,7 @@ tail_fitting_crash(Pipe) ->
     exit({success_so_far, riak_pipe:collect_results(Pipe, 100)}).
 
 verify_tail_fitting_crash([RN|_]) ->
-    lager:info("Verify pipe tears down when a fitting crashes (tail)"),
+    logger:info("Verify pipe tears down when a fitting crashes (tail)"),
 
     {badrpc, {'EXIT', {success_so_far, {timeout, Res, Trace}}}} =
         rpc:call(RN, riak_pipe, generic_transform,
@@ -339,7 +339,7 @@ verify_tail_fitting_crash([RN|_]) ->
     ?assertEqual(0, length(rt_pipe:extract_trace_errors(Trace))).
 
 verify_worker_init_exit([RN|_]) ->
-    lager:info("Verify error on worker startup failure (init_exit)"),
+    logger:info("Verify error on worker startup failure (init_exit)"),
     Spec = [#fitting_spec{name="init crash",
                           module=riak_pipe_w_crash,
                           arg=init_exit,
@@ -352,7 +352,7 @@ verify_worker_init_exit([RN|_]) ->
     ?assertEqual({eoi, [], []}, riak_pipe:collect_results(Pipe)).
 
 verify_worker_init_badreturn([RN|_]) ->
-    lager:info("Verify error on worker startup failure (init_badreturn)"),
+    logger:info("Verify error on worker startup failure (init_badreturn)"),
     Spec = [#fitting_spec{name="init crash",
                           module=riak_pipe_w_crash,
                           arg=init_badreturn,
@@ -372,7 +372,7 @@ send_1_100(Pipe) ->
     riak_pipe:eoi(Pipe).
 
 verify_worker_limit_one([RN|_]) ->
-    lager:info("Verify worker limit for one pipe"),
+    logger:info("Verify worker limit for one pipe"),
     PipeLen = 90,
     {eoi, Res, Trace} =
         rpc:call(RN, riak_pipe, generic_transform,
@@ -388,7 +388,7 @@ verify_worker_limit_one([RN|_]) ->
                  proplists:get_value(error, Ps)).
 
 verify_worker_limit_multiple([RN|_]) ->
-    lager:info("Verify worker limit for multiple pipes"),
+    logger:info("Verify worker limit for multiple pipes"),
     PipeLen = 90,
     Spec = lists:duplicate(
              PipeLen,
@@ -417,7 +417,7 @@ verify_worker_limit_multiple([RN|_]) ->
     riak_pipe:destroy(Pipe2).
 
 verify_under_worker_limit_one([RN|_]) ->
-    lager:info("Verify that many workers + many fittings still under limit"),
+    logger:info("Verify that many workers + many fittings still under limit"),
 
     %% 20 * Ring size > worker limit, if indeed the worker
     %% limit were enforced per node instead of per vnode.
@@ -451,7 +451,7 @@ send_100_100(Pipe) ->
     riak_pipe:eoi(Pipe).
 
 verify_queue_limit([RN|_]) ->
-    lager:info("Verify queue size limits are enforced"),
+    logger:info("Verify queue size limits are enforced"),
     verify_queue_limit(RN, 10).
 
 verify_queue_limit(RN, Retries) when Retries > 0 ->
@@ -471,16 +471,16 @@ verify_queue_limit(RN, Retries) when Retries > 0 ->
 
     case Full of
         [] ->
-            lager:info("Queues were never full; Retries left: ~b",
+            logger:info("Queues were never full; Retries left: ~b",
                        [Retries-1]);
         _ ->
             ok
     end;
 verify_queue_limit(_, _) ->
-    lager:warning("Queues were never full; Consider re-running.").
+    logger:warning("Queues were never full; Consider re-running.").
 
 verify_vnode_death([RN|_]) ->
-    lager:info("Verify a vnode death does not kill the pipe"),
+    logger:info("Verify a vnode death does not kill the pipe"),
 
     {ok, Pipe} =
         rpc:call(RN, riak_pipe, exec,
@@ -506,7 +506,7 @@ verify_vnode_death([RN|_]) ->
 %% down, but not to finish, resulting in an input in its
 %% queue after it completes its done/1 function
 verify_restart_after_eoi([RN|_]) ->
-    lager:info("Verify worker restart via recursive inputs after eoi"),
+    logger:info("Verify worker restart via recursive inputs after eoi"),
 
     Inputs = [0, 1, 2, 0],
     ChashFun = fun([Head|_]) ->

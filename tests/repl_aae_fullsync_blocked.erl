@@ -45,7 +45,7 @@
         ]).
 
 confirm() ->
-    lager:notice("blocking test"),
+    logger:notice("blocking test"),
     blocking_test(),
     pass.
 
@@ -56,35 +56,35 @@ blocking_test() ->
     %% Break up the 6 nodes into three clustes.
     {ANodes, BNodes} = lists:split(3, Nodes),
 
-    lager:info("ANodes: ~p", [ANodes]),
-    lager:info("BNodes: ~p", [BNodes]),
+    logger:info("ANodes: ~p", [ANodes]),
+    logger:info("BNodes: ~p", [BNodes]),
 
-    lager:info("Building two clusters."),
+    logger:info("Building two clusters."),
     [repl_util:make_cluster(N) || N <- [ANodes, BNodes]],
 
     AFirst = hd(ANodes),
     BFirst = hd(BNodes),
 
-    lager:info("Naming clusters."),
+    logger:info("Naming clusters."),
     repl_util:name_cluster(AFirst, "A"),
     repl_util:name_cluster(BFirst, "B"),
 
-    lager:info("Waiting for convergence."),
+    logger:info("Waiting for convergence."),
     rt:wait_until_ring_converged(ANodes),
     rt:wait_until_ring_converged(BNodes),
 
-    lager:info("Waiting for transfers to complete."),
+    logger:info("Waiting for transfers to complete."),
     rt:wait_until_transfers_complete(ANodes),
     rt:wait_until_transfers_complete(BNodes),
 
-    lager:info("Get leaders."),
+    logger:info("Get leaders."),
     LeaderA = get_leader(AFirst),
     LeaderB = get_leader(BFirst),
 
-    lager:info("Finding connection manager ports."),
+    logger:info("Finding connection manager ports."),
     BPort = get_port(LeaderB),
 
-    lager:info("Connecting cluster A to B"),
+    logger:info("Connecting cluster A to B"),
     connect_cluster(LeaderA, BPort, "B"),
 
     %% Write keys prior to fullsync.
@@ -97,7 +97,7 @@ blocking_test() ->
     rt:wait_until_aae_trees_built(ANodes),
     rt:wait_until_aae_trees_built(BNodes),
 
-    lager:info("Test fullsync from cluster A leader ~p to cluster B",
+    logger:info("Test fullsync from cluster A leader ~p to cluster B",
                [LeaderA]),
     repl_util:enable_fullsync(LeaderA, "B"),
     rt:wait_until_ring_converged(ANodes),
@@ -134,7 +134,7 @@ validate_completed_fullsync(ReplicationLeader,
                             Start,
                             End) ->
     ok = check_fullsync(ReplicationLeader, DestinationCluster, 0),
-    lager:info("Verify: Reading ~p keys repl'd from A(~p) to ~p(~p)",
+    logger:info("Verify: Reading ~p keys repl'd from A(~p) to ~p(~p)",
                [?NUM_KEYS, ReplicationLeader,
                 DestinationCluster, DestinationNode]),
     ?assertEqual(0,
@@ -150,7 +150,7 @@ check_fullsync(Node, Cluster, ExpectedFailures) ->
     {Time, _} = timer:tc(repl_util,
                          start_and_wait_until_fullsync_complete,
                          [Node, Cluster]),
-    lager:info("Fullsync completed in ~p seconds", [Time/1000/1000]),
+    logger:info("Fullsync completed in ~p seconds", [Time/1000/1000]),
 
     Status = rpc:call(Node, riak_repl_console, status, [quiet]),
 
@@ -177,7 +177,7 @@ validate_intercepted_fullsync(InterceptTarget,
                                   riak_core_ring,
                                   my_indices,
                                   [rt:get_ring(InterceptTarget)])),
-    lager:info("~p owns ~p indices",
+    logger:info("~p owns ~p indices",
                [InterceptTarget, NumIndicies]),
 
     %% Before enabling fullsync, ensure trees on one source node return
@@ -223,7 +223,7 @@ validate_intercepted_fullsync(InterceptTarget,
                               ReplicationLeader,
                               ReplicationCluster,
                               NumIndicies) ->
-    lager:info("Validating intercept ~p on ~p.",
+    logger:info("Validating intercept ~p on ~p.",
                [Intercept, InterceptTarget]),
 
     %% Add intercept.
@@ -261,20 +261,20 @@ get_leader(Node) ->
 
 %% @doc Connect two clusters using a given name.
 connect_cluster(Source, Port, Name) ->
-    lager:info("Connecting ~p to ~p for cluster ~p.",
+    logger:info("Connecting ~p to ~p for cluster ~p.",
                [Source, Port, Name]),
     repl_util:connect_cluster(Source, "127.0.0.1", Port),
     ?assertEqual(ok, repl_util:wait_for_connection(Source, Name)).
 
 %% @doc Write a series of keys and ensure they are all written.
 write_to_cluster(Node, Start, End) ->
-    lager:info("Writing ~p keys to node ~p.", [End - Start, Node]),
+    logger:info("Writing ~p keys to node ~p.", [End - Start, Node]),
     ?assertEqual([],
                  repl_util:do_write(Node, Start, End, ?TEST_BUCKET, 1)).
 
 %% @doc Read from cluster a series of keys, asserting a certain number
 %%      of errors.
 read_from_cluster(Node, Start, End, Errors) ->
-    lager:info("Reading ~p keys from node ~p.", [End - Start, Node]),
+    logger:info("Reading ~p keys from node ~p.", [End - Start, Node]),
     Res2 = rt:systest_read(Node, Start, End, ?TEST_BUCKET, 1),
     ?assertEqual(Errors, length(Res2)).

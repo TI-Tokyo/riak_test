@@ -63,7 +63,7 @@ setup_test_env() ->
 
     {YZBucket, YZKeyAndUniques, YZCommon} = generate_test_data(<<"yz">>),
     YZIndex = generate_string(),
-    lager:info("yz index: ~s", [YZIndex]),
+    logger:info("yz index: ~s", [YZIndex]),
 
     setup_yz_index(Nodes, YZIndex),
     setup_yz_bucket(Nodes, YZBucket, YZIndex),
@@ -71,7 +71,7 @@ setup_test_env() ->
 
     %% give yokozuna time to auto-commit
     YZSleep_ms = 1000,
-    lager:info("Giving Yokozuna ~bms to auto-commit", [YZSleep_ms]),
+    logger:info("Giving Yokozuna ~bms to auto-commit", [YZSleep_ms]),
     timer:sleep(YZSleep_ms),
 
     #env{ nodes=Nodes,
@@ -100,12 +100,12 @@ confirm_config(#env{nodes=Nodes,
                     yz_keyuqs=YZKeyAndUniques,
                     yz_index=YZIndex}=Env,
                     Config) ->
-    lager:info("Running Config: ~p", [Config]),
+    logger:info("Running Config: ~p", [Config]),
     set_config(Env, Config),
 
     YZBResults = run_bucket_mr(Nodes, YZIndex, <<"*:*">>),
 
-    lager:info("YZ Bucket Results: ~p", [YZBResults]),
+    logger:info("YZ Bucket Results: ~p", [YZBResults]),
 
     ?assertEqual(expected_yokozuna(Config),
                  got_yokozuna(YZBResults, YZBucket, YZKeyAndUniques)),
@@ -117,15 +117,15 @@ confirm_config(#env{nodes=Nodes,
 %% put it in the test log so we know where to poke when things fail
 generate_test_data(System) ->
     Bucket = generate_bucket_name(System),
-    lager:info("~s bucket: ~s", [System, Bucket]),
+    logger:info("~s bucket: ~s", [System, Bucket]),
 
     Common = generate_string(),
-    lager:info("~s common: ~s", [System, Common]),
+    logger:info("~s common: ~s", [System, Common]),
 
     KeyAndUniques = [ {generate_string(), generate_string()},
                       {generate_string(), generate_string()},
                       {generate_string(), generate_string()} ],
-    [ lager:info("~s key/uq: ~s / ~s", [System, Key, Unique])
+    [ logger:info("~s key/uq: ~s / ~s", [System, Key, Unique])
       || {Key, Unique} <- KeyAndUniques ],
 
     {Bucket, KeyAndUniques, Common}.
@@ -153,7 +153,7 @@ index_path(Index) ->
 wait_for_index(Cluster, Index) ->
     IsIndexUp =
         fun(Node) ->
-                lager:info("Waiting for index ~s on node ~p", [Index, Node]),
+                logger:info("Waiting for index ~s on node ~p", [Index, Node]),
                 IUrl = iburl(Node, index_path(Index)),
                 case ibrowse:send_req(IUrl, [], get) of
                     {ok, "200", _, _} -> true;
@@ -169,7 +169,7 @@ iburl(Node, Path) ->
 %% Create a set of keys, all of which have a common term in their
 %% value, and each of which has a unique term in its value
 load_test_data([Node|_], Bucket, KeyAndUniques, Common) ->
-    lager:info("Loading test data"),
+    logger:info("Loading test data"),
     C = rt:httpc(Node),
     [ begin
           Value = list_to_binary([Common, " ", Unique]),
@@ -204,7 +204,7 @@ got_yokozuna(Results, Bucket, KeyAndUniques) ->
                       (_) ->
                            false
                    end,
-            lager:info("got_yokozuna: ~p ... ~p", [Matches, KeyAndUniques]),
+            logger:info("got_yokozuna: ~p ... ~p", [Matches, KeyAndUniques]),
             lists:all(IsYZ, Matches);
         _ ->
             false

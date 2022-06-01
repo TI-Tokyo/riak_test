@@ -38,11 +38,11 @@ home_dir() ->
 
 %% @doc Wrap 'which' to give a good output if something is not installed
 which(Command) ->
-    lager:info("Checking for presence of ~s", [Command]),
+    logger:info("Checking for presence of ~s", [Command]),
     Cmd = lists:flatten(io_lib:format("which ~s; echo $?", [Command])),
     case rt:str(os:cmd(Cmd), "0") of
         false ->
-            lager:warning("`~s` is not installed", [Command]),
+            logger:warning("`~s` is not installed", [Command]),
             false;
         true ->
             true
@@ -53,14 +53,14 @@ assert_which(Command) ->
     ?assert(which(Command)).
 
 download(Url) ->
-    lager:info("Downloading ~s", [Url]),
+    logger:info("Downloading ~s", [Url]),
     Filename = url_to_filename(Url),
     case filelib:is_file(filename:join(rt_config:get(rt_scratch_dir), Filename))  of
         true ->
-            lager:info("Got it ~p", [Filename]),
+            logger:info("Got it ~p", [Filename]),
             ok;
         _ ->
-            lager:info("Getting it ~p", [Filename]),
+            logger:info("Getting it ~p", [Filename]),
             rt_local:stream_cmd("curl  -O -L " ++ Url, [{cd, rt_config:get(rt_scratch_dir)}])
     end.
 
@@ -72,7 +72,7 @@ url_to_filename(Url) ->
 install_on_absence(Command, InstallCommand) ->
     case which(Command) of
         false ->
-            lager:info("Attempting to install `~s` with command `~s`", [Command, InstallCommand]),
+            logger:info("Attempting to install `~s` with command `~s`", [Command, InstallCommand]),
             ?assertCmd(InstallCommand);
         _True ->
             ok
@@ -98,16 +98,16 @@ stream_cmd_loop(Port, Buffer, NewLineBuffer, Time={_MegaSecs, Secs, _MicroSecs})
             {_, Now, _} = os:timestamp(),
             NewNewLineBuffer = case Now > Secs of
                 true ->
-                    lager:info(NewLineBuffer),
+                    logger:info(NewLineBuffer),
                     "";
                 _ ->
                     NewLineBuffer
             end,
             case rt:str(Data, "\n") of
                 true ->
-                    lager:info(NewNewLineBuffer),
+                    logger:info(NewNewLineBuffer),
                     Tokens = string:tokens(Data, "\n"),
-                    [ lager:info(Token) || Token <- Tokens ],
+                    [ logger:info(Token) || Token <- Tokens ],
                     stream_cmd_loop(Port, Buffer ++ NewNewLineBuffer ++ Data, "", Time);
                 _ ->
                     stream_cmd_loop(Port, Buffer, NewNewLineBuffer ++ Data, os:timestamp())

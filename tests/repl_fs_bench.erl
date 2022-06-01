@@ -45,15 +45,15 @@ confirm() ->
     {E5, F5, D5, N5} = fullsync_test(aae, 10),
     {E6, F6, D6, N6} = fullsync_test(aae, 100),
 
-    lager:info("Keylist Empty: ~pms ~pms ~pms", [E1 / 1000, E2 / 1000, E3 / 1000]),
-    lager:info("Keylist Full:  ~pms ~pms ~pms", [F1 / 1000, F2 / 1000, F3 / 1000]),
-    lager:info("Keylist Diff:  ~pms ~pms ~pms", [D1 / 1000, D2 / 1000, D3 / 1000]),
-    lager:info("Keylist None:  ~pms ~pms ~pms", [N1 / 1000, N2 / 1000, N3 / 1000]),
+    logger:info("Keylist Empty: ~pms ~pms ~pms", [E1 / 1000, E2 / 1000, E3 / 1000]),
+    logger:info("Keylist Full:  ~pms ~pms ~pms", [F1 / 1000, F2 / 1000, F3 / 1000]),
+    logger:info("Keylist Diff:  ~pms ~pms ~pms", [D1 / 1000, D2 / 1000, D3 / 1000]),
+    logger:info("Keylist None:  ~pms ~pms ~pms", [N1 / 1000, N2 / 1000, N3 / 1000]),
 
-    lager:info("AAE Empty: ~pms ~pms ~pms", [E4 / 1000, E5 / 1000, E6 / 1000]),
-    lager:info("AAE Full:  ~pms ~pms ~pms", [F4 / 1000, F5 / 1000, F6 / 1000]),
-    lager:info("AAE Diff:  ~pms ~pms ~pms", [D4 / 1000, D5 / 1000, D6 / 1000]),
-    lager:info("AAE None:  ~pms ~pms ~pms", [N4 / 1000, N5 / 1000, N6 / 1000]),
+    logger:info("AAE Empty: ~pms ~pms ~pms", [E4 / 1000, E5 / 1000, E6 / 1000]),
+    logger:info("AAE Full:  ~pms ~pms ~pms", [F4 / 1000, F5 / 1000, F6 / 1000]),
+    logger:info("AAE Diff:  ~pms ~pms ~pms", [D4 / 1000, D5 / 1000, D6 / 1000]),
+    logger:info("AAE None:  ~pms ~pms ~pms", [N4 / 1000, N5 / 1000, N6 / 1000]),
 
     pass.
 

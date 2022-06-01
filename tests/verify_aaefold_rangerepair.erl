@@ -53,7 +53,7 @@
 -define(DELTA_COUNT, 10).
 
 confirm() ->
-    lager:info("Testing without rebuilds - using http api"),
+    logger:info("Testing without rebuilds - using http api"),
     Nodes0 = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD),
     CH_HTTP = rt:httpc(hd(Nodes0)),
     ok = verify_aae_repair(Nodes0, rhc, CH_HTTP, Nodes0),
@@ -72,7 +72,7 @@ verify_aae_repair(Nodes, ClientMod, ClientHead, Nodes) ->
     TailNode = lists:last(Nodes),
     HeadNode = hd(Nodes),
 
-    lager:info("Generating KVs (3 lots)"),
+    logger:info("Generating KVs (3 lots)"),
 
     TestKVs0 = test_data(1, ?NUM_KEYS, list_to_binary("U1")),
     TestKVs1 = test_data(?NUM_KEYS + 1, ?NUM_KEYS * 2, list_to_binary("U2")),
@@ -81,18 +81,18 @@ verify_aae_repair(Nodes, ClientMod, ClientHead, Nodes) ->
     TS0 = os:timestamp(),
     timer:sleep(1000),
 
-    lager:info("Commencing object load"),
+    logger:info("Commencing object load"),
     ok = write_data(HeadNode, TestKVs0),
-    lager:info("Loaded ~w objects", [length(TestKVs0)]),
+    logger:info("Loaded ~w objects", [length(TestKVs0)]),
     wait_until_root_stable(ClientMod, ClientHead),
 
     timer:sleep(1000),
     TS1 = os:timestamp(),
     timer:sleep(1000),
 
-    lager:info("Second object load"),
+    logger:info("Second object load"),
     ok = write_data(HeadNode, TestKVs1),
-    lager:info("Loaded ~w objects", [length(TestKVs1)]),
+    logger:info("Loaded ~w objects", [length(TestKVs1)]),
     wait_until_root_stable(ClientMod, ClientHead),
 
     timer:sleep(1000),
@@ -101,12 +101,12 @@ verify_aae_repair(Nodes, ClientMod, ClientHead, Nodes) ->
 
     rt:stop_and_wait(TailNode),
 
-    lager:info("Third object load - with node down"),
+    logger:info("Third object load - with node down"),
     ok = write_data(HeadNode, TestKVs2),
-    lager:info("Loaded ~w objects", [length(TestKVs2)]),
+    logger:info("Loaded ~w objects", [length(TestKVs2)]),
     wait_until_root_stable(ClientMod, ClientHead),
 
-    lager:info("Cleaning data directory on stopped node"),
+    logger:info("Cleaning data directory on stopped node"),
     TestMetaData = riak_test_runner:metadata(),
     KVBackend = proplists:get_value(backend, TestMetaData),
     rt:clean_data_dir([TailNode], base_dir_for_backend(KVBackend)),
@@ -130,7 +130,7 @@ verify_aae_repair(Nodes, ClientMod, ClientHead, Nodes) ->
 
     verify_tictac_aae:verify_data(HeadNode, TestKVs2),
 
-    lager:info("Forcing read repair - first set"),
+    logger:info("Forcing read repair - first set"),
     %% Initially two sets were to be used, to similate reverting to backup, but
     %% as only leveled has a testable hot_backup, we have to repair the first
     %% set to get back to the "recovered from backup point" 
@@ -142,10 +142,10 @@ verify_aae_repair(Nodes, ClientMod, ClientHead, Nodes) ->
     ?assertEqual(?NUM_KEYS, NumKeys0),
 
     verify_tictac_aae:verify_data(HeadNode, TestKVs0),
-    lager:info("Count read repairs after first repair query"),
+    logger:info("Count read repairs after first repair query"),
     get_read_repair_total(Nodes),
 
-    lager:info("Forcing read repair - second set"),
+    logger:info("Forcing read repair - second set"),
     {ok, NumKeys1} = 
         ClientMod:aae_range_repairkeys(ClientHead,
                                         ?BUCKET,
@@ -162,9 +162,9 @@ verify_aae_repair(Nodes, ClientMod, ClientHead, Nodes) ->
     ?assertMatch(TC2, 3 * ?NUM_KEYS),
 
     RR1 = get_read_repair_total(Nodes),
-    lager:info("Read repairs ~w", [RR1 - RR0]),
+    logger:info("Read repairs ~w", [RR1 - RR0]),
 
-    lager:info("Read repair total should be about ~w/~w of ~w",
+    logger:info("Read repair total should be about ~w/~w of ~w",
                 [?N_VAL, ?NUM_NODES, 2 * ?NUM_KEYS]),
     
     true = (RR1 - RR0) > ?NUM_KEYS,
@@ -206,12 +206,12 @@ wait_until_root_stable(Mod, Client) ->
     {ok, {root, RH1}} = Mod:aae_merge_root(Client, ?N_VAL),
     case aae_exchange:compare_roots(RH0, RH1) of
         [] ->
-            lager:info("Root appears stable matched");
+            logger:info("Root appears stable matched");
         [L] ->
             Pre = L * 4,
             <<_B0:Pre/binary, V0:32/integer, _Post0/binary>> = RH0,
             <<_B1:Pre/binary, V1:32/integer, _Post1/binary>> = RH1,
-            lager:info("Root not stable: branch ~w compares ~w with ~w",
+            logger:info("Root not stable: branch ~w compares ~w with ~w",
                         [L, V0, V1]),
             wait_until_root_stable(Mod, Client)
     end.
@@ -230,7 +230,7 @@ object_count(ClientMod, ClientHead, LogInfo) ->
     timer:sleep(1000),
     {ok, {stats, StatList}} =
         ClientMod:aae_object_stats(ClientHead, ?BUCKET, all, all),
-    lager:info("Stats ~p ~s", [StatList, LogInfo]),
+    logger:info("Stats ~p ~s", [StatList, LogInfo]),
     {<<"total_count">>, TC} = lists:keyfind(<<"total_count">>, 1, StatList),
     TC.
 
@@ -241,15 +241,15 @@ get_read_repair_total(Nodes) ->
             Stats = get_stats(Node),
             {<<"read_repairs_total">>, RR} =
                 lists:keyfind(<<"read_repairs_total">>, 1, Stats),
-            lager:info("Repairs on ~p ~w", [Node, RR]),
+            logger:info("Repairs on ~p ~w", [Node, RR]),
             Acc + RR
         end,
     RRT = lists:foldl(FoldFun, 0, Nodes),
-    lager:info("Read repair total ~w", [RRT]),
+    logger:info("Read repair total ~w", [RRT]),
     RRT.
 
 get_stats(Node) ->
-    lager:info("Retrieving stats from node ~s", [Node]),
+    logger:info("Retrieving stats from node ~s", [Node]),
     StatsCommand = io_lib:format("curl -s -S ~s/stats", [rt:http_url(Node)]),
     StatString = os:cmd(StatsCommand),
     {struct, Stats} = mochijson2:decode(StatString),

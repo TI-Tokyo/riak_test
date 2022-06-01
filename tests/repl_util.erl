@@ -65,36 +65,36 @@ make_cluster(Nodes) ->
     ?assertEqual(ok, rt:wait_until_no_pending_changes(Nodes)).
 
 name_cluster(Node, Name) ->
-    lager:info("Naming cluster ~p",[Name]),
+    logger:info("Naming cluster ~p",[Name]),
     Res = rpc:call(Node, riak_repl_console, clustername, [[Name]]),
     ?assertEqual(ok, Res).
 
 wait_until_is_leader(Node) ->
-    lager:info("wait_until_is_leader(~p)", [Node]),
+    logger:info("wait_until_is_leader(~p)", [Node]),
     rt:wait_until(Node, fun is_leader/1).
 
 is_leader(Node) ->
     case rpc:call(Node, riak_core_cluster_mgr, get_leader, []) of
         {badrpc, Wut} ->
-            lager:info("Badrpc during is_leader for ~p. Error: ~p", [Node, Wut]),
+            logger:info("Badrpc during is_leader for ~p. Error: ~p", [Node, Wut]),
             false;
         Leader ->
-            lager:info("Checking: ~p =:= ~p", [Leader, Node]),
+            logger:info("Checking: ~p =:= ~p", [Leader, Node]),
             Leader =:= Node
     end.
 
 
 wait_until_is_not_leader(Node) ->
-    lager:info("wait_until_is_not_leader(~p)", [Node]),
+    logger:info("wait_until_is_not_leader(~p)", [Node]),
     rt:wait_until(Node, fun is_not_leader/1).
 
 is_not_leader(Node) ->
     case rpc:call(Node, riak_core_cluster_mgr, get_leader, []) of
         {badrpc, Wut} ->
-            lager:info("Badrpc during is_not leader for ~p. Error: ~p", [Node, Wut]),
+            logger:info("Badrpc during is_not leader for ~p. Error: ~p", [Node, Wut]),
             false;
         Leader ->
-            lager:info("Checking: ~p =/= ~p", [Leader, Node]),
+            logger:info("Checking: ~p =/= ~p", [Leader, Node]),
             Leader =/= Node
     end.
 
@@ -156,7 +156,7 @@ wait_until_connection(Node) ->
                             [_C] ->
                                 true;
                             Conns ->
-                                lager:warning("multiple connections detected: ~p",
+                                logger:warning("multiple connections detected: ~p",
                                               [Conns]),
                                 true
                         end
@@ -182,7 +182,7 @@ wait_until_no_connection(Node) ->
 
 wait_until_fullsync_started(SourceLeader) ->
     rt:wait_until(fun() ->
-                     lager:info("Waiting for fullsync to start"),
+                     logger:info("Waiting for fullsync to start"),
                      Coordinators = [Pid || {"B", Pid} <-
                          riak_repl2_fscoordinator_sup:started(SourceLeader)],
                      lists:any(fun riak_repl2_fscoordinator:is_running/1,
@@ -191,7 +191,7 @@ wait_until_fullsync_started(SourceLeader) ->
 
 wait_until_fullsync_stopped(SourceLeader) ->
     rt:wait_until(fun() ->
-                     lager:info("Waiting for fullsync to stop"),
+                     logger:info("Waiting for fullsync to stop"),
                      Coordinators = [Pid || {"B", Pid} <-
                          riak_repl2_fscoordinator_sup:started(SourceLeader)],
                      not lists:any(fun riak_repl2_fscoordinator:is_running/1,
@@ -244,9 +244,9 @@ start_and_wait_until_fullsync_complete([Node|_] = Nodes, Cluster, NotifyPid, Ret
     Count0 = proplists:get_value(server_fullsyncs, Status0),
     Count = fullsync_count(Count0, Status0, Cluster),
 
-    lager:info("Waiting for fullsync count to be ~p", [Count]),
+    logger:info("Waiting for fullsync count to be ~p", [Count]),
 
-    lager:info("Starting fullsync on: ~p", [Node]),
+    logger:info("Starting fullsync on: ~p", [Node]),
     rpc:call(Node, riak_repl_console, fullsync, [fullsync_start_args(Cluster)]),
 
     %% sleep because of the old bug where stats will crash if you call it too
@@ -261,10 +261,10 @@ start_and_wait_until_fullsync_complete([Node|_] = Nodes, Cluster, NotifyPid, Ret
             ok;
         _  when Retries > 0 ->
             ?assertEqual(ok, wait_until_connection(Node)),
-            lager:warning("Node failed to fullsync, retrying"),
+            logger:warning("Node failed to fullsync, retrying"),
             start_and_wait_until_fullsync_complete(Node, Cluster, NotifyPid, Retries-1)
     end,
-    lager:info("Fullsync on ~p complete", [Node]).
+    logger:info("Fullsync on ~p complete", [Node]).
 
 fullsync_count(Count, Status, undefined) ->
     %% count the # of fullsync enabled clusters
@@ -274,10 +274,10 @@ fullsync_count(Count, _Status, _Cluster) ->
       Count + 1.
 
 fullsync_start_args(undefined) ->
-    lager:info("No cluster for fullsync start"),
+    logger:info("No cluster for fullsync start"),
     ["start"];
 fullsync_start_args(Cluster) ->
-    lager:info("Cluster for fullsync start: ~p", [Cluster]),
+    logger:info("Cluster for fullsync start: ~p", [Cluster]),
     ["start", Cluster].
 
 fullsync_notify(NotifyPid) when is_pid(NotifyPid) ->
@@ -322,7 +322,7 @@ disconnect_cluster(Node, Name) ->
 wait_for_connection(Node, Name) ->
     rt:wait_until(Node,
         fun(_) ->
-                lager:info("Waiting for repl connection to cluster named ~p on node ~p", [Name, Node]),
+                logger:info("Waiting for repl connection to cluster named ~p on node ~p", [Name, Node]),
                 case rpc:call(Node, riak_core_cluster_mgr,
                         get_connections, []) of
                     {ok, Connections} ->
@@ -359,14 +359,14 @@ wait_for_connection(Node, Name) ->
 %%      named cluster.
 wait_for_disconnect(Node, Name) ->
     rt:wait_until(Node, fun(_) ->
-                lager:info("Attempting to verify disconnect on ~p from ~p.",
+                logger:info("Attempting to verify disconnect on ~p from ~p.",
                            [Node, Name]),
                 try
                     {ok, Connections} = rpc:call(Node,
                                                  riak_core_cluster_mgr,
                                                  get_connections,
                                                  []),
-                    lager:info("Waiting for sink disconnect on ~p: ~p.",
+                    logger:info("Waiting for sink disconnect on ~p: ~p.",
                                [Node, Connections]),
                     Conn = [P || {{cluster_by_name, N}, P} <- Connections, N == Name],
                     case Conn of
@@ -377,7 +377,7 @@ wait_for_disconnect(Node, Name) ->
                     end
                 catch
                     _:Error ->
-                        lager:info("Caught error: ~p.", [Error]),
+                        logger:info("Caught error: ~p.", [Error]),
                         false
                 end
         end).
@@ -385,14 +385,14 @@ wait_for_disconnect(Node, Name) ->
 %% @doc Wait for full disconnect from all clusters and IP's
 wait_for_full_disconnect(Node) ->
     rt:wait_until(Node, fun(_) ->
-                lager:info("Attempting to verify full disconnect on ~p.",
+                logger:info("Attempting to verify full disconnect on ~p.",
                            [Node]),
                 try
                     {ok, Connections} = rpc:call(Node,
                                                  riak_core_cluster_mgr,
                                                  get_connections,
                                                  []),
-                    lager:info("Waiting for sink disconnect on ~p: ~p.",
+                    logger:info("Waiting for sink disconnect on ~p: ~p.",
                                [Node, Connections]),
                     case Connections of
                         [] ->
@@ -402,7 +402,7 @@ wait_for_full_disconnect(Node) ->
                     end
                 catch
                     _:Error ->
-                        lager:info("Caught error: ~p.", [Error]),
+                        logger:info("Caught error: ~p.", [Error]),
                         false
                 end
         end).
@@ -415,7 +415,7 @@ wait_until_connections_clear(Node) ->
                                      riak_core_connection_mgr,
                                      get_request_states,
                                      []),
-                    lager:info("Waiting for cancelled connections to clear on ~p: ~p.",
+                    logger:info("Waiting for cancelled connections to clear on ~p: ~p.",
                                [Node, Status]),
                     case Status of
                         [] ->
@@ -425,7 +425,7 @@ wait_until_connections_clear(Node) ->
                     end
                 catch
                     _:Error ->
-                        lager:info("Caught error: ~p.", [Error]),
+                        logger:info("Caught error: ~p.", [Error]),
                         false
                 end
         end).
@@ -440,7 +440,7 @@ wait_until_connection_errors(Node, BNode) ->
                                        riak_core_connection_mgr,
                                        get_connection_errors,
                                        [{"127.0.0.1",Port}]),
-                    lager:info("Waiting for endpoint connection failures on ~p: ~p.",
+                    logger:info("Waiting for endpoint connection failures on ~p: ~p.",
                                [Node, Failures]),
                     case orddict:size(Failures) of
                         0 ->
@@ -450,7 +450,7 @@ wait_until_connection_errors(Node, BNode) ->
                     end
                 catch
                     _:Error ->
-                        lager:info("Caught error: ~p.", [Error]),
+                        logger:info("Caught error: ~p.", [Error]),
                         false
                 end
         end).
@@ -488,7 +488,7 @@ do_write(Node, Start, End, Bucket, W) ->
         [] ->
             [];
         Errors ->
-            lager:warning("~p errors while writing: ~p",
+            logger:warning("~p errors while writing: ~p",
                 [length(Errors), Errors]),
             timer:sleep(1000),
             lists:flatten([rt:systest_write(Node, S, S, Bucket, W) ||
@@ -538,14 +538,14 @@ connect_rt(SourceNode, SinkPort, SinkName) ->
 
 %% @doc Connect two clusters using a given name.
 connect_cluster_by_name(Source, Port, Name) ->
-    lager:info("Connecting ~p to ~p for cluster ~p.",
+    logger:info("Connecting ~p to ~p for cluster ~p.",
                [Source, Port, Name]),
     repl_util:connect_cluster(Source, "127.0.0.1", Port),
     ?assertEqual(ok, repl_util:wait_for_connection(Source, Name)).
 
 %% @doc Connect two clusters using a given name.
 connect_cluster_by_name(Source, Destination, Port, Name) ->
-    lager:info("Connecting ~p to ~p:~p for cluster ~p.",
+    logger:info("Connecting ~p to ~p:~p for cluster ~p.",
                [Source, Destination, Port, Name]),
     repl_util:connect_cluster(Source, Destination, Port),
     ?assertEqual(ok, repl_util:wait_for_connection(Source, Name)).
@@ -578,7 +578,7 @@ validate_completed_fullsync(ReplicationLeader,
                             End,
                             Bucket) ->
     ok = check_fullsync(ReplicationLeader, DestinationCluster, 0),
-    lager:info("Verify: Reading ~p keys repl'd from A(~p) to ~p(~p)",
+    logger:info("Verify: Reading ~p keys repl'd from A(~p) to ~p(~p)",
                [End - Start, ReplicationLeader,
                 DestinationCluster, DestinationNode]),
     ?assertEqual(0,
@@ -594,7 +594,7 @@ write_to_cluster(Node, Start, End, Bucket) ->
 
 %% @doc Write a series of keys and ensure they are all written.
 write_to_cluster(Node, Start, End, Bucket, Quorum) ->
-    lager:info("Writing ~p keys to node ~p.", [End - Start, Node]),
+    logger:info("Writing ~p keys to node ~p.", [End - Start, Node]),
     ?assertEqual([],
                  repl_util:do_write(Node, Start, End, Bucket, Quorum)).
 
@@ -606,7 +606,7 @@ read_from_cluster(Node, Start, End, Bucket, Errors) ->
 %% @doc Read from cluster a series of keys, asserting a certain number
 %%      of errors.
 read_from_cluster(Node, Start, End, Bucket, Errors, Quorum) ->
-    lager:info("Reading ~p keys from node ~p.", [End - Start, Node]),
+    logger:info("Reading ~p keys from node ~p.", [End - Start, Node]),
     Res2 = rt:systest_read(Node, Start, End, Bucket, Quorum, <<>>, true),
     ?assertEqual(Errors, length(Res2)).
 
@@ -616,7 +616,7 @@ check_fullsync(Node, Cluster, ExpectedFailures) ->
     {Time, _} = timer:tc(repl_util,
                          start_and_wait_until_fullsync_complete,
                          [Node, Cluster]),
-    lager:info("Fullsync completed in ~p seconds", [Time/1000/1000]),
+    logger:info("Fullsync completed in ~p seconds", [Time/1000/1000]),
 
     Status = rpc:call(Node, riak_repl_console, status, [quiet]),
 
@@ -630,12 +630,12 @@ check_fullsync(Node, Cluster, ExpectedFailures) ->
 
     %% check that the expected number of partitions failed to sync
     ErrorExits = proplists:get_value(error_exits, Props),
-    lager:info("Error exits: ~p", [ErrorExits]),
+    logger:info("Error exits: ~p", [ErrorExits]),
     ?assertEqual(ExpectedFailures, ErrorExits),
 
     %% check that we retried each of them 5 times
     RetryExits = proplists:get_value(retry_exits, Props),
-    lager:info("Retry exits: ~p", [RetryExits]),
+    logger:info("Retry exits: ~p", [RetryExits]),
     ?assert(RetryExits >= ExpectedFailures * 5),
 
     ok.
@@ -648,7 +648,7 @@ validate_intercepted_fullsync(InterceptTarget,
                               ReplicationLeader,
                               ReplicationCluster,
                               NumIndicies) ->
-    lager:info("Validating intercept ~p on ~p.",
+    logger:info("Validating intercept ~p on ~p.",
                [Intercept, InterceptTarget]),
 
     %% Add intercept.

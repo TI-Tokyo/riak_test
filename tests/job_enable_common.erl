@@ -243,7 +243,7 @@ close_client({pbc, Mod, PBC}) ->
     Mod:stop(PBC).
 
 setup_cluster([Node | _] = Nodes) ->
-    lager:info("Creating a cluster of ~b nodes ...", [erlang:length(Nodes)]),
+    logger:info("Creating a cluster of ~b nodes ...", [erlang:length(Nodes)]),
     ?assertEqual(ok, rt:join_cluster(Nodes)),
     load_data(Node),
     ?assertEqual(ok, rt:wait_until_transfers_complete(Nodes)).
@@ -259,13 +259,13 @@ setup_yokozuna(Node) ->
 load_data([Node | _]) ->
     load_data(Node);
 load_data(Node) ->
-    lager:info("Writing known data to node ~p ...", [Node]),
+    logger:info("Writing known data to node ~p ...", [Node]),
     PBConn = rt:pbc(Node),
     load_data(PBConn, populated_bucket(), test_buckets()),
     riakc_pb_socket:stop(PBConn).
 
 test_operation(Node, Class, Enabled, ClientType) ->
-    lager:info("Testing ~s on ~p",
+    logger:info("Testing ~s on ~p",
         [test_label(Class, Enabled, ClientType), Node]),
     test_request(Node, Class, Enabled, ClientType).
 
@@ -301,7 +301,7 @@ test_operation(Node, Class, Enabled, ClientType) ->
 % test unless/until we want to implement it directly.
 test_request(Node, ?TOKEN_LIST_BUCKETS = Class, Enabled, pbc = ClientType) ->
     {_, Mod, _} = Client = open_client(ClientType, Node),
-    lager:warning(
+    logger:warning(
         "non-streaming list-buckets is not implemented in the ~p client,"
         " skipping the ~s test.",
         [Mod, test_label(Class, Enabled, ClientType)]),
@@ -344,7 +344,7 @@ test_request(Node, ?TOKEN_LIST_BUCKETS_S = Class, Enabled, ClientType) ->
 
 % protobuf list-keys only does streams, so skip the non-stream test
 test_request(_, ?TOKEN_LIST_KEYS = Class, Enabled, pbc = ClientType) ->
-    lager:info(
+    logger:info(
         "non-streaming list-keys over protobufs is not implemented in Riak,"
         " skipping the ~s test.", [test_label(Class, Enabled, ClientType)]),
     ok;
@@ -416,7 +416,7 @@ test_request(Node, ?TOKEN_MAP_REDUCE = Class, Enabled, ClientType) ->
     end;
 
 test_request(_Node, ?TOKEN_MAP_REDUCE_JS = Class, Enabled, ClientType) ->
-    lager:info(
+    logger:info(
         "map-reduce javascript discrimination is not implemented in Riak,"
         " skipping the ~s test.", [test_label(Class, Enabled, ClientType)]),
     ok;
@@ -528,7 +528,7 @@ test_request(Node, ?TOKEN_YZ_SEARCH = Class, Enabled, http) ->
     end;
 
 test_request(_Node, ?TOKEN_OLD_SEARCH = Class, Enabled, ClientType) ->
-    lager:warning(
+    logger:warning(
         "riak_search job switch test not implemented,"
         " skipping the ~s test.", [test_label(Class, Enabled, ClientType)]),
     ok.

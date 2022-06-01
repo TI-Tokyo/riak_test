@@ -40,7 +40,7 @@ confirm() ->
     io:put_chars("This is an io:put_chars/1 call"),
     io:format("This is an io:format/1 call"),
     io:format("This is an io:format/~w call", [2]),
-    lager:info("This is a lager message"),
+    logger:info("This is a lager message"),
     {ok, {LogId, Failures}} = gen_event:delete_handler(lager_event, ?MODULE, []),
     ?assertEqual(5, LogId),
     ?assertEqual([], Failures),

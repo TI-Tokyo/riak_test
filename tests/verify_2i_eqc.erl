@@ -113,7 +113,7 @@ confirm() ->
     Size = rand:uniform(?MAX_CLUSTER_SIZE),
     %% Run for 2 minutes by default.
     TestingTime = rt_config:get(eqc_testing_time, 120),
-    lager:info("Will run in cluster of size ~p for ~p seconds.",
+    logger:info("Will run in cluster of size ~p for ~p seconds.",
                [Size, TestingTime]),
 
     Nodes = rt:build_cluster(Size),
@@ -129,16 +129,16 @@ prop_test(Nodes) ->
     ?FORALL(Cmds, commands(?MODULE, {initial_state(), InitState}),
             ?WHENFAIL(
                begin
-                   _ = lager:error("*********************** FAILED!!!!"
+                   _ = logger:error("*********************** FAILED!!!!"
                                    "*******************")
                end,
                ?TRAPEXIT(
                   begin
-                      lager:info("========================"
+                      logger:info("========================"
                                  " Will run commands with Nodes:~p:", [Nodes]),
-                      [lager:info(" Command : ~p~n", [Cmd]) || Cmd <- Cmds],
+                      [logger:info(" Command : ~p~n", [Cmd]) || Cmd <- Cmds],
                       {H, {_SName, S}, Res} = run_commands(?MODULE, Cmds),
-                      lager:info("======================== Ran commands"),
+                      logger:info("======================== Ran commands"),
                       %% Each run creates a new pool of clients. Clean up.
                       close_clients(S#state.clients),
                       %% Record stats on what commands were generated on
@@ -409,7 +409,7 @@ tx_next_bucket() ->
 %% Index a bunch of keys under the same field/term.
 tx_index_single_term(Clients, ClientId, Bucket, Keys, Field, Term) ->
     Client = get_client(ClientId, Clients),
-    lager:info("Indexing in ~p under (~p, ~p) using client ~p: ~w",
+    logger:info("Indexing in ~p under (~p, ~p) using client ~p: ~w",
                [Bucket, Field, Term, ClientId, Keys]),
     [index_object(Client, Bucket, Key, Field, Term) || Key <- Keys],
     ok.
@@ -417,7 +417,7 @@ tx_index_single_term(Clients, ClientId, Bucket, Keys, Field, Term) ->
 %% Index a number of keys each under a different term.
 tx_index_multi_term(Clients, ClientId, Bucket, KeyFieldTerms) ->
     Client = get_client(ClientId, Clients),
-    lager:info("Indexing in ~p with client ~p: ~p",
+    logger:info("Indexing in ~p with client ~p: ~p",
                [Bucket, ClientId, KeyFieldTerms]),
     [index_object(Client, Bucket, Key, Field, Term)
      || {Key, Field, Term} <- KeyFieldTerms],
@@ -426,7 +426,7 @@ tx_index_multi_term(Clients, ClientId, Bucket, KeyFieldTerms) ->
 %% Delete a single object and all its associated index entries.
 tx_delete_one(Clients, ClientId, Bucket, IntKey) ->
     Client = get_client(ClientId, Clients),
-    lager:info("Deleting key ~p from bucket ~p using ~p",
+    logger:info("Deleting key ~p from bucket ~p using ~p",
                [IntKey, Bucket, ClientId]),
     delete_key(Client, Bucket, IntKey),
     ok.
@@ -434,7 +434,7 @@ tx_delete_one(Clients, ClientId, Bucket, IntKey) ->
 tx_query_range(Clients, ClientId, Query) ->
     Client = get_client(ClientId, Clients),
     Keys = lists:sort(query_range(Client, Query, [])),
-    lager:info("Query ~p, ~p  from ~p to  ~p, page = ~p, using ~p "
+    logger:info("Query ~p, ~p  from ~p to  ~p, page = ~p, using ~p "
                "returned ~p keys.",
                [Query#query.bucket, Query#query.field, Query#query.start_term,
                 Query#query.end_term, Query#query.page_size, ClientId,

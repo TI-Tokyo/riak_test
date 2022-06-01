@@ -46,24 +46,24 @@ confirm() ->
             {nodePutTime99,<<"node_put_fsm_time_99">>},
             {nodePutTime100,<<"node_put_fsm_time_100">>}],
 
-    lager:info("Waiting for SNMP to start."),
+    logger:info("Waiting for SNMP to start."),
 
     rpc:call(Node1, riak_core, wait_for_application, [snmp]),
     rpc:call(Node1, riak_core, wait_for_application, [riak_snmp]),
 
-    lager:info("Mapping SNMP names to OIDs"),
+    logger:info("Mapping SNMP names to OIDs"),
 
     OIDPairs = [ begin
                      {value, OID} = rpc:call(Node1, snmpa, name_to_oid, [SKey]),
                      {OID ++ [0], HKey}
                  end || {SKey, HKey} <- Keys ],
 
-    lager:info("Doing some reads and writes to record some stats."),
+    logger:info("Doing some reads and writes to record some stats."),
 
     rt:systest_write(Node1, 10),
     rt:systest_read(Node1, 10),
 
-    lager:info("Waiting for HTTP Stats to be non-zero"),
+    logger:info("Waiting for HTTP Stats to be non-zero"),
     ?assertEqual(ok, 
                  rt:wait_until(Node1, fun(N) -> 
                     Stats = get_stats(N),
@@ -85,7 +85,7 @@ verify_eq(Keys, Node) ->
                                        lists:all(
                                             fun({A,B}) -> 
                                                 Stat = proplists:get_value(B, Stats),
-                                                lager:info("Comparing ~p | Stats ~p ~~ SNMP ~p", [B, Stat, A]),
+                                                logger:info("Comparing ~p | Stats ~p ~~ SNMP ~p", [B, Stat, A]),
                                                 A == Stat 
                                             end, 
                                             SPairs)

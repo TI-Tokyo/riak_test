@@ -43,19 +43,19 @@ confirm() ->
 
     [rt:wait_until_capability(N, {riak_kv, object_format}, v1, v0) || N <- Nodes],
 
-    lager:info("Writing 100 keys in format v1 to ~p", [Node1]),
+    logger:info("Writing 100 keys in format v1 to ~p", [Node1]),
     rt:systest_write(Node1, 100, ?N),
     ?assertEqual([], rt:systest_read(Node1, 100, ?N)),
-    lager:info("100 keys successfully written to ~p", [Node1]),
+    logger:info("100 keys successfully written to ~p", [Node1]),
 
     %% TODO: introduce some handoff
     [begin
-         lager:info("Reformatting objects and downgrading ~p", [Node]),
+         logger:info("Reformatting objects and downgrading ~p", [Node]),
          run_reformat(Node, Node =:= Node1), %% wait for handoffs on one node, kill on rest
          [rt:wait_until_capability(N, {riak_kv, object_format}, v0, v0) || N <- Nodes],
          rt:upgrade(Node, DowngradeVsn), %% use upgrade to downgrade
          rt:wait_for_service(Node, riak_kv),
-         lager:info("Ensuring keys still readable on ~p", [Node]),
+         logger:info("Ensuring keys still readable on ~p", [Node]),
          ?assertEqual([], rt:systest_read(Node, 100, ?N))
      end || Node <- Nodes],
     pass.

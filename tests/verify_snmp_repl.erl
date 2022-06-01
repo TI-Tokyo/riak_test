@@ -63,7 +63,7 @@ intercept_riak_snmp_stat_poller(Node) ->
                     RiakTestProcess ! pass
                 catch
                     Exception:Reason ->
-                        lager:error("Failure in riak_snmp_stat_poller_orig:set_rows_orig: ~p~n", [{Exception, Reason}]),
+                        logger:error("Failure in riak_snmp_stat_poller_orig:set_rows_orig: ~p~n", [{Exception, Reason}]),
                         RiakTestProcess ! {fail, {Exception, Reason}},
                         error({Exception, Reason})
                 end
@@ -74,15 +74,15 @@ wait_for_snmp_stat_poller() ->
         pass ->
             pass;
         {fail, Reason} ->
-            lager:error("Failure in wait_for_snmp_stat_poller: ~p~n", [Reason]),
+            logger:error("Failure in wait_for_snmp_stat_poller: ~p~n", [Reason]),
             error({fail, Reason});
         X ->
-            lager:error("Unknown failure in wait_for_snmp_stat_poller: ~p~n", [X]),
+            logger:error("Unknown failure in wait_for_snmp_stat_poller: ~p~n", [X]),
             error(X)
     after
         1000 ->
             Message =  "Timeout waiting for snmp_stat_poller.",
-            lager:error(Message),
+            logger:error(Message),
             error({timeout, Message})
     end.
 

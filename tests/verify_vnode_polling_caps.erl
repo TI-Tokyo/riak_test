@@ -42,7 +42,7 @@ confirm() ->
 
     Preflist = rt:get_preflist(Prev1, ?BUCKET, ?KEY),
 
-    lager:info("Preflist ~p~n", [Preflist]),
+    logger:info("Preflist ~p~n", [Preflist]),
 
     ExpectedStatAcc =
         lists:foldl(fun(Node, Acc) ->
@@ -51,7 +51,7 @@ confirm() ->
                     new_expected_stat_acc(),
                     Nodes),
 
-    lager:info("upgrade all to current"),
+    logger:info("upgrade all to current"),
 
     rt:upgrade(Prev1, current),
     rt:upgrade(Prev2, current),
@@ -71,7 +71,7 @@ confirm() ->
 
 %% @doc in a mixed cluster state, there should be no soft-limits
 test_no_mbox_check(Nodes, Preflist, TargetNode, ExpectedStatAcc0) ->
-    lager:info("test_no_mbox_check ~p", [TargetNode]),
+    logger:info("test_no_mbox_check ~p", [TargetNode]),
 
     {ok, Client} = riak:client_connect(TargetNode),
 
@@ -106,7 +106,7 @@ test_no_mbox_check(Nodes, Preflist, TargetNode, ExpectedStatAcc0) ->
 %% @doc when all nodes are upgraded they should agree on the
 %% capability, and soft-limits should be used
 test_mbox_check(Nodes, Preflist, TargetNode, ExpectedStatAcc0) ->
-    lager:info("test_mbox_check ~p", [TargetNode]),
+    logger:info("test_mbox_check ~p", [TargetNode]),
 
     {ok, Client} = riak:client_connect(TargetNode),
     WriteRes = client_write(Client, ?BUCKET, ?KEY, ?VALUE),

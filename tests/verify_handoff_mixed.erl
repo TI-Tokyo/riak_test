@@ -72,7 +72,7 @@ confirm() ->
     %% capability renegotiation if we don't wait here - this is still
     %% technically race-prone, but negotiation usually happens *much*
     %% sooner than handoff at normal timing
-    lager:info("Wait for fold_req_version == ~p", [OldFold]),
+    logger:info("Wait for fold_req_version == ~p", [OldFold]),
     ok = rt:wait_until_capability(Current, ?FOLD_CAPABILITY, OldFold),
 
     %% this will timeout if wrong fix is in place
@@ -94,7 +94,7 @@ prepare_vnodes(Node) ->
     prepare_pipe_vnodes(Node).
 
 prepare_kv_vnodes(Node) ->
-    lager:info("Preparing KV vnodes with keys 1-~b in bucket ~s",
+    logger:info("Preparing KV vnodes with keys 1-~b in bucket ~s",
                [?KV_COUNT, ?KV_BUCKET]),
     C = rt:pbc(Node),
     lists:foreach(
@@ -112,7 +112,7 @@ prepare_pipe_vnodes(Node) ->
     DummySink = spawn_link(fun() -> receive never -> ok end end),
     Options = [{sink, #fitting{pid=DummySink}}],
 
-    lager:info("Filling a pipe with ~b inputs", [?PIPE_COUNT]),
+    logger:info("Filling a pipe with ~b inputs", [?PIPE_COUNT]),
     {ok, Pipe} = rpc:call(Node, riak_pipe, exec, [Spec, Options]),
     lists:foreach(
       fun(I) -> ok = rpc:call(Node, riak_pipe, queue_work, [Pipe, I]) end,
@@ -120,7 +120,7 @@ prepare_pipe_vnodes(Node) ->
 
 check_logs() ->
     AppCounts = sum_app_handoff(),
-    lager:info("Found handoff counts in logs: ~p", [AppCounts]),
+    logger:info("Found handoff counts in logs: ~p", [AppCounts]),
 
     %% make sure all of our apps completed some handoff
     ExpectedApps = lists:sort([riak_kv_vnode,
@@ -135,7 +135,7 @@ check_logs() ->
     ok.
 
 sum_app_handoff() ->
-    lager:info("Combing logs for handoff notes"),
+    logger:info("Combing logs for handoff notes"),
     lists:foldl(
       fun({App, Count}, Acc) ->
               orddict:update_counter(App, Count, Acc)

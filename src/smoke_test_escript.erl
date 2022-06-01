@@ -26,12 +26,11 @@ main(Args) ->
                      []
              end,
     application:start(ibrowse),
-    lager:start(),
     rt_config:load("default", filename:join([os:getenv("HOME"), ".riak_test.config"])),
     case lists:keyfind(project, 1, Parsed) of
         false ->
             getopt:usage(cli_options(), escript:script_name()),
-            lager:error("Must specify project!"),
+            logger:error("Must specify project!"),
             application:stop(lager),
             halt(1);
         {project, Project} ->
@@ -42,7 +41,7 @@ main(Args) ->
             %% run in current working directory
             ok;
         {directory, Dir} ->
-            lager:info("Changing working dir to ~s", [Dir]),
+            logger:info("Changing working dir to ~s", [Dir]),
             ok = file:set_cwd(filename:absname(Dir))
     end,
     Tasks = case lists:keyfind(tasks, 1, Parsed) of
@@ -54,12 +53,12 @@ main(Args) ->
 
     case lists:member(debug, Parsed) of
         true ->
-            lager:set_loglevel(lager_console_backend, debug);
+            logger:set_primary_config(level, debug);
         _ ->
             ok
     end,
     rt_config:set(rt_harness, ?MODULE),
-    lager:debug("ParsedArgs ~p", [Parsed]),
+    logger:debug("ParsedArgs ~p", [Parsed]),
     Suites = giddyup:get_suite(rt_config:get(platform)),
     Jobs = case lists:keyfind(jobs, 1, Parsed) of
         false ->
@@ -82,7 +81,7 @@ main(Args) ->
             SplitSuites = dict:to_list(element(2, lists:foldl(fun(S, {Counter, Dict}) ->
                                     {Counter + 1, dict:append(Counter rem Jobs, S, Dict)}
                             end, {0, dict:new()}, Suites))),
-            lager:debug("Split into ~p lists", [length(SplitSuites)]),
+            logger:debug("Split into ~p lists", [length(SplitSuites)]),
             Workers = [spawn_monitor(?MODULE, worker, [Rebar, PWD, SS, Tasks]) || {_, SS} <- SplitSuites],
             wait_for_workers([P || {P, _} <- Workers]);
         _ ->
@@ -91,7 +90,7 @@ main(Args) ->
 
 worker(Rebar, PWD, Suites, Tasks) ->
     lists:foreach(fun({Suite, Config}) ->
-                lager:info("Suite ~p config ~p", [Suite, Config]),
+                logger:info("Suite ~p config ~p", [Suite, Config]),
                 [Dep, Task] = string:tokens(atom_to_list(Suite), ":"),
                 FDep = filename:join([PWD, deps, Dep]),
                 case filelib:is_dir(FDep) of
@@ -136,12 +135,12 @@ worker(Rebar, PWD, Suites, Tasks) ->
                                 giddyup:post_artifact(Base, {"xref.log", Log}),
                                 Res;
                             _ ->
-                                lager:info("Skipping suite ~p", [Suite]),
+                                logger:info("Skipping suite ~p", [Suite]),
                                 ok
 
                         end;
                     false ->
-                        lager:debug("Not a dep: ~p", [FDep])
+                        logger:debug("Not a dep: ~p", [FDep])
                 end
         end, Suites).
 
@@ -151,8 +150,8 @@ setup_deps(Rebar, PWD, [Dep|Deps]) ->
     remove_deps_dir(Dep),
     %% symlink ALL the deps in
     file:make_symlink(filename:join(PWD, "deps"), filename:join(Dep, "deps")),
-    lager:debug("ln -sf ~s ~s", [filename:join(PWD, "deps"),
-                                 filename:join(Dep, "deps")]),
+    logger:debug("ln -sf ~s ~s", [filename:join(PWD, "deps"),
+                                  filename:join(Dep, "deps")]),
     %% run rebar list deps, to find out which ones to keep
     P = erlang:open_port({spawn_executable, Rebar},
                          [{args, ["list-deps"]},
@@ -163,7 +162,7 @@ setup_deps(Rebar, PWD, [Dep|Deps]) ->
     case re:run(Log, "([a-zA-Z0-9_]+) (?:BRANCH|TAG|REV)",
                 [global, {capture, all_but_first, list}]) of
         {match, Matches} ->
-            lager:info("Deps for ~p are ~p", [Dep, Matches]),
+            logger:info("Deps for ~p are ~p", [Dep, Matches]),
             ok = file:delete(filename:join(Dep, "deps")),
             ok = filelib:ensure_dir(filename:join(Dep, "deps")++"/"),
             [file:make_symlink(filename:join([PWD, "deps", M]),
@@ -172,7 +171,7 @@ setup_deps(Rebar, PWD, [Dep|Deps]) ->
         nomatch ->
             %% remove the symlink
             file:delete(filename:join(Dep, "deps")),
-            lager:info("~p has no deps", [Dep])
+            logger:info("~p has no deps", [Dep])
     end,
     setup_deps(Rebar, PWD, Deps).
 
@@ -212,11 +211,11 @@ wait_for_workers([]) ->
 wait_for_workers(Workers) ->
     receive
         {'DOWN', _, _, Pid, normal} ->
-            lager:info("Worker ~p exited normally, ~p left", [Pid, length(Workers)-1]),
+            logger:info("Worker ~p exited normally, ~p left", [Pid, length(Workers)-1]),
             wait_for_workers(Workers -- [Pid]);
         {'DOWN', _, _, Pid, Reason} ->
-            lager:info("Worker ~p exited abnormally: ~p, ~p left", [Pid, Reason,
-                                                                 length(Workers)-1]),
+            logger:info("Worker ~p exited abnormally: ~p, ~p left",
+                        [Pid, Reason, length(Workers)-1]),
             wait_for_workers(Workers -- [Pid])
     end.
 
@@ -235,9 +234,9 @@ accumulate(P, Acc) ->
         {P, {data, {EOL, Data}}} ->
             accumulate(P, [[Data,maybe_eol(EOL)]|Acc]);
         {P, {exit_status, Status}} ->
-            lager:debug("Exited with status ~b", [Status]),
+            logger:debug("Exited with status ~b", [Status]),
             {Status, list_to_binary(lists:reverse(Acc))};
         {P, Other} ->
-            lager:warning("Unexpected return from port: ~p", [Other]),
+            logger:warning("Unexpected return from port: ~p", [Other]),
             accumulate(P, Acc)
     end.

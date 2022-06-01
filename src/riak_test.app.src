@@ -6,7 +6,6 @@
   {applications, [
                   kernel,
                   stdlib,
-                  lager,
                   mapred_verify
                  ]},
   {env, [

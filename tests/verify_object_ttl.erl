@@ -130,7 +130,7 @@ put_object_with_ttl(Client, KV, TTL) ->
     put_object_with_ttl(Client, ?BUCKET, KV, TTL).
 
 put_object_with_ttl(Client, Bucket, KVs, TTL) when is_list(KVs) ->
-    lager:info("Putting ~p object", [length(KVs)]),
+    logger:info("Putting ~p object", [length(KVs)]),
     [put_object_with_ttl(Client, Bucket, KV, TTL)  || KV <- KVs];
 
 put_object_with_ttl(Client, Bucket, {Key, Value}, TTL) ->
@@ -140,7 +140,7 @@ put_object_with_ttl(Client, Bucket, {Key, Value}, TTL) ->
     riakc_pb_socket:put(Client, Robj1).
 
 put_object_without_ttl(Client, Bucket, KVs) when is_list(KVs) ->
-    lager:info("Putting ~p object", [length(KVs)]),
+    logger:info("Putting ~p object", [length(KVs)]),
     [put_object_without_ttl(Client, Bucket, KV)  || KV <- KVs];
 
 put_object_without_ttl(Client, Bucket, {Key, Value}) ->
@@ -166,10 +166,10 @@ check_expired(Client, Bucket, KVs) when is_list(KVs) ->
     Expired = [true || true <- [check_expired(Client, Bucket, KV)  || KV <- KVs]],
     case length(KVs) of
        N when N == length(Expired) ->
-           lager:info("TTL expired ~p keys ~n", [N]),
+           logger:info("TTL expired ~p keys ~n", [N]),
            true;
         N ->
-            lager:info("Not all keys expired ~p keys ~n", [N]),
+            logger:info("Not all keys expired ~p keys ~n", [N]),
             false
     end;
 
@@ -200,7 +200,7 @@ int_to_key(N) ->
     end.
 
 delete_keys(Client, KVs, Opt) ->
-    lager:info("Delete data ~p keys", [length(KVs)]),
+    logger:info("Delete data ~p keys", [length(KVs)]),
     [{delete_key(Client, K, Opt)}  || {K, _V} <- KVs].
 
 delete_key(Client, Key, Opt) ->

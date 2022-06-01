@@ -131,18 +131,18 @@ pb_fun_fun(TestPid, Node, PBFun) ->
             PBPid = rt:pbc(Node),
             Result = case catch PBFun(PBPid) of
                 {error, {1001, <<"overload">>}} ->
-                    lager:debug("ts overload detected, succeeded"),
+                    logger:debug("ts overload detected, succeeded"),
                     TestPid ! {sent_ts_overload, self()},
                     true;
                 {ok, _Res} ->
-                    lager:debug("succeeded, continuing..."),
+                    logger:debug("succeeded, continuing..."),
                     TestPid ! {sent_ok, self()},
                     true;
                 {error, Reason} ->
-                    lager:debug("error: ~p, continuing...", [Reason]),
+                    logger:debug("error: ~p, continuing...", [Reason]),
                     false;
                 {'EXIT', Type} ->
-                    lager:debug("EXIT: ~p, continuing...", [Type]),
+                    logger:debug("EXIT: ~p, continuing...", [Type]),
                     false
             end,
             riakc_pb_socket:stop(PBPid),

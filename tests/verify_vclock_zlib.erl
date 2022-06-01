@@ -31,5 +31,5 @@ confirm() ->
    
     verify_vclock:run_test(TestMode, NTestItems, encode_zlib),
 
-    lager:info("Test verify_vclock passed."),
+    logger:info("Test verify_vclock passed."),
     pass.

@@ -113,6 +113,6 @@ simple_tests(State) ->
                            end}
     ],
     lists:foreach(fun({Name, Eval}) ->
-        lager:info("===== simple: ~s =====", [Name]),
+        logger:info("===== simple: ~s =====", [Name]),
         Eval()
                   end, Tests).

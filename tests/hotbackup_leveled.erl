@@ -70,7 +70,7 @@ hot_backup(Nodes, FullCoverage) ->
 
     KeyCount= ?NUM_KEYS_PERNODE * length(Nodes),
     lists:foldl(KeyLoadFun, 1, Nodes),
-    lager:info("Loaded ~w objects", [KeyCount]),
+    logger:info("Loaded ~w objects", [KeyCount]),
 
     check_objects(hd(Nodes), 1, KeyCount, ?VAL_FLAG1),
 
@@ -85,7 +85,7 @@ test_by_backend(bitcask, Nodes, _FC) ->
 test_by_backend(eleveldb, Nodes, _Fc) ->
     not_supported_test(Nodes);
 test_by_backend(CapableBackend, Nodes, FullCoverage) ->
-    lager:info("Clean backup folder if present"),
+    logger:info("Clean backup folder if present"),
     rt:clean_data_dir(Nodes, "backup"),
     {CoverNumber, RVal} =
         case FullCoverage of
@@ -94,23 +94,23 @@ test_by_backend(CapableBackend, Nodes, FullCoverage) ->
         end,
 
     KeyCount= ?NUM_KEYS_PERNODE * length(Nodes),
-    lager:info("Testing capable backend ~w", [CapableBackend]),
+    logger:info("Testing capable backend ~w", [CapableBackend]),
     {ok, C} = riak:client_connect(hd(Nodes)),
 
-    lager:info("Backup to self to fail"),
+    logger:info("Backup to self to fail"),
     {ok, false} =
         riak_client:hotbackup("./data/leveled/", ?N_VAL, CoverNumber, C),
 
-    lager:info("Backup all nodes to succeed"),
+    logger:info("Backup all nodes to succeed"),
     {ok, true} =
         riak_client:hotbackup("./data/backup/", ?N_VAL, CoverNumber, C),
     
-    lager:info("Change some keys"),
+    logger:info("Change some keys"),
     Changes2 = test_data(1, ?DELTA_COUNT, list_to_binary(?VAL_FLAG2)),
     ok = write_data(hd(Nodes), Changes2),
     check_objects(hd(Nodes), 1, ?DELTA_COUNT, ?VAL_FLAG2),
 
-    lager:info("Stop the primary cluster and start from backup"),
+    logger:info("Stop the primary cluster and start from backup"),
     lists:foreach(fun rt:stop_and_wait/1, Nodes),
     rt:clean_data_dir(Nodes, backend_dir()),
     rt:restore_data_dir(Nodes, backend_dir(), "backup/"),
@@ -118,9 +118,9 @@ test_by_backend(CapableBackend, Nodes, FullCoverage) ->
 
     rt:wait_for_cluster_service(Nodes, riak_kv),
 
-    lager:info("Confirm changed objects are unchanged"),
+    logger:info("Confirm changed objects are unchanged"),
     check_objects(hd(Nodes), 1, ?DELTA_COUNT, ?VAL_FLAG1, RVal),
-    lager:info("Confirm last 5K unchanged objects are unchanged"),
+    logger:info("Confirm last 5K unchanged objects are unchanged"),
     check_objects(hd(Nodes), KeyCount - 5000, KeyCount, ?VAL_FLAG1, RVal),
     ok.
 
@@ -128,7 +128,7 @@ test_by_backend(CapableBackend, Nodes, FullCoverage) ->
 
 not_supported_test(Nodes) ->
     {ok, C} = riak:client_connect(hd(Nodes)),
-    lager:info("Backup all nodes to fail"),
+    logger:info("Backup all nodes to fail"),
     {ok, false} = riak_client:hotbackup("./data/backup/", ?N_VAL, ?N_VAL, C),
     ok.
 
@@ -175,7 +175,7 @@ check_objects(Node, KCStart, KCEnd, VFlag, RVal) ->
                     ?assertMatch(RetValue, <<Key/binary, V/binary>>),
                     Acc;
                 {error, notfound} ->
-                    lager:error("Search for Key ~w not found", [K]),
+                    logger:error("Search for Key ~w not found", [K]),
                     [K|Acc]
             end
         end,

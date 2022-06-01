@@ -42,47 +42,47 @@
 confirm() ->
     %% Bring up a 3-node cluster for the test
 
-    lager:info("Leave and join nodes during write activity"),
-    lager:info("Do this with aggressive AAE - but we shouldn't see AAE repairs"),
-    lager:info("In the future - need a riak stat for repairs to validate this"),
+    logger:info("Leave and join nodes during write activity"),
+    logger:info("Do this with aggressive AAE - but we shouldn't see AAE repairs"),
+    logger:info("In the future - need a riak stat for repairs to validate this"),
     Nodes = rt:build_cluster(3, ?CFG),
     [Node1, Node2, Node3] = Nodes,
 
-    lager:info("Writing ~p items", [?TEST_ITEM_COUNT]),
+    logger:info("Writing ~p items", [?TEST_ITEM_COUNT]),
     rt:systest_write(Node1, 1, ?TEST_ITEM_COUNT),
 
-    lager:info("Have node2 leave and continue to write"),
+    logger:info("Have node2 leave and continue to write"),
     rt:leave(Node2),
     rt:systest_write(Node1, ?TEST_ITEM_COUNT + 1, 2 * ?TEST_ITEM_COUNT),
     ?assertEqual(ok, rt:wait_until_unpingable(Node2)),
 
-    lager:info("Have node3 leave and continue to write"),
+    logger:info("Have node3 leave and continue to write"),
     rt:leave(Node3),
     rt:systest_write(Node1, 2 * ?TEST_ITEM_COUNT + 1, 3 * ?TEST_ITEM_COUNT),
     ?assertEqual(ok, rt:wait_until_unpingable(Node3)),
     
-    lager:info("Restart node2"),
+    logger:info("Restart node2"),
     rt:start_and_wait(Node2),
     timer:sleep(5000),
     
-    lager:info("Rejoin node2 and continue to write"),
+    logger:info("Rejoin node2 and continue to write"),
     rt:join(Node2, Node1),
     rt:systest_write(Node1, 3 * ?TEST_ITEM_COUNT + 1, 4 * ?TEST_ITEM_COUNT),
     check_joined([Node1, Node2]),
 
-    lager:info("Restart node3"),
+    logger:info("Restart node3"),
     rt:start_and_wait(Node3),
     timer:sleep(5000),
 
-    lager:info("Rejoin node3 and continue to write"),
+    logger:info("Rejoin node3 and continue to write"),
     rt:join(Node3, Node1),
     rt:systest_write(Node1, 4 * ?TEST_ITEM_COUNT + 1, 5 * ?TEST_ITEM_COUNT),
     check_joined([Node1, Node2, Node3]),
 
-    lager:info("Checking for AAE repairs - should be none"),
-    lager:info("Will check the tictac_deltacount on state"),
-    lager:info("This may be brittle to changes in riak_kv_vnode state"),
-    lager:info("TODO - Add riak stat"),
+    logger:info("Checking for AAE repairs - should be none"),
+    logger:info("Will check the tictac_deltacount on state"),
+    logger:info("This may be brittle to changes in riak_kv_vnode state"),
+    logger:info("TODO - Add riak stat"),
     Ring = rt:get_ring(Node1),
     Owners = riak_core_ring:all_owners(Ring),
     timer:sleep(10000),
@@ -92,7 +92,7 @@ confirm() ->
     timer:sleep(10000),
     lists:foreach(fun check_vnode_stats/1, Owners),
 
-    lager:info("Check all values read"),
+    logger:info("Check all values read"),
     rt:systest_read(Node1, 5 * ?TEST_ITEM_COUNT),
     pass.
 

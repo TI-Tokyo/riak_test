@@ -34,13 +34,13 @@ confirm() ->
     check_riaknostic_log_levels(Node1),
 
     %% Done!
-    lager:info("Test riaknostic: PASS"),
+    logger:info("Test riaknostic: PASS"),
     pass.
 
 %% Check that riaknostic executes
 check_riaknostic_execute(Node) ->
     %% Execute
-    lager:info("**  Check Riaknostic executes"),
+    logger:info("**  Check Riaknostic executes"),
     {ok, RiaknosticOut} = rt:admin(Node, ["diag"]),
     ?assertNot(rt:str(RiaknosticOut, "is not present!")),
     ?assertNot(rt:str(RiaknosticOut, "[debug]")),
@@ -49,7 +49,7 @@ check_riaknostic_execute(Node) ->
 %% Check that riaknostic gives a usage message
 check_riaknostic_usage(Node) ->
     %% Check usage message
-    lager:info("**  Run Riaknostic usage message"),
+    logger:info("**  Run Riaknostic usage message"),
     {ok, RiaknosticOut} = rt:admin(Node, ["diag", "--help"]),
     ?assert(rt:str(RiaknosticOut, "Usage: riak admin")),
     ok.
@@ -57,7 +57,7 @@ check_riaknostic_usage(Node) ->
 %% Check that riaknostic gives a command listing
 check_riaknostic_command_list(Node) ->
     %% Check commands list
-    lager:info("**  Run Riaknostic commands list message"),
+    logger:info("**  Run Riaknostic commands list message"),
     {ok, RiaknosticOut} = rt:admin(Node, ["diag", "--list"]),
     ?assert(rt:str(RiaknosticOut, "Available diagnostic checks")),
     ?assert(rt:str(RiaknosticOut, "  disk           ")),
@@ -73,7 +73,7 @@ check_riaknostic_command_list(Node) ->
 %% Check that log levels can be set
 check_riaknostic_log_levels(Node) ->
     %% Check log levels
-    lager:info("**  Run Riaknostic with a different log level"),
+    logger:info("**  Run Riaknostic with a different log level"),
     {ok, RiaknosticOut} = rt:admin(Node, ["diag", "--level", "debug"]),
     ?assert(rt:str(RiaknosticOut, "[debug]")),
     ok.

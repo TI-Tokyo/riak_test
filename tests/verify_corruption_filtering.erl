@@ -44,7 +44,7 @@ confirm() ->
 
     load_cluster(Node1),
 
-    lager:info("Cluster loaded"),
+    logger:info("Cluster loaded"),
 
     case rt_config:get(rt_backend, undefined) of
         riak_kv_eleveldb_backend ->
@@ -58,7 +58,7 @@ confirm() ->
     get_put_mix(Node1),
 
     %% Have node2 leave
-    lager:info("Have ~p leave", [Node2]),
+    logger:info("Have ~p leave", [Node2]),
     leave(Node2),
     ?assertEqual(ok, wait_until_unpingable(Node2)),
 
@@ -81,7 +81,7 @@ get_put_mix(Node) ->
                      {error, notfound} ->
                          ok;
                      {error, Reason} ->
-                         lager:error("got unexpected return: ~p",
+                         logger:error("got unexpected return: ~p",
                                      [Reason]),
                          throw(Reason);
                      {ok, _O} -> ok;

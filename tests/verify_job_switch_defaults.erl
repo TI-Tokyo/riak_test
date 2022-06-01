@@ -32,7 +32,7 @@
 
 confirm() ->
     Configs = [{current, {cuttlefish, ?COMMON_CONFIG}}],
-    lager:info("Deploying ~b nodes ...", [erlang:length(Configs)]),
+    logger:info("Deploying ~b nodes ...", [erlang:length(Configs)]),
     [Node | _] = Nodes = rt:deploy_nodes(Configs),
 
     job_enable_common:setup_cluster(Nodes),
@@ -48,7 +48,7 @@ confirm() ->
 %% ===================================================================
 
 test_job_switch(Node, Class, Enabled) ->
-    lager:info("verifying ~p default ~s",
+    logger:info("verifying ~p default ~s",
         [Class, job_enable_common:enabled_string(Enabled)]),
     ?assertEqual(Enabled, job_enable_common:get_enabled(Node, Class)),
     ?assertEqual(ok, job_enable_common:set_enabled(Node, Class, not Enabled)),

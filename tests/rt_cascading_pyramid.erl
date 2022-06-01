@@ -84,6 +84,6 @@ pyramid_tests(Nodes) ->
                            end}
     ],
     lists:foreach(fun({Name, Eval}) ->
-        lager:info("===== pyramid: ~s =====", [Name]),
+        logger:info("===== pyramid: ~s =====", [Name]),
         Eval()
                   end, Tests).

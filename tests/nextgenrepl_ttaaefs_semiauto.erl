@@ -56,14 +56,14 @@ confirm() ->
     rt:join_cluster(ClusterB),
     rt:join_cluster(ClusterC),
     
-    lager:info("Waiting for convergence."),
+    logger:info("Waiting for convergence."),
     rt:wait_until_ring_converged(ClusterA),
     rt:wait_until_ring_converged(ClusterB),
     rt:wait_until_ring_converged(ClusterC),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end,
                     ClusterA ++ ClusterB ++ ClusterC),
     
-    lager:info("Ready for test."),
+    logger:info("Ready for test."),
     test_repl_between_clusters(ClusterA, ClusterB, ClusterC,
                                 fun fullsync_check/2,
                                 fun setup_replqueues/1).
@@ -102,7 +102,7 @@ fullsync_check({SrcNode, SrcIP, SrcPort, SrcNVal},
     ok = rpc:call(SrcNode, ModRef, set_allsync, [SrcNVal, SinkNVal]),
     AAEResult = rpc:call(SrcNode, riak_client, ttaaefs_fullsync, [all_check, 60]),
 
-    lager:info("Sleeping to await queue drain."),
+    logger:info("Sleeping to await queue drain."),
     timer:sleep(2000),
 
     ok = rpc:call(SinkNode, riak_kv_replrtq_snk,

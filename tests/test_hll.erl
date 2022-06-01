@@ -54,7 +54,7 @@ confirm() ->
     NodeRand2A = rt:select_random([N3, N4]),
     NodeRand2B = rt:select_random([N3, N4]),
 
-    lager:info("Create PB/HTTP Clients from first two nodes, and then"
+    logger:info("Create PB/HTTP Clients from first two nodes, and then"
                " the second two nodes, as we'll partition Nodes 1 & 2 from"
                " Nodes 3 & 4 later"),
 
@@ -77,7 +77,7 @@ confirm() ->
                                                      ?HLL_TYPE2,
                                                      [{datatype, hll}]),
 
-    lager:info("Create a bucket-type w/ a HLL datatype and a bad HLL precision"
+    logger:info("Create a bucket-type w/ a HLL datatype and a bad HLL precision"
                " - This should throw an error"),
     ?assertError({badmatch, {error, [{hll_precision, _}]}},
                  rt:create_activate_and_wait_for_bucket_type(Nodes,
@@ -96,7 +96,7 @@ confirm() ->
     pass.
 
 http_tests(C1, C2, CMod, Bucket, Nodes) ->
-    lager:info("HTTP CLI TESTS: Create new Hll DT"),
+    logger:info("HTTP CLI TESTS: Create new Hll DT"),
 
     add_tests(C1, CMod, Bucket),
 
@@ -112,7 +112,7 @@ http_tests(C1, C2, CMod, Bucket, Nodes) ->
     ok.
 
 pb_tests(C1, C2, CMod, Bucket, Nodes) ->
-    lager:info("PB CLI TESTS: Create new Hll DT"),
+    logger:info("PB CLI TESTS: Create new Hll DT"),
 
     add_tests(C1, CMod, Bucket),
 
@@ -142,24 +142,24 @@ add_tests(C, CMod, Bucket) ->
     ?assertEqual(riakc_hll:value(S3), 4).
 
 partition_write_heal(C1, C2, CMod, Bucket, Nodes) ->
-    lager:info("Partition cluster in two to force merge."),
+    logger:info("Partition cluster in two to force merge."),
     [N1, N2, N3, N4] = Nodes,
     PartInfo = rt:partition([N1, N2], [N3, N4]),
 
     try
-        lager:info("Write to one side of the partition"),
+        logger:info("Write to one side of the partition"),
         {ok, S0} = CMod:fetch_type(C1, Bucket, ?KEY),
         add_element(C1, CMod, Bucket, S0, <<"OH hello there">>),
         {ok, S1} = CMod:fetch_type(C1, Bucket, ?KEY),
         ?assertEqual(riakc_hll:value(S1), 5),
 
-        lager:info("Write to the other side of the partition"),
+        logger:info("Write to the other side of the partition"),
         {ok, S2} = CMod:fetch_type(C2, Bucket, ?KEY),
         add_element(C2, CMod, Bucket, S2, <<"Riak 1.4.eva">>),
         {ok, S3} = CMod:fetch_type(C2, Bucket, ?KEY),
         ?assertEqual(riakc_hll:value(S3), 5),
 
-        lager:info("Heal")
+        logger:info("Heal")
     after
         ok = rt:heal(PartInfo)
     end,
@@ -167,7 +167,7 @@ partition_write_heal(C1, C2, CMod, Bucket, Nodes) ->
     ok = rt:wait_until_no_pending_changes(Nodes),
     ok = rt:wait_until_transfers_complete(Nodes),
 
-    lager:info("Once healed, check both sides for the correct, merged value"),
+    logger:info("Once healed, check both sides for the correct, merged value"),
     {ok, S4} = CMod:fetch_type(C1, Bucket, ?KEY),
     ?assertEqual(riakc_hll:value(S4), 6),
     {ok, S5} = CMod:fetch_type(C2, Bucket, ?KEY),
@@ -180,21 +180,21 @@ get_hll(C, CMod, Bucket) ->
     HllSet.
 
 add_element(C, CMod, Bucket, S, Elem) ->
-    lager:info("Add element to HLL DT"),
+    logger:info("Add element to HLL DT"),
     CMod:update_type(
       C, Bucket, ?KEY,
       riakc_hll:to_op(
         riakc_hll:add_element(Elem, S))).
 
 add_elements(C, CMod, Bucket, S, Elems) ->
-    lager:info("Add multiple elements to HLL DT"),
+    logger:info("Add multiple elements to HLL DT"),
     CMod:update_type(
       C, Bucket, ?KEY,
       riakc_hll:to_op(
         riakc_hll:add_elements(Elems, S))).
 
 add_redundant_element(C, CMod, Bucket, S, Elem) ->
-    lager:info("Add redundant element to HLL DT by calling"
+    logger:info("Add redundant element to HLL DT by calling"
                " add_element/3 again"),
     add_element(C, CMod, Bucket, S, Elem).
 
@@ -207,7 +207,7 @@ check_precision_and_reduce_test(C, CMod, Bucket, ExpP, HllSet) ->
     ?assertEqual(proplists:get_value(?P_SETTING, Props1), ExpP - 1).
 
 check_precision_and_reduce_invalid_test(C, CMod, Bucket, ExpP, HllSet) ->
-    lager:info("HLL's can be reduced, but never increased.\n"
+    logger:info("HLL's can be reduced, but never increased.\n"
                " Test to make sure we don't allow invalid values."),
 
     ?assertEqual(riak_kv_hll:precision(HllSet), ExpP),

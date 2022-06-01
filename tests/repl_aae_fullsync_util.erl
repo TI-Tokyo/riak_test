@@ -14,17 +14,17 @@
 make_clusters(NumNodesWanted, ClusterSize, Conf) ->
     NumNodes = rt_config:get(num_nodes, NumNodesWanted),
     ClusterASize = rt_config:get(cluster_a_size, ClusterSize),
-    lager:info("Deploy ~p nodes", [NumNodes]),
+    logger:info("Deploy ~p nodes", [NumNodes]),
     Nodes = deploy_nodes(NumNodes, Conf, [riak_kv, riak_repl]),
 
     {ANodes, BNodes} = lists:split(ClusterASize, Nodes),
-    lager:info("ANodes: ~p", [ANodes]),
-    lager:info("BNodes: ~p", [BNodes]),
+    logger:info("ANodes: ~p", [ANodes]),
+    logger:info("BNodes: ~p", [BNodes]),
 
-    lager:info("Build cluster A"),
+    logger:info("Build cluster A"),
     repl_util:make_cluster(ANodes),
 
-    lager:info("Build cluster B"),
+    logger:info("Build cluster B"),
     repl_util:make_cluster(BNodes),
     {ANodes, BNodes}.
 
@@ -41,9 +41,9 @@ prepare_cluster_data(TestBucket, NumKeysAOnly, _NumKeysBoth, [AFirst|_] = ANodes
     rt:wait_until_ring_converged(ANodes),
     rt:wait_until_ring_converged(BNodes),
 
-    lager:info("waiting for leader to converge on cluster A"),
+    logger:info("waiting for leader to converge on cluster A"),
     ?assertEqual(ok, repl_util:wait_until_leader_converge(ANodes)),
-    lager:info("waiting for leader to converge on cluster B"),
+    logger:info("waiting for leader to converge on cluster B"),
     ?assertEqual(ok, repl_util:wait_until_leader_converge(BNodes)),
 
     %% get the leader for the first cluster
@@ -52,12 +52,12 @@ prepare_cluster_data(TestBucket, NumKeysAOnly, _NumKeysBoth, [AFirst|_] = ANodes
     {ok, {_IP, Port}} = rpc:call(BFirst, application, get_env,
                                  [riak_core, cluster_mgr]),
 
-    lager:info("connect cluster A:~p to B on port ~p", [LeaderA, Port]),
+    logger:info("connect cluster A:~p to B on port ~p", [LeaderA, Port]),
     repl_util:connect_cluster(LeaderA, "127.0.0.1", Port),
     ?assertEqual(ok, repl_util:wait_for_connection(LeaderA, "B")),
 
     %% make sure we are connected
-    lager:info("Wait for cluster connection A:~p -> B:~p:~p", [LeaderA, BFirst, Port]),
+    logger:info("Wait for cluster connection A:~p -> B:~p:~p", [LeaderA, BFirst, Port]),
     ?assertEqual(ok, repl_util:wait_for_connection(LeaderA, "B")),
 
     %%---------------------------------------------------
@@ -65,12 +65,12 @@ prepare_cluster_data(TestBucket, NumKeysAOnly, _NumKeysBoth, [AFirst|_] = ANodes
     %% keys: 1..NumKeysAOnly
     %%---------------------------------------------------
 
-    lager:info("Writing ~p keys to A(~p)", [NumKeysAOnly, AFirst]),
+    logger:info("Writing ~p keys to A(~p)", [NumKeysAOnly, AFirst]),
     ?assertEqual([], repl_util:do_write(AFirst, 1, NumKeysAOnly, TestBucket, 2)),
 
     %% check that the keys we wrote initially aren't replicated yet, because
     %% we've disabled fullsync_on_connect
-    lager:info("Check keys written before repl was connected are not present"),
+    logger:info("Check keys written before repl was connected are not present"),
     Res2 = rt:systest_read(BFirst, 1, NumKeysAOnly, TestBucket, 1, <<>>, true),
     ?assertEqual(NumKeysAOnly, length(Res2)),
 

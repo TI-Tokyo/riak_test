@@ -47,6 +47,6 @@ init(Props) ->
         ?CHILD(Num, loaded_upgrade_worker_sup, Node, Backend, Vsn, ReportPid)
     || Num <- lists:seq(1, WorkersPerNode)],
 
-    lager:info("Starting ~p workers to ~p", [WorkersPerNode, Node]),
+    logger:info("Starting ~p workers to ~p", [WorkersPerNode, Node]),
 
     {ok, {{one_for_one, 1000, 60}, ChildSpecs}}.

@@ -100,7 +100,7 @@ confirm() ->
     PL = kv679_tombstone:get_preflist(hd(Nodes), ?NVAL),
     ?assert(kv679_tombstone2:perfect_preflist(PL, ?NVAL)),
 
-    lager:info("Got preflist ~p", [PL]),
+    logger:info("Got preflist ~p", [PL]),
 
     {CoordNode, _}=CoordClient = kv679_tombstone:coordinating_client(Clients, PL),
     OtherPrimaries = [Node || {{_Idx, Node}, Type} <- PL,
@@ -110,25 +110,25 @@ confirm() ->
 
     ?assert(length(Fallbacks) == 3),
 
-    lager:info("fallbacks ~p, primaries ~p~n", [Fallbacks, [CoordNode] ++ OtherPrimaries]),
+    logger:info("fallbacks ~p, primaries ~p~n", [Fallbacks, [CoordNode] ++ OtherPrimaries]),
 
     %% Partition the other primary and one non-preflist node
     {_, _, _P1, P2} = PartInfo = rt:partition([CoordNode] ++ tl(Fallbacks), OtherPrimaries ++ [hd(Fallbacks)]),
-    lager:info("Partitioned ~p~n", [PartInfo]),
+    logger:info("Partitioned ~p~n", [PartInfo]),
 
     rt:wait_until(fun() ->
                           NewPL = kv679_tombstone:get_preflist(CoordNode, ?NVAL),
-                          lager:info("new PL ~p~n", [NewPL]),
+                          logger:info("new PL ~p~n", [NewPL]),
                           primary_and_fallback_counts(NewPL) == {1, 1}
                   end),
 
     FBPL = kv679_tombstone:get_preflist(CoordNode, ?NVAL),
-    lager:info("Got a preflist with coord and 1 fb ~p~n", [FBPL]),
+    logger:info("Got a preflist with coord and 1 fb ~p~n", [FBPL]),
 
     %% Write key once at coordinating primary
     kv679_tombstone:write_key(CoordClient, [<<"alice">>]),
     kv679_tombstone2:dump_clock(CoordClient),
-    lager:info("Clock at fallback"),
+    logger:info("Clock at fallback"),
 
     %% Kill the fallback before it can handoff
     [FB1] = [Node || {{_Idx, Node}, Type} <- FBPL,
@@ -142,7 +142,7 @@ confirm() ->
                           primary_and_fallback_counts(NewPL) == {1, 1} andalso NewPL /= FBPL
                   end),
     FBPL2 = kv679_tombstone:get_preflist(CoordNode, ?NVAL),
-    lager:info("Got a preflist with coord and 1 fb ~p~n", [FBPL2]),
+    logger:info("Got a preflist with coord and 1 fb ~p~n", [FBPL2]),
     ?assert(FBPL2 /= FBPL),
 
     %% do two more writes so that there exists out there a clock of
@@ -150,7 +150,7 @@ confirm() ->
     %% the second
     kv679_tombstone:write_key(CoordClient, [<<"bob">>, <<"charlie">>]),
     kv679_tombstone2:dump_clock(CoordClient),
-    lager:info("Clock at fallback2"),
+    logger:info("Clock at fallback2"),
 
     %% Kill the fallback before it can handoff
     [FB2] = [Node || {{_Idx, Node}, Type} <- FBPL2,
@@ -160,7 +160,7 @@ confirm() ->
 
     %% meanwhile, in the other partition, let's write some data
     P2PL = kv679_tombstone:get_preflist(hd(P2), ?NVAL),
-    lager:info("partition 2 PL ~p", [P2PL]),
+    logger:info("partition 2 PL ~p", [P2PL]),
     [P2FB] = [Node || {{_Idx, Node}, Type} <- P2PL,
                       Type == fallback],
     [P2P] = [Node || {{_Idx, Node}, Type} <- P2PL,
@@ -168,7 +168,7 @@ confirm() ->
     P2Client = kv679_tombstone:coordinating_client(Clients, P2PL),
     kv679_tombstone:write_key(P2Client, [<<"dave">>]),
     kv679_tombstone2:dump_clock(P2Client),
-    lager:info("Clock in Partition 2"),
+    logger:info("Clock in Partition 2"),
 
     %% set up a local read error on Primary 1 (this is any disk error,
     %% delete the datadir, an intercept for a local crc failure or
@@ -180,7 +180,7 @@ confirm() ->
     %% handoff, not a failure, killing them is just a way to control
     %% timing (maybe should've used intercepts??))
     {ok, DownNodes} = rt:heal_upnodes(PartInfo),
-    lager:info("These nodes still need healing ~p", [DownNodes]),
+    logger:info("These nodes still need healing ~p", [DownNodes]),
 
     %% wait for the partition 2 fallback to hand off
     rpc:call(P2FB, riak_core_vnode_manager, force_handoffs, []),
@@ -195,7 +195,7 @@ confirm() ->
 
     %% restart fallback one and wait for it to handoff
     rt:start_and_wait(FB1),
-    lager:info("started fallback 1 back up"),
+    logger:info("started fallback 1 back up"),
     rpc:call(FB1, riak_core_vnode_manager, force_handoffs, []),
     rt:wait_until_node_handoffs_complete(FB1),
 
@@ -209,7 +209,7 @@ confirm() ->
     rt:stop_and_wait(P2FB),
     rt:wait_until(fun() ->
                           NewPL = kv679_tombstone:get_preflist(CoordNode, ?NVAL),
-                          lager:info("new PL ~p~n", [NewPL]),
+                          logger:info("new PL ~p~n", [NewPL]),
                           primary_and_fallback_counts(NewPL) == {1, 1} andalso
                               different_nodes(NewPL)
                   end),
@@ -224,7 +224,7 @@ confirm() ->
     %% get a primary PL
     rt:wait_until(fun() ->
                           NewPL = kv679_tombstone:get_preflist(CoordNode, ?NVAL),
-                          lager:info("new PL ~p~n", [NewPL]),
+                          logger:info("new PL ~p~n", [NewPL]),
                           primary_and_fallback_counts(NewPL) == {2, 0} andalso
                               different_nodes(NewPL)
                   end),
@@ -239,7 +239,7 @@ confirm() ->
     rpc:call(FB2, riak_core_vnode_manager, force_handoffs, []),
     rt:wait_until_transfers_complete(Nodes),
 
-    lager:info("final get"),
+    logger:info("final get"),
     Res = kv679_tombstone:read_key(CoordClient),
     ?assertMatch({ok, _}, Res),
     {ok, O} = Res,
@@ -247,7 +247,7 @@ confirm() ->
     %% A nice riak would have somehow managed to make a sibling of the
     %% last acked write, even with all the craziness
     ?assertEqual([<<"charlie">>, <<"emma">>], lists:sort(riakc_obj:get_values(O))),
-    lager:info("Final Object ~p~n", [O]),
+    logger:info("Final Object ~p~n", [O]),
     pass.
 
 different_nodes(PL) ->

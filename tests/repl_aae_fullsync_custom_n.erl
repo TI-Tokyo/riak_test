@@ -65,7 +65,7 @@ aae_fs_test(NumKeysAOnly, NumKeysBoth, ANodes, BNodes) ->
     %% Set a different bucket N value between the two clusters
     NewProps = [{n_val, 2}],
     DefaultProps = get_current_bucket_props(BNodes, TestBucket),
-    lager:info("Setting custom bucket n_val = ~p on node ~p", [2, AFirst]),
+    logger:info("Setting custom bucket n_val = ~p on node ~p", [2, AFirst]),
     update_props(DefaultProps, NewProps, AFirst, ANodes, TestBucket),
 
     %% populate them with data
@@ -79,18 +79,18 @@ aae_fs_test(NumKeysAOnly, NumKeysBoth, ANodes, BNodes) ->
     LeaderA = rpc:call(AFirst, riak_core_cluster_mgr, get_leader, []),
 
     rt:log_to_nodes(AllNodes, "Test fullsync from cluster A leader ~p to cluster B", [LeaderA]),
-    lager:info("Test fullsync from cluster A leader ~p to cluster B", [LeaderA]),
+    logger:info("Test fullsync from cluster A leader ~p to cluster B", [LeaderA]),
     repl_util:enable_fullsync(LeaderA, "B"),
     rt:wait_until_ring_converged(ANodes),
 
     %% Start fullsync and wait for it to finish.
     {Time,_} = timer:tc(repl_util,start_and_wait_until_fullsync_complete,[LeaderA]),
-    lager:info("Fullsync completed in ~p seconds", [Time/1000/1000]),
+    logger:info("Fullsync completed in ~p seconds", [Time/1000/1000]),
 
     %% verify data is replicated to B
     rt:log_to_nodes(AllNodes, "Verify: Reading ~p keys repl'd from A(~p) to B(~p)",
                  [NumKeysAOnly, LeaderA, BFirst]),
-    lager:info("Verify: Reading ~p keys repl'd from A(~p) to B(~p)",
+    logger:info("Verify: Reading ~p keys repl'd from A(~p) to B(~p)",
                [NumKeysAOnly, LeaderA, BFirst]),
     ?assertEqual(0, repl_util:wait_for_reads(BFirst, 1, NumKeysAOnly,
                                              TestBucket, 1)),
@@ -98,7 +98,7 @@ aae_fs_test(NumKeysAOnly, NumKeysBoth, ANodes, BNodes) ->
     ok.
 
 update_props(DefaultProps, NewProps, Node, Nodes, Bucket) ->
-    lager:info("Setting bucket properties ~p for bucket ~p on node ~p", 
+    logger:info("Setting bucket properties ~p for bucket ~p on node ~p", 
                [NewProps, Bucket, Node]),
     rpc:call(Node, riak_core_bucket, set_bucket, [Bucket, NewProps]),    
     rt:wait_until_ring_converged(Nodes),

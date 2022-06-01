@@ -43,28 +43,28 @@ confirm() ->
 %% @doc Verify an upgrade succeeds with all nodes running control from
 %%      the specified `Vsn' to current.
 verify_upgrade(Vsn) ->
-    lager:info("Verify upgrade from ~p to current.", [Vsn]),
+    logger:info("Verify upgrade from ~p to current.", [Vsn]),
 
-    lager:info("Building cluster."),
+    logger:info("Building cluster."),
     [Nodes] = rt:build_clusters([{3, Vsn, ?RC_ENABLE_CFG}]),
 
-    lager:info("Verifying all nodes are alive."),
+    logger:info("Verifying all nodes are alive."),
     verify_alive(Nodes),
 
-    lager:info("Upgrading each node and verifying Control."),
+    logger:info("Upgrading each node and verifying Control."),
     VersionedNodes = [{Vsn, Node} || Node <- Nodes],
     lists:foldl(fun verify_upgrade_fold/2, VersionedNodes, VersionedNodes),
 
-    lager:info("Validate capability convergence."),
+    logger:info("Validate capability convergence."),
     validate_capability(VersionedNodes),
 
     ok.
 
 %% @doc Verify upgrade fold function.
 verify_upgrade_fold({FromVsn, Node}, VersionedNodes0) ->
-    lager:info("Upgrading ~p from ~p to current.", [Node, FromVsn]),
+    logger:info("Upgrading ~p from ~p to current.", [Node, FromVsn]),
 
-    lager:info("Performing upgrade."),
+    logger:info("Performing upgrade."),
     rt:upgrade(Node, current),
     rt:wait_for_service(Node, riak_kv),
 
@@ -74,20 +74,20 @@ verify_upgrade_fold({FromVsn, Node}, VersionedNodes0) ->
     %% Wait for Riak Control polling cycle.
     wait_for_control_cycle(Node),
 
-    lager:info("Versioned nodes is: ~p.", [VersionedNodes0]),
+    logger:info("Versioned nodes is: ~p.", [VersionedNodes0]),
     VersionedNodes = lists:keyreplace(Node, 2, VersionedNodes0, {current, Node}),
-    lager:info("Versioned nodes is now: ~p.", [VersionedNodes]),
+    logger:info("Versioned nodes is now: ~p.", [VersionedNodes]),
 
-    lager:info("Verify that all nodes are still alive."),
+    logger:info("Verify that all nodes are still alive."),
     verify_alive([VersionedNode || {_, VersionedNode} <- VersionedNodes]),
 
-    lager:info("Verify that control still works on all nodes."),
+    logger:info("Verify that control still works on all nodes."),
     verify_control(VersionedNodes),
 
     VersionedNodes.
 
 verify_control({Vsn, Node}, VersionedNodes) ->
-    lager:info("Verifying control on node ~p vsn ~p.", [Node, Vsn]),
+    logger:info("Verifying control on node ~p vsn ~p.", [Node, Vsn]),
 
     %% Verify node resource.
     ?assertMatch(ok,
@@ -113,7 +113,7 @@ verify_control(VersionedNodes) ->
 verify_resource(Node0, Resource) ->
     Node = rt:http_url(Node0),
     Output = os:cmd(io_lib:format("curl -s -S ~s~p", [Node, Resource])),
-    lager:info("Verifying node ~p resource ~p.", [Node, Resource]),
+    logger:info("Verifying node ~p resource ~p.", [Node, Resource]),
     mochijson2:decode(Output).
 
 %% @doc Verify that riak_kv is still running on all nodes.
@@ -127,7 +127,7 @@ validate_nodes(ControlNode, VersionedNodes, Status0) ->
     {struct,
         [{<<"nodes">>, ResponseNodes}]} = verify_resource(ControlNode, "/admin/nodes"),
     MixedCluster = mixed_cluster(VersionedNodes),
-    lager:info("Mixed cluster: ~p.", [MixedCluster]),
+    logger:info("Mixed cluster: ~p.", [MixedCluster]),
 
     Results = lists:map(fun({struct, Node}) ->
 
@@ -159,7 +159,7 @@ mixed_cluster(VersionedNodes) ->
             lists:map(fun({Vsn, _}) -> Vsn end, VersionedNodes))) =/= 1.
 
 wait_for_control_cycle(Node) when is_atom(Node) ->
-    lager:info("Waiting for riak_control poll on node ~p.", [Node]),
+    logger:info("Waiting for riak_control poll on node ~p.", [Node]),
 
     {ok, CurrentVsn} = rpc:call(Node,
                                 riak_control_session,
@@ -213,7 +213,7 @@ validate_partitions({ControlVsn, ControlNode}, VersionedNodes) ->
             true;
         _ ->
             MixedCluster = mixed_cluster(VersionedNodes),
-            lager:info("Mixed cluster: ~p.", [MixedCluster]),
+            logger:info("Mixed cluster: ~p.", [MixedCluster]),
 
             Results = lists:map(fun({struct, Partition}) ->
 
@@ -240,7 +240,7 @@ valid_status(true, _, _, <<"valid">>) ->
     true;
 valid_status(MixedCluster, ControlVsn, NodeVsn, Status) ->
     %% Default failure case.
-    lager:info("Invalid status: ~p ~p ~p ~p", [MixedCluster,
+    logger:info("Invalid status: ~p ~p ~p ~p", [MixedCluster,
                                                ControlVsn,
                                                NodeVsn,
                                                Status]),
@@ -255,10 +255,10 @@ validate_capability(VersionedNodes) ->
 
     %% We can test any node here, so just choose the first.
     [{_Vsn, Node}|_] = VersionedNodes,
-    lager:info("Verifying capability through ~p.", [Node]),
+    logger:info("Verifying capability through ~p.", [Node]),
 
     %% Wait the Riak Control converges.
-    lager:info("Waiting for riak_control to converge."),
+    logger:info("Waiting for riak_control to converge."),
 
     rt:wait_until(Node, fun(N) ->
                 {ok, _, Status} = rpc:call(N,

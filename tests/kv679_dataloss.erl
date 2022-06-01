@@ -63,11 +63,11 @@ confirm() ->
 
     {ok, Bod} =  write_key(Client, <<"bob">>, [return_body]),
 
-    lager:info("wrote value <<bob>>"),
+    logger:info("wrote value <<bob>>"),
 
     VCE0 = riakc_obj:vclock(Bod),
     VC0 = rpc:call(Node, riak_object, decode_vclock, [VCE0]),
-    lager:info("VC ~p~n", [VC0]),
+    logger:info("VC ~p~n", [VC0]),
 
 
     %% delete the local data for Key
@@ -77,10 +77,10 @@ confirm() ->
 
     VCE1 = riakc_obj:vclock(Bod2),
     VC1 = rpc:call(Node, riak_object, decode_vclock, [VCE1]),
-    lager:info("VC ~p~n", [VC1]),
+    logger:info("VC ~p~n", [VC1]),
 
 
-    lager:info("wrote value <<jon>>"),
+    logger:info("wrote value <<jon>>"),
 
     %% At this point, two puts with empty contexts should be siblings
     %% due to the data loss at the coordinator we lose the second
@@ -93,7 +93,7 @@ confirm() ->
 
     VCE = riakc_obj:vclock(O),
     VC = rpc:call(Node, riak_object, decode_vclock, [VCE]),
-    lager:info("VC ~p~n", [VC]),
+    logger:info("VC ~p~n", [VC]),
 
     ?assertEqual([<<"bob">>, <<"jon">>, <<"phil">>], lists:sort(riakc_obj:get_values(O))),
 
@@ -106,7 +106,7 @@ write_object(Client, Object, Opts) ->
     riakc_pb_socket:put(Client, Object, Opts).
 
 delete_datadir({{Idx, Node}, Type}) ->
-    lager:info("deleting backend data dir for ~p ~p on ~p",
+    logger:info("deleting backend data dir for ~p ~p on ~p",
                [Idx, Node, Type]),
     %% Get default backend
     Backend = rpc:call(Node, app_helper, get_env, [riak_kv, storage_backend]),
@@ -122,7 +122,7 @@ delete_datadir({{Idx, Node}, Type}) ->
                           "riak",
                           DataRoot,
                           integer_to_list(Idx)]),
-    lager:info("Path ~p~n", [Path]),
+    logger:info("Path ~p~n", [Path]),
 
     %% stop node
     rt:stop_and_wait(Node),

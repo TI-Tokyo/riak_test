@@ -9,7 +9,7 @@
 -define(assertDenied(Op), ?assertMatch({error, <<"Permission",_/binary>>}, Op)).
 
 confirm() ->
-    lager:info("Deploy & cluster some nodes"),
+    logger:info("Deploy & cluster some nodes"),
 
     _Nodes = rt:build_cluster(4),
     pass.

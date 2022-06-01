@@ -48,7 +48,7 @@ confirm() ->
 
     [?assertEqual(8, get_counter(C, Key)) || C <- Clients],
 
-    lager:info("Partition cluster in two."),
+    logger:info("Partition cluster in two."),
 
     PartInfo = rt:partition([N1, N2], [N3, N4]),
 
@@ -69,7 +69,7 @@ confirm() ->
     [?assertEqual(6, get_counter(C, Key)) || C <- [C3, C4]],
 
     %% heal
-    lager:info("Heal and check merged values"),
+    logger:info("Heal and check merged values"),
     ok = rt:heal(PartInfo),
     ok = rt:wait_for_cluster_service(Nodes, riak_kv),
 
@@ -87,7 +87,7 @@ set_allow_mult_true(Nodes, Bucket) ->
     %% Counters REQUIRE allow_mult=true
     N1 = hd(Nodes),
     AllowMult = [{allow_mult, true}],
-    lager:info("Setting bucket properties ~p for bucket ~p on node ~p",
+    logger:info("Setting bucket properties ~p for bucket ~p on node ~p",
                [AllowMult, Bucket, N1]),
     rpc:call(N1, riak_core_bucket, set_bucket, [Bucket, AllowMult]),
     rt:wait_until_ring_converged(Nodes).

@@ -39,14 +39,14 @@ confirm() ->
     %% Allow listing of buckets and keys for testing
     application:set_env(riakc, allow_listing, true),
 
-    lager:info("Deploying 1 node"),
+    logger:info("Deploying 1 node"),
     rt:set_backend(eleveldb),
     [Node] = rt:build_cluster(1, ?CFG),
 
     HttpClient = rt:httpc(Node),
     PbClient = rt:pbc(Node),
 
-    lager:info("Writing test data via protocol buffers"),
+    logger:info("Writing test data via protocol buffers"),
     write_test_data(PbClient),
 
     run_tests(HttpClient, [verify_list_buckets_disabled_http,
@@ -58,7 +58,7 @@ confirm() ->
                          verify_secondary_index_disabled_pb,
                          verify_mapred_disabled_pb]),
 
-    lager:info("Enabling all job classes"),
+    logger:info("Enabling all job classes"),
     ok = rpc:call(Node, application, set_env,
         [riak_core, ?APP_CONFIG_KEY, ?JOB_CLASSES]),
 
@@ -94,7 +94,7 @@ run_tests(Client, TestList) ->
     lists:foreach(fun(Test) -> run_test(Client, Test) end, TestList).
 
 run_test(Client, Test) ->
-    lager:info("Running test ~p", [Test]),
+    logger:info("Running test ~p", [Test]),
     ?MODULE:Test(Client).
 
 verify_list_buckets_disabled_pb(Client) ->

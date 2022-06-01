@@ -37,7 +37,7 @@
 get_os_env(Var) ->
     case get_os_env(Var, undefined) of
         undefined ->
-            lager:error("ENV['~s'] is not defined", [Var]),
+            logger:error("ENV['~s'] is not defined", [Var]),
             ?assert(false);
         Value -> Value
     end.
@@ -81,7 +81,7 @@ set(Key, Value) ->
 get(Key) ->
     case kvc:path(Key, application:get_all_env(riak_test)) of
         [] ->
-            lager:warning("Missing configuration key: ~p", [Key]),
+            logger:warning("Missing configuration key: ~p", [Key]),
             erlang:error("Missing configuration key", [Key]);
         Value ->
             Value
@@ -104,10 +104,10 @@ config_or_os_env(Config) ->
             MSG = io_lib:format("Neither riak_test.~p nor ENV['~p'] are defined", [Config, OSEnvVar]),
             erlang:error(binary_to_list(iolist_to_binary(MSG)));
         {undefined, V} ->
-            lager:info("Found riak_test.~s: ~s", [Config, V]),
+            logger:info("Found riak_test.~s: ~s", [Config, V]),
             V;
         {V, _} ->
-            lager:info("Found ENV[~s]: ~s", [OSEnvVar, V]),
+            logger:info("Found ENV[~s]: ~s", [OSEnvVar, V]),
             set(Config, V),
             V
     end.
@@ -118,10 +118,10 @@ config_or_os_env(Config, Default) ->
     case {get_os_env(OSEnvVar, undefined), get(Config, undefined)} of
         {undefined, undefined} -> Default;
         {undefined, V} ->
-            lager:info("Found riak_test.~s: ~s", [Config, V]),
+            logger:info("Found riak_test.~s: ~s", [Config, V]),
             V;
         {V, _} ->
-            lager:info("Found ENV[~s]: ~s", [OSEnvVar, V]),
+            logger:info("Found ENV[~s]: ~s", [OSEnvVar, V]),
             set(Config, V),
             V
     end.

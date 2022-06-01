@@ -48,7 +48,7 @@ init_per_suite(Config) ->
     ok = make_certificates(CertDir),
     ok = make_certificates_http_server(CertDir),
 
-    lager:info("Deploy some nodes"),
+    logger:info("Deploy some nodes"),
     ClusterConf = [
             {riak_core, [
                 {default_bucket_props, [{allow_mult, true}, {dvv_enabled, true}]},
@@ -158,19 +158,19 @@ user_name() ->
 receive_keys(Pid, Acc) ->
     receive
         {ReqId, {keys, Keys}} ->
-            lager:info("received batch of ~b\n", [length(Keys)]),
+            logger:info("received batch of ~b\n", [length(Keys)]),
             receive_keys(ReqId, lists:append(Keys, Acc));
         {ReqId, {error, Reason}} ->
-            lager:info("list_keys(~p) at ~b got an error: ~p\n", [ReqId, length(Acc), Reason]),
+            logger:info("list_keys(~p) at ~b got an error: ~p\n", [ReqId, length(Acc), Reason]),
             {error, Reason};
         {ReqId, done} ->
-            lager:info("done receiving from one quantum (~p) \n", [ReqId]),
+            logger:info("done receiving from one quantum (~p) \n", [ReqId]),
             receive_keys(Pid, Acc);
         Else ->
-            lager:info("What's that? ~p\n", [Else]),
+            logger:info("What's that? ~p\n", [Else]),
             receive_keys(Pid, Acc)
     after 3000 ->
-        lager:info("Consider streaming done\n", []),
+        logger:info("Consider streaming done\n", []),
         {ok, Acc}
     end.
 

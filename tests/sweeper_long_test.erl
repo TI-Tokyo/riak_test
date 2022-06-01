@@ -48,12 +48,12 @@
 confirm() ->
     BenchDuration =
         rt_config:get(basho_bench_duration, ?DEFAULT_BENCH_DURATION),
-    lager:info("Setup test that will run for ~p min", [BenchDuration]),
+    logger:info("Setup test that will run for ~p min", [BenchDuration]),
     {ANodes, BNodes} =
         deploy_clusters_with_rt([{?SizeA, ?Conf}, {?SizeB,?Conf}], '<->'),
 
     State0 = #state{ a_up = ANodes, b_up = BNodes},
-    lager:info("Start bench"),
+    logger:info("Start bench"),
     start_basho_bench(ANodes, "putttl", [{put, 1}, {put_ttl, 1}, {delete, 1}]),
     put(test_start, os:timestamp()),
     timer:sleep(timer:minutes(1)),
@@ -96,7 +96,7 @@ up_and_down_nodes(State) ->
 
     State5 = node_b_up(State4),
     rt:wait_until_no_pending_changes(all_active_nodes(State5)),
-    lager:info("No pending changes"),
+    logger:info("No pending changes"),
     State5.
 
 get_status(Node) ->
@@ -268,7 +268,7 @@ all_active_nodes(State) ->
     State#state.a_up ++ State#state.b_up.
 
 prepare_cluster([AFirst|_] = ANodes, [BFirst|_]) ->
-    lager:info("Prepare cluster for fullsync"),
+    logger:info("Prepare cluster for fullsync"),
     LeaderA = rpc:call(AFirst,
                        riak_core_cluster_mgr, get_leader, []),
     {ok, {IP, Port}} = rpc:call(BFirst,
@@ -278,11 +278,11 @@ prepare_cluster([AFirst|_] = ANodes, [BFirst|_]) ->
     repl_util:enable_fullsync(LeaderA, "B"),
     rt:wait_until_ring_converged(ANodes), %% Only works when all nodes in ANodes are up.
     ?assertEqual(ok, repl_util:wait_for_connection(LeaderA, "B")),
-    lager:info("Prepare cluster for fullsync done"),
+    logger:info("Prepare cluster for fullsync done"),
     LeaderA.
 
 time_stamp_action(Action, MetaData) ->
-lager:info("repl_test ~p ~p ~p", [time_since_test_start(), Action, MetaData]).
+logger:info("repl_test ~p ~p ~p", [time_since_test_start(), Action, MetaData]).
 
 time_since_test_start() ->
     timer:now_diff(os:timestamp(), get(test_start)) div 1000000.

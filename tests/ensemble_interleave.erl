@@ -40,12 +40,12 @@ confirm() ->
     NVal = 5,
     Quorum = NVal div 2 + 1,
     Config = ensemble_util:fast_config(NVal),
-    lager:info("Building cluster and waiting for ensemble to stablize"),
+    logger:info("Building cluster and waiting for ensemble to stablize"),
     Nodes = ensemble_util:build_cluster(8, Config, NVal),
     Node = hd(Nodes),
     vnode_util:load(Nodes),
 
-    lager:info("Creating/activating 'strong' bucket type"),
+    logger:info("Creating/activating 'strong' bucket type"),
     rt:create_and_activate_bucket_type(Node, <<"strong">>,
                                        [{consistent, true}, {n_val, NVal}]),
     ensemble_util:wait_until_stable(Node, NVal),
@@ -72,15 +72,15 @@ confirm() ->
     Part = rt:partition(Nodes -- Partitioned, Partitioned),
     ensemble_util:wait_until_stable(Node, Quorum),
 
-    lager:info("Writing ~p consistent keys", [1000]),
+    logger:info("Writing ~p consistent keys", [1000]),
     [ok = rt:pbc_write(PBC, Bucket, Key, Key) || Key <- Keys],
 
-    lager:info("Read keys to verify they exist"),
+    logger:info("Read keys to verify they exist"),
     [rt:pbc_read(PBC, Bucket, Key, Options) || Key <- Keys],
     rt:heal(Part),
 
     [begin
-         lager:info("Suspending vnode: ~p", [VIdx]),
+         logger:info("Suspending vnode: ~p", [VIdx]),
          vnode_util:suspend_vnode(VNode, VIdx)
      end || {VIdx, VNode} <- Suspend],
 
@@ -91,11 +91,11 @@ confirm() ->
     rpc:multicall(Nodes, riak_kv_entropy_manager, set_mode, [automatic]),
     ensemble_util:wait_until_stable(Node, Quorum),
 
-    lager:info("Disabling AAE"),
+    logger:info("Disabling AAE"),
     rpc:multicall(Nodes, riak_kv_entropy_manager, disable, []),
     ensemble_util:wait_until_stable(Node, Quorum),
 
-    lager:info("Re-reading keys to verify they exist"),
+    logger:info("Re-reading keys to verify they exist"),
     Expect = [ok, {error, timeout}, {error, <<"timeout">>}, {error, <<"failed">>}],
     [rt:pbc_read_check(PBC, Bucket, Key, Expect, Options) || Key <- Keys],
     pass.

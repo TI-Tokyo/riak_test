@@ -124,6 +124,6 @@ diamond_tests(Nodes) ->
 
     ],
     lists:foreach(fun({Name, Eval}) ->
-        lager:info("===== diamond: ~s =====", [Name]),
+        logger:info("===== diamond: ~s =====", [Name]),
         Eval()
                   end, Tests).

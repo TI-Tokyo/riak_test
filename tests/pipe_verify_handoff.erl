@@ -59,17 +59,17 @@
 
 %% @doc riak_test callback
 confirm() ->
-    lager:info("Start ~b nodes", [?NODE_COUNT]),
+    logger:info("Start ~b nodes", [?NODE_COUNT]),
     NodeDefs = lists:duplicate(?NODE_COUNT, {current, default}),
     Services = [riak_pipe],
     [Primary,Secondary] = Nodes = rt:deploy_nodes(NodeDefs, Services),
     %% Ensure each node owns 100% of it's own ring
     [?assertEqual([Node], rt:owners_according_to(Node)) || Node <- Nodes],
 
-    lager:info("Load useful modules"),
+    logger:info("Load useful modules"),
     rt:load_modules_on_nodes([?MODULE, rt_pipe], Nodes),
 
-    lager:info("Start run coordinator"),
+    logger:info("Start run coordinator"),
     Runner = spawn_link(?MODULE, runner_wait, [[]]),
 
     P1Spec = [#fitting_spec{name="p1handoff",
@@ -79,7 +79,7 @@ confirm() ->
                             module=riak_pipe_w_xform,
                             arg=pause_until_signal(Runner)}],
 
-    lager:info("Start two pipes on Primary"),
+    logger:info("Start two pipes on Primary"),
     {ok, Pipe1} =
         rpc:call(Primary, riak_pipe, exec,
                  [P1Spec, [{sink, rt_pipe:self_sink()}|?ALL_LOG]]),
@@ -87,7 +87,7 @@ confirm() ->
         rpc:call(Primary, riak_pipe, exec,
                  [P2Spec, [{sink, rt_pipe:self_sink()}|?ALL_LOG]]),
 
-    lager:info("Send some inputs to both pipes"),
+    logger:info("Send some inputs to both pipes"),
     [ok = rpc:call(Primary, riak_pipe, queue_work, [Pipe1, X]) ||
         X <- lists:seq(1, 20)],
     [ok = rpc:call(Primary, riak_pipe, queue_work, [Pipe2, X]) ||
@@ -96,26 +96,26 @@ confirm() ->
     P1Status1 = pipe_status(Primary, Pipe1),
     P2Status1 = pipe_status(Primary, Pipe2),
 
-    lager:info("Start and register intercept log collector"),
+    logger:info("Start and register intercept log collector"),
     Collector = spawn_link(Primary, ?MODULE, collector, []),
     rpc:call(Primary, erlang, register, [riak_test_collector, Collector]),
 
-    lager:info("Install pipe vnode intercept"),
+    logger:info("Install pipe vnode intercept"),
     Intercept = {riak_pipe_vnode,
                  [{{handle_handoff_command,3}, log_handoff_command}]},
     ok = rt_intercept:add(Primary, Intercept),
 
-    lager:info("Join Secondary to Primary"),
+    logger:info("Join Secondary to Primary"),
     %% Give slave a chance to start and master to notice it.
     rt:join(Secondary, Primary),
     rt:wait_until_nodes_agree_about_ownership(Nodes),
 
-    lager:info("Unpause workers"),
+    logger:info("Unpause workers"),
     Runner ! go,
 
     ok = rt:wait_until_transfers_complete(Nodes),
 
-    lager:info("Add more inputs to Pipe2"),
+    logger:info("Add more inputs to Pipe2"),
     [ok = rpc:call(Primary, riak_pipe, queue_work, [Pipe2, X]) ||
         X <- lists:seq(121, 140)],
 
@@ -125,7 +125,7 @@ confirm() ->
     P1Status2 = pipe_status(Primary, Pipe1),
     P2Status2 = pipe_status(Primary, Pipe2),
 
-    lager:info("Send eoi and collect results"),
+    logger:info("Send eoi and collect results"),
     riak_pipe:eoi(Pipe1),
     riak_pipe:eoi(Pipe2),
     {eoi, Out1, Trace1} = riak_pipe:collect_results(Pipe1, 1000),
@@ -140,7 +140,7 @@ confirm() ->
 
     %% VM trace verification
     timer:sleep(1000),
-    lager:info("Collect intercept log"),
+    logger:info("Collect intercept log"),
     PTraces = get_collection(Collector),
 
     %% time to compare things
@@ -185,14 +185,14 @@ confirm() ->
     case ordsets:intersection(ordsets:from_list(P1PrimaryWorkers1),
                               ordsets:from_list(P2PrimaryWorkers1)) of
         [] ->
-            lager:warning("Multiple archives in a single fold was not tested");
+            logger:warning("Multiple archives in a single fold was not tested");
         _ ->
             ok
     end,
 
     rt_pipe:assert_no_zombies(Nodes),
 
-    lager:info("~s: PASS", [atom_to_list(?MODULE)]),
+    logger:info("~s: PASS", [atom_to_list(?MODULE)]),
     pass.
 
 %%% Run pausing bits

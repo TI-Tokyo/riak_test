@@ -48,7 +48,7 @@ confirm() ->
 
 %% @doc populate a counter via http and pbc
 populate_counters(Node) ->
-    lager:info("Writing counters to ~p", [Node]),
+    logger:info("Writing counters to ~p", [Node]),
     rt:wait_for_service(Node, riak_kv),
     ?assertEqual(ok, rt:wait_until(Node, fun has_counter_capability/1)),
 
@@ -64,7 +64,7 @@ populate_counters(Node) ->
 %% @doc check that the counter values exist after upgrade, and
 %%      check that you can get via default bucket
 verify_counters(Node) ->
-    lager:info("Verifying counters on ~p", [Node]),
+    logger:info("Verifying counters on ~p", [Node]),
     RHC = rt:httpc(Node),
     ?assertMatch({ok, 4}, rhc:counter_val(RHC, ?COUNTER_BUCKET, <<"pbkey">>)),
 
@@ -81,7 +81,7 @@ verify_counters(Node) ->
     ok.
 
 upgrade(Node, NewVsn) ->
-    lager:info("Upgrading ~p to ~p", [Node, NewVsn]),
+    logger:info("Upgrading ~p to ~p", [Node, NewVsn]),
     rt:upgrade(Node, NewVsn),
     rt:wait_for_service(Node, riak_kv),
     ok.

@@ -39,7 +39,7 @@
 -include("rt_pipe.hrl").
 
 confirm() ->
-    lager:info("Build ~b node cluster", [?NODE_COUNT]),
+    logger:info("Build ~b node cluster", [?NODE_COUNT]),
     Nodes = rt:build_cluster(?NODE_COUNT),
 
     [rt:wait_for_service(Node, riak_pipe) || Node <- Nodes],
@@ -53,7 +53,7 @@ confirm() ->
 
     rt_pipe:assert_no_zombies(Nodes),
 
-    lager:info("~s: PASS", [atom_to_list(?MODULE)]),
+    logger:info("~s: PASS", [atom_to_list(?MODULE)]),
     pass.
 
 %% @doc generic driver used as a riak_pipe:generic_transform
@@ -69,7 +69,7 @@ mult_by_2(X) ->
     2 * X.
 
 verify_order([RN|_]) ->
-    lager:info("Verifying fittings operate in order"),
+    logger:info("Verifying fittings operate in order"),
 
     AllLog = [{log, sink}, {trace, all}],
     {eoi, Res, Trace} = 
@@ -83,7 +83,7 @@ verify_order([RN|_]) ->
     ?assertEqual([1,2,4,8,16], [X || {_, X} <- Qed]).
 
 verify_trace_filtering([RN|_]) ->
-    lager:info("Verify that trace messages are filtered"),
+    logger:info("Verify that trace messages are filtered"),
     {eoi, _Res, Trace1} = 
         rpc:call(RN, riak_pipe, generic_transform,
                  [fun mult_by_2/1, fun order_fun/1,
@@ -97,7 +97,7 @@ verify_trace_filtering([RN|_]) ->
     ?assert(length(Trace1) < length(Trace2)).
 
 verify_recursive_countdown_1([RN|_]) ->
-    lager:info("Verify recurse_input"),
+    logger:info("Verify recurse_input"),
     Spec = [#fitting_spec{name=counter,
                           module=riak_pipe_w_rec_countdown}],
     Opts = [{sink, rt_pipe:self_sink()}],
@@ -108,7 +108,7 @@ verify_recursive_countdown_1([RN|_]) ->
     ?assertEqual([{counter,0},{counter,1},{counter,2},{counter,3}], Res).
 
 verify_recursive_countdown_2([RN|_]) ->
-    lager:info("Verify nondeterministic recurse_input"),
+    logger:info("Verify nondeterministic recurse_input"),
     verify_recursive_countdown_2(RN, 10).
 
 verify_recursive_countdown_2(RN, Retries) when Retries > 0 ->
@@ -127,12 +127,12 @@ verify_recursive_countdown_2(RN, Retries) when Retries > 0 ->
         [{counter,{trace,[restart],{vnode,{restart,_}}}}] ->
             ok;
         [] ->
-            lager:info("recursive countdown test #2 did not"
+            logger:info("recursive countdown test #2 did not"
                        " trigger the done/eoi race it tests."
                        " Retries left: ~b", [Retries-1]),
             verify_recursive_countdown_2(RN, Retries-1)
     end;
 verify_recursive_countdown_2(_, _) ->
-    lager:warning("recursive countdown test #2 did not"
+    logger:warning("recursive countdown test #2 did not"
                   " trigger the done/eoi race it tests."
                   " Consider re-running.").

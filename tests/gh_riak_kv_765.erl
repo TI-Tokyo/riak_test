@@ -53,7 +53,7 @@ check_empty_build() ->
                  done -> pass
              after
                  10000 ->
-                     lager:info("Failed. Empty AAE trees were not built instantly"),
+                     logger:info("Failed. Empty AAE trees were not built instantly"),
                      fail
              end,
     rt:clean_cluster(Nodes),
@@ -70,7 +70,7 @@ check_throttle_and_expiration() ->
     Node = hd(Nodes),
     timer:sleep(2000),
 
-    lager:info("Write 1000 keys"),
+    logger:info("Write 1000 keys"),
     rt:systest_write(Node, 1000),
     enable_aae(Node),
     time_build(Node),
@@ -79,10 +79,10 @@ check_throttle_and_expiration() ->
     ?assert(Duration2 > (2 * Duration1)),
 
     %% Test manual expiration
-    lager:info("Disabling automatic expiration"),
+    logger:info("Disabling automatic expiration"),
     rpc:call(Node, application, set_env,
              [riak_kv, anti_entropy_expire, never]),
-    lager:info("Manually expiring hashtree for partition 0"),
+    logger:info("Manually expiring hashtree for partition 0"),
     expire_tree(Node, 0),
     pass.
 
@@ -90,7 +90,7 @@ time_build(Node) ->
     T0 = os:timestamp(),
     rt:wait_until_aae_trees_built([Node]),
     Duration = timer:now_diff(os:timestamp(), T0),
-    lager:info("Build took ~b us", [Duration]),
+    logger:info("Build took ~b us", [Duration]),
     Duration.
 
 rebuild(Node, Limit, Wait) ->

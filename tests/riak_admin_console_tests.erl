@@ -143,7 +143,7 @@ riak_admin_tests(Node) ->
 
 confirm() ->
     %% Deploy a node to test against
-    lager:info("Deploy node to test riak command line"),
+    logger:info("Deploy node to test riak command line"),
     [Node] = rt:deploy_nodes(1),
     ?assertEqual(ok, rt:wait_until_nodes_ready([Node])),
     rt_intercept:add(Node,
@@ -221,7 +221,7 @@ confirm() ->
 
 check_admin_cmd(Node, Cmd) ->
     S = string:tokens(Cmd, " "),
-    lager:info("Testing riak admin ~s on ~s", [Cmd, Node]),
+    logger:info("Testing riak admin ~s on ~s", [Cmd, Node]),
     {ok, Out} = rt:admin(Node, S),
     ?assertEqual("pass", Out).
 
@@ -230,6 +230,6 @@ check_admin_cmd(Node, Cmd) ->
 %% return instead of a simple "pass"
 check_admin_cmd_2x(Node, Cmd) ->
     S = string:tokens(Cmd, " "),
-    lager:info("Testing riak admin ~s on ~s", [Cmd, Node]),
+    logger:info("Testing riak admin ~s on ~s", [Cmd, Node]),
     {ok, Out} = rt:admin(Node, S),
     ?assertEqual("passpass", Out).

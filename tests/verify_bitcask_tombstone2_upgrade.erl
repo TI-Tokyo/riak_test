@@ -13,7 +13,7 @@
 confirm() ->
     TestMetaData = riak_test_runner:metadata(),
     Backend = proplists:get_value(backend, TestMetaData),
-    lager:info("Running with backend (this better be Bitcask!) ~p", [Backend]),
+    logger:info("Running with backend (this better be Bitcask!) ~p", [Backend]),
     ?assertEqual({backend, bitcask}, {backend, Backend}),
     OldVsn = proplists:get_value(upgrade_version, TestMetaData, legacy),
     % Configure for fast merge checks
@@ -26,17 +26,17 @@ confirm() ->
 
 % Expects nodes running a version of Riak < 2.0 using Bitcask
 verify_bitcask_tombstone2_upgrade(Nodes) ->
-    lager:info("Write some data, write it good"),
+    logger:info("Write some data, write it good"),
     write_some_data(Nodes),
-    lager:info("Collect the list of bitcask files created"),
+    logger:info("Collect the list of bitcask files created"),
     BitcaskFiles = list_bitcask_files(Nodes),
     NodeFiles = [[ {Node, Idx, F} || {Idx, F} <- Files, F /= []] || {Node, Files} <- BitcaskFiles],
-    lager:info("files are ~p", [NodeFiles]),
-    lager:info("Now update the node to the current version"),
+    logger:info("files are ~p", [NodeFiles]),
+    logger:info("Now update the node to the current version"),
     [rt:upgrade(Node, current) || Node <- Nodes],
-    lager:info("And wait until all the old files have been merged, the version upgrade finished"),
+    logger:info("And wait until all the old files have been merged, the version upgrade finished"),
     ?assertEqual(ok, rt:wait_until(upgrade_complete_fun(BitcaskFiles))),
-    lager:info("And that is that").
+    logger:info("And that is that").
 
 write_some_data([Node1 | _]) ->
     rt:pbc_systest_write(Node1, 10000).
@@ -104,7 +104,7 @@ tombstones_merged(Node, IdxDir, Files) ->
                             false ->
                                 Acc;
                             true ->
-                                lager:debug("~p unmerged", [{Node, Fname}]),
+                                logger:debug("~p unmerged", [{Node, Fname}]),
                                 false
                         end
                 end,

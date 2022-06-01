@@ -100,7 +100,7 @@ put_an_object(HTTPc, N, IndexSize) ->
     put_an_object(HTTPc, Key, Data, Indexes).
 
 put_an_object(HTTPc, Key, Data, Indexes) when is_list(Indexes) ->
-    lager:info("Putting object ~p", [Key]),
+    logger:info("Putting object ~p", [Key]),
     MetaData = dict:from_list([{<<"index">>, Indexes}]),
     Robj0 = riakc_obj:new(?BUCKET, Key),
     Robj1 = riakc_obj:update_value(Robj0, Data),
@@ -108,7 +108,7 @@ put_an_object(HTTPc, Key, Data, Indexes) when is_list(Indexes) ->
     rhc:put(HTTPc, Robj2).
 
 generate_big_value(0, BigVal) ->
-    lager:info("Generated big index value of size ~w", [byte_size(BigVal)]),
+    logger:info("Generated big index value of size ~w", [byte_size(BigVal)]),
     BigVal;
 generate_big_value(N, <<BigValAcc/binary>>) ->
     M = min(N, 8),

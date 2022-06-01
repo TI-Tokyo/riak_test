@@ -39,20 +39,20 @@ ensure_ack_setup() ->
 ensure_ack_tests(Nodes) ->
     [LeaderA, LeaderB] = Nodes,
 
-    lager:info("Nodes:~p, ~p", [LeaderA, LeaderB]),
+    logger:info("Nodes:~p, ~p", [LeaderA, LeaderB]),
     TestHash =  list_to_binary([io_lib:format("~2.16.0b", [X]) ||
         <<X>> <= erlang:md5(term_to_binary(os:timestamp()))]),
     TestBucket = <<TestHash/binary, "-rt_test_a">>,
 
     %% Write some objects to the source cluster (A),
-    lager:info("Writing 1 key to ~p, which should RT repl to ~p",
+    logger:info("Writing 1 key to ~p, which should RT repl to ~p",
         [LeaderA, LeaderB]),
     ?assertEqual([], repl_util:do_write(LeaderA, 1, 1, TestBucket, 2)),
 
     %% verify data is replicated to B
-    lager:info("Reading 1 key written from ~p", [LeaderB]),
+    logger:info("Reading 1 key written from ~p", [LeaderB]),
     ?assertEqual(0, repl_util:wait_for_reads(LeaderB, 1, 1, TestBucket, 2)),
-    lager:info("Checking unacked on ~p", [LeaderA]),
+    logger:info("Checking unacked on ~p", [LeaderA]),
     ?assertEqual(ok, rt:wait_until(fun () -> check_unacked(LeaderA) end)).
 
 check_unacked(LeaderA) ->
@@ -63,6 +63,6 @@ check_unacked(LeaderA) ->
             missing_consumer;
         Consumer ->
             Unacked = proplists:get_value(unacked, Consumer, 0),
-            lager:info("unacked: ~p", [Unacked]), 
+            logger:info("unacked: ~p", [Unacked]), 
             Unacked == 0
     end.

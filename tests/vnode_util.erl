@@ -26,7 +26,7 @@ load(Nodes) ->
     ok.
 
 suspend_vnode(Node, Idx) ->
-    lager:info("Suspending vnode ~p/~p", [Node, Idx]),
+    logger:info("Suspending vnode ~p/~p", [Node, Idx]),
     Pid = rpc:call(Node, ?MODULE, remote_suspend_vnode, [Idx], infinity),
     Pid.
 
@@ -48,7 +48,7 @@ resume_vnode(Pid) ->
     Pid ! resume.
 
 kill_vnode({VIdx, VNode}) ->
-    lager:info("Killing vnode: ~p", [VIdx]),
+    logger:info("Killing vnode: ~p", [VIdx]),
     Pid = vnode_pid(VNode, VIdx),
     rpc:call(VNode, erlang, exit, [Pid, kill]),
     ok = rt:wait_until(fun() ->
@@ -61,20 +61,20 @@ vnode_pid(Node, Partition) ->
     Pid.
 
 rebuild_vnode({VIdx, VNode}) ->
-    lager:info("Rebuild AAE tree: ~p", [VIdx]),
+    logger:info("Rebuild AAE tree: ~p", [VIdx]),
     rebuild_aae_tree(VNode, VIdx).
 
 rebuild_aae_tree(Node, Partition) ->
     {ok, Pid} = rpc:call(Node, riak_kv_vnode, hashtree_pid, [Partition]),
     Info = rpc:call(Node, riak_kv_entropy_info, compute_tree_info, []),
     {_, Built} = lists:keyfind(Partition, 1, Info),
-    lager:info("Forcing rebuild of AAE tree for: ~b", [Partition]),
-    lager:info("Tree originally built at: ~p", [Built]),
+    logger:info("Forcing rebuild of AAE tree for: ~b", [Partition]),
+    logger:info("Tree originally built at: ~p", [Built]),
     rpc:call(Node, riak_kv_index_hashtree, clear, [Pid]),
     ok = rt:wait_until(fun() ->
                                NewInfo = rpc:call(Node, riak_kv_entropy_info, compute_tree_info, []),
                                {_, NewBuilt} = lists:keyfind(Partition, 1, NewInfo),
                                NewBuilt > Built
                        end),
-    lager:info("Tree successfully rebuilt"),
+    logger:info("Tree successfully rebuilt"),
     ok.

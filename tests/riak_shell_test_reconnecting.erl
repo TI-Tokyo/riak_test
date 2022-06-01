@@ -31,14 +31,14 @@
 %% and the running test interprets then as being messages to the shell
 confirm() -> 
     Nodes = riak_shell_test_util:build_cluster(),
-    lager:info("Built a cluster of ~p~n", [Nodes]),
+    logger:info("Built a cluster of ~p~n", [Nodes]),
     Self = self(),
     _Pid = spawn_link(fun() -> run_test(Self) end),
     riak_shell_test_util:loop().
 
 run_test(Pid) ->
     State = riak_shell_test_util:shell_init(),
-    lager:info("~n~nStart running the command set-------------------------", []),
+    logger:info("~n~nStart running the command set-------------------------", []),
     Cmds = [
             %% 'connection prompt on' means you need to do unicode printing and stuff
             {run, 
@@ -54,7 +54,7 @@ run_test(Pid) ->
            ],
     Result = riak_shell_test_util:run_commands(Cmds, State,
                                                ?DONT_INCREMENT_PROMPT),
-    lager:info("Result is ~p~n", [Result]),
-    lager:info("~n~n------------------------------------------------------", []),
+    logger:info("Result is ~p~n", [Result]),
+    logger:info("~n~n------------------------------------------------------", []),
     Pid ! Result.
 

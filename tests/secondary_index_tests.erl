@@ -63,10 +63,10 @@ confirm() ->
     assertRangeQuery(Clients, ?KEYS(10, 17), <<"$key">>, <<"obj10">>, <<"obj17">>),
     assertRangeQuery(Clients, ?KEYS(12), <<"$key">>, <<"obj10">>, <<"obj17">>, <<"ob..2">>),
 
-    lager:info("Delete an object, verify deletion..."),
+    logger:info("Delete an object, verify deletion..."),
     ToDel = [<<"obj05">>, <<"obj11">>],
     [?assertMatch(ok, riakc_pb_socket:delete(PBC, ?BUCKET, KD)) || KD <- ToDel],
-    lager:info("Make sure the tombstone is reaped..."),
+    logger:info("Make sure the tombstone is reaped..."),
     ?assertMatch(ok, rt:wait_until(fun() -> rt:pbc_really_deleted(PBC, ?BUCKET, ToDel) end)),
 
     assertExactQuery(Clients, [], <<"field1_bin">>, <<"val5">>),
@@ -110,15 +110,15 @@ confirm() ->
                      1000000000000,
                      TestIdxVal),
 
-    lager:info("Add back deleted objects"),
+    logger:info("Add back deleted objects"),
     put_an_object(PBC, 5),
     put_an_object(PBC, 11),
 
     ?assertMatch(ok, riakc_pb_socket:delete(PBC, ?BUCKET, TestObj)),
-    lager:info("Make sure the tombstone is reaped..."),
+    logger:info("Make sure the tombstone is reaped..."),
     ?assertMatch(ok, rt:wait_until(fun() -> rt:pbc_really_deleted(PBC, ?BUCKET, ?KEYS(TestIdxVal)) end)),
 
-    lager:info("Create sibling objects with alternative indexes"),
+    logger:info("Create sibling objects with alternative indexes"),
     [put_a_sibling_object(PBC, N) || N <- lists:seq(0, 20)],
 
     assertExactQuery(Clients, ?KEYS(3, 4), <<"field1_bin">>, <<"val4">>),
@@ -134,10 +134,10 @@ confirm() ->
     assertRangeQuery(Clients, ?KEYS(10, 17), <<"$key">>, <<"obj10">>, <<"obj17">>),
     assertRangeQuery(Clients, ?KEYS(12), <<"$key">>, <<"obj10">>, <<"obj17">>, <<"ob..2">>),
 
-    lager:info("Delete an object, verify deletion..."),
+    logger:info("Delete an object, verify deletion..."),
     ToDel = [<<"obj05">>, <<"obj11">>],
     [?assertMatch(ok, riakc_pb_socket:delete(PBC, ?BUCKET, KD)) || KD <- ToDel],
-    lager:info("Make sure the tombstone is reaped..."),
+    logger:info("Make sure the tombstone is reaped..."),
     ?assertMatch(ok, rt:wait_until(fun() -> rt:pbc_really_deleted(PBC, ?BUCKET, ToDel) end)),
 
     assertRangeQuery(Clients,
@@ -155,7 +155,7 @@ assertExactQuery(Clients, Expected, Index, Value, Sorted) when is_list(Clients) 
     [assertExactQuery(C, Expected, Index, Value, Sorted) || C <- Clients];
 assertExactQuery({ClientType, Client}, Expected, Index, Value,
                  {Sort, ExpectSorted}) ->
-    lager:info("Searching Index ~p for ~p, sort: ~p ~p with client ~p",
+    logger:info("Searching Index ~p for ~p, sort: ~p ~p with client ~p",
                [Index, Value, Sort, ExpectSorted, ClientType]),
     {ok, ?INDEX_RESULTS{keys=Results}} = case ClientType of
         pb ->
@@ -169,9 +169,9 @@ assertExactQuery({ClientType, Client}, Expected, Index, Value,
         true -> Results;
         _ -> lists:sort(Results)
     end,
-    lager:info("Expected: ~p", [Expected]),
-    lager:info("Actual  : ~p", [Results]),
-    lager:info("Sorted  : ~p", [ActualKeys]),
+    logger:info("Expected: ~p", [Expected]),
+    logger:info("Actual  : ~p", [Results]),
+    logger:info("Sorted  : ~p", [ActualKeys]),
     ?assertEqual(Expected, ActualKeys).
 
 assertRangeQuery(Clients, Expected, Index, StartValue, EndValue) ->
@@ -185,7 +185,7 @@ assertRangeQuery(Clients, Expected, Index, StartValue, EndValue, Re, Sort) when 
     [assertRangeQuery(C, Expected, Index, StartValue, EndValue, Re, Sort) || C <- Clients];
 assertRangeQuery({ClientType, Client}, Expected, Index, StartValue, EndValue, Re,
                  {Sort, ExpectSorted}) ->
-    lager:info("Searching Index ~p for ~p-~p re:~p, sort: ~p, ~p with ~p client",
+    logger:info("Searching Index ~p for ~p-~p re:~p, sort: ~p, ~p with ~p client",
                [Index, StartValue, EndValue, Re, Sort, ExpectSorted, ClientType]),
     {ok, ?INDEX_RESULTS{keys=Results}} = case ClientType of
         pb ->
@@ -201,9 +201,9 @@ assertRangeQuery({ClientType, Client}, Expected, Index, StartValue, EndValue, Re
         true -> Results;
         _ -> lists:sort(Results)
     end,
-    lager:info("Expected: ~p", [Expected]),
-    lager:info("Actual  : ~p", [Results]),
-    lager:info("Sorted  : ~p", [ActualKeys]),
+    logger:info("Expected: ~p", [Expected]),
+    logger:info("Actual  : ~p", [Results]),
+    logger:info("Sorted  : ~p", [ActualKeys]),
     ?assertEqual(Expected, ActualKeys).
 
 %% general 2i utility
@@ -230,7 +230,7 @@ put_a_sibling_object(Pid, N) ->
     put_an_object(Pid, Key, Data, Indexes).
 
 put_an_object(Pid, Key, Data, Indexes) when is_list(Indexes) ->
-    lager:info("Putting object ~p", [Key]),
+    logger:info("Putting object ~p", [Key]),
     MetaData = dict:from_list([{<<"index">>, Indexes}]),
     Robj0 = riakc_obj:new(?BUCKET, Key),
     Robj1 = riakc_obj:update_value(Robj0, Data),
@@ -281,7 +281,7 @@ stream_loop(Acc) ->
         {_Ref, {error, <<"{error,timeout}">>}} ->
             {error, timeout};
         {_Ref, Wat} ->
-            lager:info("got a wat ~p", [Wat]),
+            logger:info("got a wat ~p", [Wat]),
             stream_loop(Acc)
     end.
 
@@ -316,12 +316,12 @@ url(Format, Elements) ->
     lists:flatten(Path).
 
 http_get(Url, undefined) ->
-    lager:info("getting ~p", [Url]),
+    logger:info("getting ~p", [Url]),
     {ok,{{"HTTP/1.1",200,"OK"}, _, Body}} = httpc:request(Url),
     {struct, Result} = mochijson2:decode(Body),
     Result;
 http_get(Url, stream) ->
-    lager:info("streaming ~p", [Url]),
+    logger:info("streaming ~p", [Url]),
     {ok, Ref} = httpc:request(get, {Url, []}, [], [{stream, self}, {sync, false}]),
     start_http_stream(Ref).
 
@@ -353,7 +353,7 @@ start_http_stream(Ref) ->
         {http, {Ref, stream_start, Headers}} ->
             Boundary = get_boundary(proplists:get_value("content-type", Headers)),
             http_stream_loop(Ref, <<>>, Boundary);
-        Other -> lager:error("Unexpected message ~p", [Other]),
+        Other -> logger:error("Unexpected message ~p", [Other]),
                  {error, unknown_message}
     after 60000 ->
             {error, timeout_local}
@@ -374,7 +374,7 @@ http_stream_loop(Ref, Acc, {Boundary, BLen}=B) ->
                         orddict:merge(fun(_K, V1, V2) -> V1 ++ V2 end,
                                     Results, Result)
                 end, [], Parts);
-        Other -> lager:error("Unexpected message ~p", [Other]),
+        Other -> logger:error("Unexpected message ~p", [Other]),
                  {error, unknown_message}
     after 60000 ->
             {error, timeout_local}

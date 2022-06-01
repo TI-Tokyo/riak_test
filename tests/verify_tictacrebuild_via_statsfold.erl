@@ -76,18 +76,18 @@ confirm() ->
     rt:set_advanced_conf(Node3, ?CFG_NOAAE(none)),
         % Change 1 node to not use Tictac AAE
     rt:join_cluster(Cluster),
-    lager:info("Waiting for convergence."),
+    logger:info("Waiting for convergence."),
     rt:wait_until_ring_converged(Cluster),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end, Cluster),
 
-    lager:info("Cluster started with one node missing AAE config"),
+    logger:info("Cluster started with one node missing AAE config"),
 
     HttpCH = rt:httpc(Node1),
-    lager:info("Find Keys for no data "),
+    logger:info("Find Keys for no data "),
     {ok, {keys, ObjSize}} = rhc:aae_find_keys(HttpCH, ?BUCKET, all, all, {object_size, 1}),
     ?assertEqual([], ObjSize),
 
-    lager:info("Commencing object load"),
+    logger:info("Commencing object load"),
     KeyLoadFun =
         fun(KeysPerNode) ->
             fun(Node, KeyCount) ->
@@ -100,18 +100,18 @@ confirm() ->
         end,
 
     TotalKeys = lists:foldl(KeyLoadFun(?NUM_KEYS_PERNODE), 0, Cluster),
-    lager:info("Loaded ~w objects", [?NUM_KEYS_PERNODE * length(Cluster)]),
+    logger:info("Loaded ~w objects", [?NUM_KEYS_PERNODE * length(Cluster)]),
     
-    lager:info("get stats"),
+    logger:info("get stats"),
     {ok, {stats, Stats}} = rhc:aae_object_stats(HttpCH, ?BUCKET, all, all),
     FoldKeyCount = proplists:get_value(<<"total_count">>, Stats),
 
-    lager:info("FoldKeyCount=~w TotalKeys=~w", [FoldKeyCount, TotalKeys]),
+    logger:info("FoldKeyCount=~w TotalKeys=~w", [FoldKeyCount, TotalKeys]),
     ?assertMatch(true, FoldKeyCount < TotalKeys),
 
-    lager:info("Changing config on Node 1 back to using AAE"),
-    lager:info("Large exchange tick - we don't want to repair via exchange"),
-    lager:info("Short rebuild tick - we do want to resolve via rebuild"),
+    logger:info("Changing config on Node 1 back to using AAE"),
+    logger:info("Large exchange tick - we don't want to repair via exchange"),
+    logger:info("Short rebuild tick - we do want to resolve via rebuild"),
     rt:set_advanced_conf(Node1,
                             ?CFG_TICTACAAE(60 * 60 * 1000, 60 * 1000, dscp)),
     rt:wait_for_service(Node1, riak_kv),
@@ -121,8 +121,8 @@ confirm() ->
     rt:set_advanced_conf(Node3,
                             ?CFG_TICTACAAE(60 * 60 * 1000, 60 * 1000, none)),
     rt:wait_for_service(Node3, riak_kv),
-    lager:info("Wait until rebuild has caused correct result"),
-    lager:info("This should be immediate for native backend"),
+    logger:info("Wait until rebuild has caused correct result"),
+    logger:info("This should be immediate for native backend"),
 
     RebuildCompleteFun = 
         fun() ->
@@ -130,7 +130,7 @@ confirm() ->
                 rhc:aae_object_stats(HttpCH, ?BUCKET, all, all),
             RebuildFoldKeyCount =
                 proplists:get_value(<<"total_count">>, RebuildStats),
-            lager:info("RebuildFoldKeyCount=~w TotalKeys=~w",
+            logger:info("RebuildFoldKeyCount=~w TotalKeys=~w",
                         [RebuildFoldKeyCount, TotalKeys]),
             RebuildFoldKeyCount == TotalKeys
         end,
@@ -147,7 +147,7 @@ confirm() ->
     {ok, {stats, ModifiedStats}} =
         rhc:aae_object_stats(HttpCH, ?BUCKET, all, {SWbefore, SWafter}),
     ModifiedKeyCount = proplists:get_value(<<"total_count">>, ModifiedStats),
-    lager:info("ModifiedKeyCount=~w TotalModifiedKeys=~w",
+    logger:info("ModifiedKeyCount=~w TotalModifiedKeys=~w",
                 [ModifiedKeyCount, TotalModifiedKeys]),
 
     N1_AF4 = fetch_stats(af4pool_stats(), Node1),
@@ -161,7 +161,7 @@ confirm() ->
     {ok, {stats, ModifiedStats}} =
         rhc:aae_object_stats(HttpCH, ?BUCKET, all, {SWbefore, SWafter}),
     ModifiedKeyCount = proplists:get_value(<<"total_count">>, ModifiedStats),
-    lager:info("ModifiedKeyCount=~w TotalModifiedKeys=~w",
+    logger:info("ModifiedKeyCount=~w TotalModifiedKeys=~w",
                 [ModifiedKeyCount, TotalModifiedKeys]),
 
     N1_NWP = fetch_stats(nwpool_stats(), Node1),
@@ -180,7 +180,7 @@ confirm() ->
 fetch_stats(StatList, Node) ->
     Stats = verify_riak_stats:get_stats(Node, 1000),
     SL = lists:map(fun(S) -> proplists:get_value(S, Stats) end, StatList),
-    lager:info("Stats pulled for ~p ~w - ~p", [StatList, Node, SL]),
+    logger:info("Stats pulled for ~p ~w - ~p", [StatList, Node, SL]),
     SL.
 
 af4pool_stats() ->

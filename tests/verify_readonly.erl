@@ -44,7 +44,7 @@
 confirm() ->
     NTestItems = ?ITEMS,   %% How many test items to write/verify?
     NTestNodes = 4,      %% How many nodes to spin up for tests?
-    lager:info("Spinning up test nodes"),
+    logger:info("Spinning up test nodes"),
     Config = [{riak_core, [{ring_creation_size, 8}]},
                 {riak_kv, [{anti_entropy, {off, []}}]},
                 {bitcask, [{max_file_size, 1000000},
@@ -69,23 +69,23 @@ confirm() ->
             pass -> pass
         catch
             ?_exception_(_, Error, StackToken) -> 
-                lager:error("Test failure as caught error ~w", [Error]),
-                lager:error("Failure has trace ~p",
+                logger:error("Test failure as caught error ~w", [Error]),
+                logger:error("Failure has trace ~p",
                                 [?_get_stacktrace_(StackToken)]),
                 error
         end,
     
     S = io_lib:format("chmod -R u+w ~p",[Path]),
-    lager:info("Restoring write permission to path via ~s", [S]),
+    logger:info("Restoring write permission to path via ~s", [S]),
     os:cmd(S),
     
     R.
 
 
 run_test(NTestItems, RootNode, FailNode) ->
-    lager:info("Populating cluster with writes."),
+    logger:info("Populating cluster with writes."),
     [] = rt:systest_write(RootNode, 1, NTestItems, ?BUCKET, 2),
-    lager:info("Write complete - removing write permisions on data path"),
+    logger:info("Write complete - removing write permisions on data path"),
     %% write one object with a bucket type
 
     Path = filename:join([rtdev:relpath(current),
@@ -94,24 +94,24 @@ run_test(NTestItems, RootNode, FailNode) ->
                           "riak",
                           "data"]),
     S = io_lib:format("chmod -R u-w ~p",[Path]),
-    lager:info("Running command ~s with output ~w", [S, os:cmd(S)]),
+    logger:info("Running command ~s with output ~w", [S, os:cmd(S)]),
     
     pong = net_adm:ping(FailNode),
 
     WriteAttempts = NTestItems * (?POST_MULT - 1),
-    lager:info("Beginning large set of new writes ~w", [WriteAttempts]),
+    logger:info("Beginning large set of new writes ~w", [WriteAttempts]),
     PostErrors =
         rt:systest_write(RootNode,
                             NTestItems, NTestItems * ?POST_MULT, ?BUCKET,
                             2),
-    lager:info("Write complete - validating"),
+    logger:info("Write complete - validating"),
     
-    lager:info("Errors on write count of ~w out of ~w",
+    logger:info("Errors on write count of ~w out of ~w",
                 [length(PostErrors), WriteAttempts]),
     true = length(PostErrors) < (WriteAttempts div 10000),
-    lager:info("Less than 0.01% of writes errored due to failure"),
+    logger:info("Less than 0.01% of writes errored due to failure"),
     
-    lager:info("Confirm the node did crash as it couldn't write"),
+    logger:info("Confirm the node did crash as it couldn't write"),
     pang = net_adm:ping(FailNode),
 
     pass.

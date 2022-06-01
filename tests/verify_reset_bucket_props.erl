@@ -34,7 +34,7 @@ confirm() ->
     DefaultProps = get_current_bucket_props(Nodes, ?BUCKET),
 
     update_props(DefaultProps, Node1, Nodes),
-    lager:info("Resetting bucket properties for bucket ~p on node ~p via rpc",
+    logger:info("Resetting bucket properties for bucket ~p on node ~p via rpc",
                [?BUCKET, Node2]),
     rpc:call(Node2, riak_core_bucket, reset_bucket, [?BUCKET]),
     rt:wait_until_ring_converged(Nodes),
@@ -44,7 +44,7 @@ confirm() ->
 
     update_props(DefaultProps, Node1, Nodes),
     C = rt:pbc(Node3),
-    lager:info("Resetting bucket properties for bucket ~p on node ~p via pbc",
+    logger:info("Resetting bucket properties for bucket ~p on node ~p via pbc",
                [?BUCKET, Node3]),
     ok = riakc_pb_socket:reset_bucket(C, ?BUCKET),
     rt:wait_until_ring_converged(Nodes),
@@ -54,7 +54,7 @@ confirm() ->
 
 update_props(DefaultProps, Node, Nodes) ->
     Updates = [{n_val, 1}],
-    lager:info("Setting bucket properties ~p for bucket ~p on node ~p",
+    logger:info("Setting bucket properties ~p for bucket ~p on node ~p",
                [?BUCKET, Updates, Node]),
     rpc:call(Node, riak_core_bucket, set_bucket, [?BUCKET, Updates]),
     rt:wait_until_ring_converged(Nodes),

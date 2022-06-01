@@ -61,7 +61,7 @@ confirm() ->
     rt:join_cluster(ClusterA1),
     rt:join_cluster(ClusterB1),
 
-    lager:info("Testing with http protocol to be used by snk workers"),
+    logger:info("Testing with http protocol to be used by snk workers"),
     pass = srcfail_test(ClusterA1, ClusterB1, http, FunMod),
     
     rt:clean_cluster(ClusterA1),
@@ -74,26 +74,26 @@ confirm() ->
     rt:join_cluster(ClusterA2),
     rt:join_cluster(ClusterB2),
 
-    lager:info("Testing with pb protocol to be used by snk workers"),
+    logger:info("Testing with pb protocol to be used by snk workers"),
     srcfail_test(ClusterA2, ClusterB2, pb, FunMod).
 
     
 
 srcfail_test(ClusterA, ClusterB, Protocol, FunMod) ->
-    lager:info("Waiting for convergence."),
+    logger:info("Waiting for convergence."),
     rt:wait_until_ring_converged(ClusterA),
     rt:wait_until_ring_converged(ClusterB),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end,
                     ClusterA ++ ClusterB),
     
-    lager:info("Ready for test."),
+    logger:info("Ready for test."),
     setup_replqueues(ClusterA, [cluster_b]),
     setup_replqueues(ClusterB, [cluster_a]),
 
     NodeA = hd(ClusterA),
     NodeB = hd(ClusterB),
 
-    lager:info("Test empty clusters don't show any differences"),
+    logger:info("Test empty clusters don't show any differences"),
     {Protocol, {IPA, PortA}} =
         lists:keyfind(Protocol, 1, rt:connection_info(NodeA)),
     {Protocol, {IPB, PortB}} =
@@ -107,7 +107,7 @@ srcfail_test(ClusterA, ClusterB, Protocol, FunMod) ->
 
     ok = setup_snkreplworkers(ClusterA, ClusterB, cluster_b, Protocol),
 
-    lager:info("Test 5000 key difference and resolve"),
+    logger:info("Test 5000 key difference and resolve"),
     % Write keys to cluster A, verify B does not have them
     FunMod:write_to_cluster(NodeA, 1, 5000, ?TEST_BUCKET, true, ?VAL_INIT),
     FunMod:read_from_cluster(NodeB, 1, 5000, 5000, ?TEST_BUCKET, ?VAL_INIT),
@@ -121,7 +121,7 @@ srcfail_test(ClusterA, ClusterB, Protocol, FunMod) ->
                             {root_compare, 0}, ?WAIT_LOOPS),
     FunMod:read_from_cluster(NodeB, 1, 5000, 0, ?TEST_BUCKET, ?VAL_INIT),
 
-    lager:info("Modify all, then replicate some of the keys"),
+    logger:info("Modify all, then replicate some of the keys"),
     FunMod:write_to_cluster(NodeA, 1, 5000, ?TEST_BUCKET, false, ?VAL_MOD),
 
     StrK = FunMod:key(3001),
@@ -140,7 +140,7 @@ srcfail_test(ClusterA, ClusterB, Protocol, FunMod) ->
                             0,
                             ?WAIT_LOOPS),
     
-    lager:info("Fail a source-side node - replicate more keys"),
+    logger:info("Fail a source-side node - replicate more keys"),
     FailNode1 = lists:nth(2, ClusterA),
     FailNode2 = lists:nth(3, ClusterA),
     rt:stop_and_wait(FailNode1),
@@ -168,18 +168,18 @@ srcfail_test(ClusterA, ClusterB, Protocol, FunMod) ->
                             0,
                             ?WAIT_LOOPS),
 
-    lager:info("Validate everything is sync'd"),
+    logger:info("Validate everything is sync'd"),
     {root_compare, 0} = fullsync_check(RefA, RefB, no_repair, Protocol),
     {root_compare, 0} = fullsync_check(RefB, RefA, no_repair, Protocol),
 
-    lager:info("Restart and check everything is in sync"),
+    logger:info("Restart and check everything is in sync"),
     rt:start_and_wait(FailNode1),
     rt:wait_for_service(FailNode1, riak_kv),
     {root_compare, 0} = fullsync_check(RefA, RefB, no_repair, Protocol),
     {root_compare, 0} = fullsync_check(RefB, RefA, no_repair, Protocol),
 
 
-    lager:info("Load additional keys - to replicate via AAE after stop"),
+    logger:info("Load additional keys - to replicate via AAE after stop"),
     FunMod:write_to_cluster(NodeA, 5001, 6000, ?TEST_BUCKET, true, ?VAL_INIT),
     FunMod:read_from_cluster(NodeB, 5001, 6000, 1000, ?TEST_BUCKET, ?VAL_INIT),
     rt:stop_and_wait(FailNode1),
@@ -190,7 +190,7 @@ srcfail_test(ClusterA, ClusterB, Protocol, FunMod) ->
     rt:start_and_wait(FailNode1),
     rt:wait_for_service(FailNode1, riak_kv),
 
-    lager:info("Load additional keys - to replicate via AAE after kill"),
+    logger:info("Load additional keys - to replicate via AAE after kill"),
     FunMod:write_to_cluster(NodeA, 6001, 7000, ?TEST_BUCKET, true, ?VAL_INIT),
     FunMod:read_from_cluster(NodeB, 6001, 7000, 1000, ?TEST_BUCKET, ?VAL_INIT),
     rt:brutal_kill(FailNode2),
@@ -199,10 +199,10 @@ srcfail_test(ClusterA, ClusterB, Protocol, FunMod) ->
                             [RefA, RefB, cluster_b, Protocol],
                             {root_compare, 0}, ?WAIT_LOOPS),
 
-    lager:info("Success in testing failures"),
+    logger:info("Success in testing failures"),
     rt:start_and_wait(FailNode2),
     rt:wait_for_service(FailNode2, riak_kv),
-    lager:info("Restarted node to assist in cleaning cluster for next test"),
+    logger:info("Restarted node to assist in cleaning cluster for next test"),
     pass.
 
 
@@ -246,7 +246,7 @@ wait_for_outcome(Module, Func, Args, ExpOutcome, LoopCount, MaxLoops) ->
         ExpOutcome ->
             ExpOutcome;
         NotRightYet ->
-            lager:info("~w not yet ~w ~w", [Func, ExpOutcome, NotRightYet]),
+            logger:info("~w not yet ~w ~w", [Func, ExpOutcome, NotRightYet]),
             timer:sleep(LoopCount * 2000),
             wait_for_outcome(Module, Func, Args, ExpOutcome,
                                 LoopCount + 1, MaxLoops)

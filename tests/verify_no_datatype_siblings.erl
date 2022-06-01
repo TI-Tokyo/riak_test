@@ -59,12 +59,12 @@ confirm() ->
     PBC1 = rt:pbc(N1),
     PBC2 = rt:pbc(N2),
 
-    lager:info("Partition cluster in two so we can do conflicting writes"),
+    logger:info("Partition cluster in two so we can do conflicting writes"),
     PartInfo = rt:partition([N1], [N2]),
 
     write_siblings(PBC1, PBC2),
 
-    lager:info("Heal partition"),
+    logger:info("Heal partition"),
     ?assertEqual(ok, rt:heal(PartInfo)),
 
     verify_no_siblings(PBC1),
@@ -80,10 +80,10 @@ setup() ->
     {N1, N2}.
 
 write_siblings(PBC1, PBC2) ->
-    lager:info("Write to one side of the partition"),
+    logger:info("Write to one side of the partition"),
     ?assertEqual(ok, do_write(PBC1, <<"plugh">>)),
 
-    lager:info("Write to other side of the partition"),
+    logger:info("Write to other side of the partition"),
     ?assertEqual(ok, do_write(PBC2, <<"y2">>)).
 
 do_write(PBC, Value) ->
@@ -93,7 +93,7 @@ do_write(PBC, Value) ->
 
 verify_no_siblings(PBC) ->
     {ok, Obj} = do_read(PBC),
-    lager:info("Got object ~p", [Obj]),
+    logger:info("Got object ~p", [Obj]),
 
     NumSiblings = length(riakc_obj:get_values(Obj)),
     ?assertEqual(1, NumSiblings).

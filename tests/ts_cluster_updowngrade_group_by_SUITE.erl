@@ -145,9 +145,9 @@ plain_assert(String, Exp, Got) ->
     fail.
 
 log_error(String, Exp, Got) ->
-    lager:info("*****************", []),
-    lager:info("Test ~p failed", [String]),
-    lager:info("Exp ~p", [Exp]),
-    lager:info("Got ~p", [Got]),
-    lager:info("*****************", []),
+    logger:info("*****************", []),
+    logger:info("Test ~p failed", [String]),
+    logger:info("Exp ~p", [Exp]),
+    logger:info("Got ~p", [Got]),
+    logger:info("*****************", []),
     ok.

@@ -113,7 +113,7 @@ write_data(Node, KVs, Opts) ->
 
 % @doc Verifies that the data is eventually restored to the expected set.
 verify_data(Node, KeyValues, Expectation) ->
-    lager:info("Verify all replicas are eventually correct"),
+    logger:info("Verify all replicas are eventually correct"),
     PB = rt:pbc(Node),
     CheckFun =
     fun() ->
@@ -125,7 +125,7 @@ verify_data(Node, KeyValues, Expectation) ->
             case Num == NumGood of
                 true -> true;
                 false ->
-                    lager:info("Data not yet correct: ~p mismatches",
+                    logger:info("Data not yet correct: ~p mismatches",
                                [Num-NumGood]),
                     false
             end
@@ -133,9 +133,9 @@ verify_data(Node, KeyValues, Expectation) ->
     
     case rt:wait_until(CheckFun, ?RETRY_LOOPS, ?RETRY_PAUSE) of
         ok ->
-            lager:info("Data is now correct. Yay!");
+            logger:info("Data is now correct. Yay!");
         {fail, false} ->
-            lager:error("AAE failed to fix data"),
+            logger:error("AAE failed to fix data"),
             ?assertEqual(aae_failed_to_fix_data, Expectation)
     end,
     riakc_pb_socket:stop(PB),
@@ -174,7 +174,7 @@ get_replica(Node, Bucket, Key, I, N) ->
             Reply
     after
         60000 ->
-            lager:error("Replica ~p get for ~p/~p timed out",
+            logger:error("Replica ~p get for ~p/~p timed out",
                         [I, Bucket, Key]),
             ?assert(false)
     end.

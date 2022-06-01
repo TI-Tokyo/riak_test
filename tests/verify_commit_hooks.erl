@@ -24,45 +24,45 @@
 
 confirm() ->
     [Node] = rt:deploy_nodes(1),
-    lager:info("Loading the hooks module into ~p", [Node]),
+    logger:info("Loading the hooks module into ~p", [Node]),
     rt:load_modules_on_nodes([hooks], [Node]),
 
-    lager:info("Setting pid of test (~p) in application environment of ~p for postcommit hook", [self(), Node]),
+    logger:info("Setting pid of test (~p) in application environment of ~p for postcommit hook", [self(), Node]),
     ?assertEqual(ok, rpc:call(Node, application, set_env, [riak_test, test_pid, self()])),
 
-    lager:info("Installing commit hooks on ~p", [Node]),
+    logger:info("Installing commit hooks on ~p", [Node]),
     ?assertEqual(ok, rpc:call(Node, hooks, set_hooks, [])),
 
-    lager:info("Checking precommit atom failure reason."),
+    logger:info("Checking precommit atom failure reason."),
     HTTP = rt:httpc(Node),
     ?assertMatch({error, {ok, "500", _, _}},
                  rt:httpc_write(HTTP, <<"failatom">>, <<"key">>, <<"value">>)),
 
-    lager:info("Checking Bug 1145 - string failure reason"),
+    logger:info("Checking Bug 1145 - string failure reason"),
     ?assertMatch({error, {ok, "403", _, _}},
                  rt:httpc_write(HTTP, <<"failstr">>, <<"key">>, <<"value">>)),
 
-    lager:info("Checking Bug 1145 - binary failure reason"),
+    logger:info("Checking Bug 1145 - binary failure reason"),
     ?assertMatch({error, {ok, "403", _, _}},
                  rt:httpc_write(HTTP, <<"failbin">>, <<"key">>, <<"value">>)),
 
-    lager:info("Checking that bucket without commit hooks passes."),
+    logger:info("Checking that bucket without commit hooks passes."),
     ?assertEqual(ok, rt:httpc_write(HTTP, <<"fail">>, <<"key">>, <<"value">>)),
 
-    lager:info("Checking that bucket with passing precommit passes."),
+    logger:info("Checking that bucket with passing precommit passes."),
     ?assertEqual(ok, rt:httpc_write(HTTP, <<"failkey">>, <<"key">>, <<"value">>)),
 
-    lager:info("Checking that bucket with failing precommit fails."),
+    logger:info("Checking that bucket with failing precommit fails."),
     ?assertMatch({error, {ok, "403", _, _}},
                  rt:httpc_write(HTTP, <<"failkey">>, <<"fail">>, <<"value">>)),
 
-    lager:info("Checking fix for BZ1244 - riak_kv_wm_object makes call to riak_client:get/3 with invalid type for key"),
+    logger:info("Checking fix for BZ1244 - riak_kv_wm_object makes call to riak_client:get/3 with invalid type for key"),
     %% riak_kv_wm_object:ensure_doc will return {error, not_found}, leading to 404.
     %% see https://github.com/basho/riak_kv/pull/237 for details of the fix.
     ?assertMatch({error, {ok, "404", _, _}},
                  rt:httpc_write(HTTP, <<"bz1244bucket">>, undefined, <<"value">>)),
 
-    lager:info("Checking that postcommit fires."),
+    logger:info("Checking that postcommit fires."),
     ?assertMatch(ok, rt:httpc_write(HTTP, <<"postcommit">>, <<"key">>, <<"value">>)),
 
     receive
@@ -71,6 +71,6 @@ confirm() ->
             pass
     after 2000
         ->
-            lager:error("Postcommit did not send a message within 2 seconds!"),
+            logger:error("Postcommit did not send a message within 2 seconds!"),
             ?assert(false)
     end.

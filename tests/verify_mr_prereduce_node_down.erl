@@ -46,7 +46,7 @@ confirm() ->
     application:set_env(riakc, allow_listing, true),
 
     NodeCount = 4,
-    lager:info("Build ~b-node cluster", [NodeCount]),
+    logger:info("Build ~b-node cluster", [NodeCount]),
     [Primary,ToKill|_] = rt:build_cluster(NodeCount),
 
     %% We need one node down for this test
@@ -55,16 +55,16 @@ confirm() ->
     %% store our test data
     Bucket = <<"verify_mr_prereduce_node_down">>,
     ObjCount = 100,
-    lager:info("Loading ~b objects of test data", [ObjCount]),
+    logger:info("Loading ~b objects of test data", [ObjCount]),
     [] = rt:systest_write(Primary, 1, ObjCount, Bucket, 3),
 
     %% run the query a bunch
     C = rt:pbc(Primary),
     TestCount = 100,
-    lager:info("Running the MR query ~b times", [TestCount]),
+    logger:info("Running the MR query ~b times", [TestCount]),
     Runs = [ run_query(C, Bucket) || _ <- lists:seq(1, TestCount) ],
 
-    lager:info("Evaluating results"),
+    logger:info("Evaluating results"),
 
     %% Errors == failures that even Riak thinks were failures
     %% Correct == correct answers
@@ -80,7 +80,7 @@ confirm() ->
     ?assertEqual({TestCount, [], []},
                  {length(Correct), Incorrect, Errors}),
 
-    lager:info("~s: PASS", [atom_to_list(?MODULE)]),
+    logger:info("~s: PASS", [atom_to_list(?MODULE)]),
     pass.
 
 %% result should be a count of the objects in the bucket

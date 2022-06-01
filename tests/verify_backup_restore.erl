@@ -36,7 +36,7 @@
 -define(SEARCH_BUCKET, <<"search_bucket">>).
 
 confirm() ->
-    lager:info("Building cluster of ~p nodes", [?NUM_NODES]),
+    logger:info("Building cluster of ~p nodes", [?NUM_NODES]),
     SpamDir = rt_config:config_or_os_env(spam_dir),
     Config = [{riak_search, [{enabled, true}]}],
     [Node0 | _RestNodes] = Nodes = rt:build_cluster(?NUM_NODES, Config),
@@ -56,7 +56,7 @@ confirm() ->
     ConcatBin = fun({T, _},Acc) -> <<T/binary, " ", Acc/binary>> end,
     AllTerms = lists:foldl(ConcatBin, <<"">>, Searches),
 
-    lager:info("Indexing data for search from ~p", [SpamDir]),
+    logger:info("Indexing data for search from ~p", [SpamDir]),
     rt:pbc_put_dir(PbcPid, ?SEARCH_BUCKET, SpamDir),
     ExtraKey = <<"Extra1">>, 
     riakc_pb_socket:put(PbcPid, 
@@ -64,10 +64,10 @@ confirm() ->
                                       ExtraKey, 
                                       AllTerms)),
 
-    lager:info("Writing some data to the cluster"),
+    logger:info("Writing some data to the cluster"),
     write_some(PbcPid, [{last, ?NUM_KEYS}]),
 
-    lager:info("Verifying data made it in"),
+    logger:info("Verifying data made it in"),
     rt:wait_until_no_pending_changes(Nodes),
     verify_searches(PbcPid, Searches, 1),
     [?assertEqual([], read_some(Node, [{last, ?NUM_KEYS}])) || Node <- Nodes],
@@ -75,35 +75,35 @@ confirm() ->
     BackupFile = filename:join([rt_config:get(rt_scratch_dir), "TestBackup.bak"]),
     case filelib:is_regular(BackupFile) of
         true ->
-            lager:info("Deleting current backup file at ~p", [BackupFile]),
+            logger:info("Deleting current backup file at ~p", [BackupFile]),
             ?assertMatch(ok, file:delete(BackupFile));
         _ -> ok
     end,
 
-    lager:info("Backing up the data to ~p", [BackupFile]),
+    logger:info("Backing up the data to ~p", [BackupFile]),
     Cookie = "riak",
     rt:admin(Node0, ["backup", atom_to_list(Node0), Cookie, BackupFile, "all"]),
 
-    lager:info("Modifying data on cluster"),
+    logger:info("Modifying data on cluster"),
     ModF = fun(N) ->
                    <<"MOD_V_", (i2b(N))/binary>>
            end,
-    lager:info("Modifying another ~p keys (mods will persist after backup)",
+    logger:info("Modifying another ~p keys (mods will persist after backup)",
                [?NUM_MOD]),
     write_some(PbcPid, [{delete, true},
                         {last, ?NUM_MOD},
                         {vfun, ModF}]),
-    lager:info("Deleting ~p keys", [?NUM_DEL+1]),
+    logger:info("Deleting ~p keys", [?NUM_DEL+1]),
     delete_some(PbcPid, [{first, ?NUM_MOD+1},
                          {last, ?NUM_MOD+?NUM_DEL}]),
-    lager:info("Deleting extra search doc"),
+    logger:info("Deleting extra search doc"),
     riakc_pb_socket:delete(PbcPid, ?SEARCH_BUCKET, ExtraKey),
     rt:wait_until(fun() -> rt:pbc_really_deleted(PbcPid,
                                                  ?SEARCH_BUCKET,
                                                  [ExtraKey])
         end),
 
-    lager:info("Verifying data has changed"),
+    logger:info("Verifying data has changed"),
     [?assertEqual([], read_some(Node, [{last, ?NUM_MOD},
                                        {vfun, ModF}]))
      || Node <- Nodes],
@@ -113,14 +113,14 @@ confirm() ->
      || Node <- Nodes],
     verify_searches(PbcPid, Searches, 0),
 
-    lager:info("Restoring from backup ~p", [BackupFile]),
+    logger:info("Restoring from backup ~p", [BackupFile]),
     rt:admin(Node0, ["restore", atom_to_list(Node0), Cookie, BackupFile]),
     rt:wait_until_no_pending_changes(Nodes),
 
     %% When allow_mult=false, the mods overwrite the restored data.  When
     %% allow_mult=true, the a sibling is generated with the original
     %% data, and a divergent vclock.  Verify that both objects exist.
-    lager:info("Verifying that deleted data is back, mods are still in"),
+    logger:info("Verifying that deleted data is back, mods are still in"),
     [?assertEqual([], read_some(Node, [{siblings, true},
                                        {last, ?NUM_MOD},
                                        {vfun, ModF}]))
@@ -130,35 +130,35 @@ confirm() ->
                                        {last, ?NUM_KEYS}]))
      || Node <- Nodes],
 
-    lager:info("Verifying deleted search results are back"),
+    logger:info("Verifying deleted search results are back"),
     verify_searches(PbcPid, Searches, 1),
 
-    lager:info("Wipe out entire cluster and start fresh"),
+    logger:info("Wipe out entire cluster and start fresh"),
     riakc_pb_socket:stop(PbcPid),
     rt:clean_cluster(Nodes),
-    lager:info("Rebuilding the cluster"),
+    logger:info("Rebuilding the cluster"),
     rt:build_cluster(?NUM_NODES, Config),
     rt:enable_search_hook(Node0, ?SEARCH_BUCKET),
     rt:wait_until_ring_converged(Nodes),
     rt:wait_until_no_pending_changes(Nodes),
     PbcPid2 = rt:pbc(Node0),
 
-    lager:info("Verify no data in cluster"),
+    logger:info("Verify no data in cluster"),
     [?assertEqual([], read_some(Node, [{last, ?NUM_KEYS},
                                        {expect, deleted}]))
      || Node <- Nodes],
     verify_searches(PbcPid2, EmptySearches, 0),
 
-    lager:info("Restoring from backup ~p again", [BackupFile]),
+    logger:info("Restoring from backup ~p again", [BackupFile]),
     rt:admin(Node0, ["restore", atom_to_list(Node0), Cookie, BackupFile]),
     rt:enable_search_hook(Node0, ?SEARCH_BUCKET),
 
-    lager:info("Verifying data is back to original backup"),
+    logger:info("Verifying data is back to original backup"),
     rt:wait_until_no_pending_changes(Nodes),
     verify_searches(PbcPid2, Searches, 1),
     [?assertEqual([], read_some(Node, [{last, ?NUM_KEYS}])) || Node <- Nodes],
 
-    lager:info("C'est tout mon ami"),
+    logger:info("C'est tout mon ami"),
     riakc_pb_socket:stop(PbcPid2),
     pass.
 
@@ -288,5 +288,5 @@ delete_some(PBC, Props) ->
 
 verify_search_count(Pid, SearchQuery, Count) ->
     {ok, #search_results{num_found=NumFound}} = riakc_pb_socket:search(Pid, ?SEARCH_BUCKET, SearchQuery),
-    lager:info("Found ~p search results for query ~p", [NumFound, SearchQuery]),
+    logger:info("Found ~p search results for query ~p", [NumFound, SearchQuery]),
     ?assertEqual(Count, NumFound).

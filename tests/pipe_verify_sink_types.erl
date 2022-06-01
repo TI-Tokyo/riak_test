@@ -38,7 +38,7 @@
 
 %% @doc riak_test callback
 confirm() ->
-    lager:info("Build ~b node cluster", [?NODE_COUNT]),
+    logger:info("Build ~b node cluster", [?NODE_COUNT]),
     Nodes = rt:build_cluster(?NODE_COUNT),
 
     [rt:wait_for_service(Node, riak_pipe) || Node <- Nodes],
@@ -52,7 +52,7 @@ confirm() ->
 
     rt_pipe:assert_no_zombies(Nodes),
 
-    lager:info("~s: PASS", [atom_to_list(?MODULE)]),
+    logger:info("~s: PASS", [atom_to_list(?MODULE)]),
     pass.
 
 %%% TESTS
@@ -61,7 +61,7 @@ confirm() ->
 %% all other tests should have covered it), but try specifying it
 %% explicitly here
 verify_raw([RN|_]) ->
-    lager:info("Verify explicit 'raw' sink type"),
+    logger:info("Verify explicit 'raw' sink type"),
     Spec = [#fitting_spec{name=r,
                           module=riak_pipe_w_pass}],
     Opts = [{sink_type, raw},{sink, rt_pipe:self_sink()}],
@@ -74,7 +74,7 @@ verify_raw([RN|_]) ->
 %% @doc rt_pipe_test_sink *only* accepts results delivered as
 %% gen_fsm events that are tagged as sync vs async
 verify_fsm([RN|_]) ->
-    lager:info("Verify 'fsm' sink type"),
+    logger:info("Verify 'fsm' sink type"),
     PipeRef = make_ref(),
     {ok, SinkPid} = rt_pipe_sink_fsm:start_link(PipeRef),
     Spec = [#fitting_spec{name=fs,
@@ -90,7 +90,7 @@ verify_fsm([RN|_]) ->
 %% @doc purposefully disable acking one output, to trigger the timeout
 %% on the gen_fsm:sync_send_event
 verify_fsm_timeout([RN|_]) ->
-    lager:info("Verify sink fsm timeout"),
+    logger:info("Verify sink fsm timeout"),
     PipeRef = make_ref(),
     SinkOpts = [{skip_ack, [{fst,{sync, 2}}]}],
     {ok, SinkPid} = rt_pipe_sink_fsm:start_link(
@@ -126,7 +126,7 @@ verify_fsm_timeout([RN|_]) ->
 %% @doc make sure that the sink messages are sent synchronously on the
 %% Period, and asynchronously otherwise
 verify_fsm_sync_period([RN|_]) ->
-    lager:info("Verify fsm sink sync period"),
+    logger:info("Verify fsm sink sync period"),
     PipeRef = make_ref(),
     {ok, SinkPid} = rt_pipe_sink_fsm:start_link(PipeRef, []),
     %% force a single worker, to make it easy to test the sync period

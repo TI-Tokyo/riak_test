@@ -33,7 +33,7 @@
 confirm() ->
     Nodes = ts_setup:start_cluster(3),
     _Conn = ts_setup:conn(Nodes),
-    lager:info("Built a cluster of ~p~n", [Nodes]),
+    logger:info("Built a cluster of ~p~n", [Nodes]),
     Self = self(),
     _Pid = spawn_link(fun() -> load_log_file(Self) end),
     Got1 = riak_shell_test_util:loop(),
@@ -45,12 +45,12 @@ confirm() ->
 
 load_log_file(Pid) ->
     State = riak_shell_test_util:shell_init(),
-    lager:info("~n~nLoad the log -------------------------", []),
+    logger:info("~n~nLoad the log -------------------------", []),
     Cmds = [
             {{match, "No Regression Errors."},
               ts_data:flat_format("regression_log \"~s\";", [?LOG_FILE])}
            ],
     Result = riak_shell_test_util:run_commands(Cmds, State,
                                                ?DONT_INCREMENT_PROMPT),
-    lager:info("~n~n------------------------------------------------------", []),
+    logger:info("~n~n------------------------------------------------------", []),
     Pid ! Result.

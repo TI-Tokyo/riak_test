@@ -5,7 +5,7 @@
 -define(HARNESS, (rt_config:get(rt_harness))).
 
 confirm() ->
-    lager:info("entering get_put:confirm()"),
+    logger:info("entering get_put:confirm()"),
     HostList = rt_config:get(rt_hostnames),
     Count = length(HostList),
     BinSize = rt_config:get(perf_bin_size),

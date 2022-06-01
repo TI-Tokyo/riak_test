@@ -41,7 +41,7 @@ start_cluster(NumNodes) ->
                     Config :: list(tuple())) -> list(node()).
 start_cluster(NumNodes, Config) ->
     rt:set_backend(eleveldb),
-    lager:info("Building cluster of ~p~n", [NumNodes]),
+    logger:info("Building cluster of ~p~n", [NumNodes]),
     rt:build_cluster(NumNodes, Config).
 
 -spec conn(list(node())) -> pid().
@@ -91,7 +91,7 @@ activate_bucket_type(Cluster, Table, RetriesSoFar, RetriesLeft) ->
     %% Look for a successful message
     case string:str(Msg, "has been activated") of
         0 ->
-            lager:error("Could not activate bucket type. Retrying. Result = ~p", [Result]),
+            logger:error("Could not activate bucket type. Retrying. Result = ~p", [Result]),
             case RetriesLeft of
                 0 -> Result;
 

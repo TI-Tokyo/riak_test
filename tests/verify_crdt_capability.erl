@@ -57,10 +57,10 @@ confirm() ->
     ?assertEqual(ok, riakc_pb_socket:counter_incr(PB, ?BUCKET, ?KEY, 1)),
     ?assertEqual({ok, 4}, riakc_pb_socket:counter_val(PB, ?BUCKET, ?KEY)),
 
-    lager:info("Passed mixed test, upgrade time!"),
+    logger:info("Passed mixed test, upgrade time!"),
 
     rt:upgrade(Previous, current),
-    lager:info("Upgrayded!!"),
+    logger:info("Upgrayded!!"),
     ?assertEqual(ok, rt:wait_until_ready(Current)),
     ?assertEqual(ok, rt:wait_until_ready(Previous)),
     rt:wait_for_service(Previous, riak_kv),

@@ -17,29 +17,29 @@ confirm() ->
         ]}
     ],
 
-    lager:info("deploying 2 nodes"),
+    logger:info("deploying 2 nodes"),
     Nodes = rt:deploy_nodes(2, Conf, [riak_kv, riak_repl]),
 
     [SourceNode, SinkNode] = Nodes,
 
-    lager:info("nameing clusters"),
+    logger:info("nameing clusters"),
     repl_util:name_cluster(SourceNode, "source"),
     repl_util:name_cluster(SinkNode, "sink"),
 
     {ok, {_IP, Port}} = rpc:call(SinkNode, application, get_env, [riak_core, cluster_mgr]),
 
-    lager:info("connecting clusters using port ~p", [Port]),
+    logger:info("connecting clusters using port ~p", [Port]),
     repl_util:connect_cluster(SourceNode, "127.0.0.1", Port),
     repl_util:wait_for_connection(SourceNode, "sink"),
 
-    lager:info("enabling and starting realtime"),
+    logger:info("enabling and starting realtime"),
     repl_util:enable_realtime(SourceNode, "sink"),
     repl_util:start_realtime(SourceNode, "sink"),
 
-    lager:info("testing for leaks on flakey sink"),
+    logger:info("testing for leaks on flakey sink"),
     flakey_sink(SourceNode, SinkNode),
 
-    lager:info("testing for leaks on flakey source"),
+    logger:info("testing for leaks on flakey source"),
     flakey_source(SourceNode, SinkNode),
 
     pass.
@@ -92,7 +92,7 @@ flakey_source(SourceNode, _SinkNode) ->
 
     Biggest = lists:max(ProcCounts),
     Smallest = lists:min(ProcCounts),
-    %lager:info("initial: ~p; post: ~p", [InitialProcCount, PostProcCount]),
+    %logger:info("initial: ~p; post: ~p", [InitialProcCount, PostProcCount]),
     %?assertEqual(InitialProcCount, PostProcCount).
     ?assert(2 =< Biggest - Smallest),
     true.
@@ -107,12 +107,12 @@ send_source_tcp_errors(SourceNode, N, Acc) ->
             timer:sleep(?SEND_ERROR_INTERVAL),
             send_source_tcp_errors(SourceNode, N, Acc);
         Pid ->
-            lager:debug("Get the status"),
+            logger:debug("Get the status"),
             SysStatus = try sys:get_status(Pid) of
                 S -> S
             catch
                 W:Y ->
-                    lager:info("Sys failed due to ~p:~p", [W,Y]),
+                    logger:info("Sys failed due to ~p:~p", [W,Y]),
                     {status, Pid, undefined, [undefined, undefined, undefined, undefined, [undefined, undefined, {data, [{"State", {Pid}}]}]]}
             end,
             {status, Pid, _Module, [_PDict, _Status, _, _, Data]} = SysStatus,
@@ -121,12 +121,12 @@ send_source_tcp_errors(SourceNode, N, Acc) ->
             [Helper | _] = lists:filter(fun(E) ->
                 is_pid(E)
             end, tuple_to_list(StateRec)),
-            lager:debug("mon the hlepr"),
+            logger:debug("mon the hlepr"),
             HelperMon = erlang:monitor(process, Helper),
-            lager:debug("Send the murder"),
+            logger:debug("Send the murder"),
             Pid ! {tcp_error, <<>>, test},
             Mon = erlang:monitor(process, Pid),
-            lager:debug("Wait for deaths"),
+            logger:debug("Wait for deaths"),
             receive
                 {'DOWN', Mon, process, Pid, _} -> ok
             end,

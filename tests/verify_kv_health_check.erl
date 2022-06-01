@@ -40,7 +40,7 @@ confirm() ->
     rt_intercept:load_code(Node1),
     rt_intercept:add(Node1, {riak_kv_vnode,
                              [{{handle_command, 3}, slow_handle_command}]}),
-    lager:info("Installed intercept to delay handling of requests by kv_vnode on ~p",
+    logger:info("Installed intercept to delay handling of requests by kv_vnode on ~p",
                [Node1]),
 
     %% make DISABLE_THRESHOLD+5 requests and trigger the health check explicitly
@@ -50,7 +50,7 @@ confirm() ->
     [riakc_pb_socket:get(C, <<"b">>, <<"k">>) || _ <- lists:seq(1,?DISABLE_THRESHOLD+5)],
     ok = rpc:call(Node1, riak_core_node_watcher, check_health, [riak_kv]),
 
-    lager:info("health check should disable riak_kv on ~p shortly", [Node1]),
+    logger:info("health check should disable riak_kv on ~p shortly", [Node1]),
     ?assertMatch(ok,
                  rt:wait_until(
                    Node1,
@@ -58,11 +58,11 @@ confirm() ->
                            Up = rpc:call(N, riak_core_node_watcher, services, [N]),
                            not lists:member(riak_kv, Up)
                    end)),
-    lager:info("health check successfully disabled riak_kv on ~p", [Node1]),
-    lager:info("health check should re-enable riak_kv on ~p after some messages have been processed",
+    logger:info("health check successfully disabled riak_kv on ~p", [Node1]),
+    logger:info("health check should re-enable riak_kv on ~p after some messages have been processed",
                [Node1]),
     %% wait for health check timer to do its thing, don't explicitly execute it
     ?assertMatch(ok, rt:wait_for_service(Node1, riak_kv)),
-    lager:info("health check successfully re-enabled riak_kv on ~p", [Node1]),
+    logger:info("health check successfully re-enabled riak_kv on ~p", [Node1]),
     riakc_pb_socket:stop(C),
     pass.

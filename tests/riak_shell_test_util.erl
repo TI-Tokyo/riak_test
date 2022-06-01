@@ -52,8 +52,8 @@ shell_init() ->
         %% message - we need to drain that msg here if we want the runner
         %% to work, or it will be off-by-1 in the test runner
         ConnectionMsg ->
-            lager:info("Got a connection message ~p on shell_init",
-                       [ConnectionMsg])
+            logger:info("Got a connection message ~p on shell_init",
+                        [ConnectionMsg])
     end,
     State.
 
@@ -66,13 +66,13 @@ run_commands([], _State, _ShouldIncrement) ->
 run_commands([{drain, discard} | T], State, ShouldIncrement) ->
     {_, Cmd} = riak_shell:make_cmd_TEST(ShouldIncrement),
     {_Error, Response, NewState} = riak_shell:loop_TEST(Cmd, State),
-    lager:info("Message drained and discared unchecked ~p", [lists:flatten(Response)]),
+    logger:info("Message drained and discared unchecked ~p", [lists:flatten(Response)]),
     run_commands(T, NewState, ShouldIncrement);
 run_commands([{drain, Expected} | T], State, ShouldIncrement) ->
     {_, Cmd} = riak_shell:make_cmd_TEST(ShouldIncrement),
     {_Error, Response, NewState} = riak_shell:loop_TEST(Cmd, State),
     case lists:flatten(Response) of
-        Expected -> lager:info("Message drained successfully ~p", [Expected]),
+        Expected -> logger:info("Message drained successfully ~p", [Expected]),
                     run_commands(T, NewState, ShouldIncrement);
         Got      -> print_error("Message Expected", "", Expected, Got),
                     fail
@@ -95,15 +95,15 @@ run_commands([{{match, Expected}, Cmd} | T], State, ShouldIncrement) ->
     ExpectedTrimmed = cleanup_output(Expected),
     ResultTrimmed = cleanup_output(Response),
     case ResultTrimmed of
-        ExpectedTrimmed -> lager:info("Successful match of ~p from ~p", [Expected, Cmd]),
+        ExpectedTrimmed -> logger:info("Successful match of ~p from ~p", [Expected, Cmd]),
                            run_commands(T, NewState, ShouldIncrement);
         _               -> print_error("Ran ~p:", Cmd, Expected, Response),
                            fail
     end;
 run_commands([{run, Cmd} | T], State, ShouldIncrement) ->
-    lager:info("Run command: ~p", [Cmd]),
+    logger:info("Run command: ~p", [Cmd]),
     {_Error, Result, NewState} = run_cmd(Cmd, State, ShouldIncrement),
-    lists:map(fun(X) -> lager:info("~s~n", [X]) end, re:split(Result, "\n", [trim])),
+    lists:map(fun(X) -> logger:info("~s~n", [X]) end, re:split(Result, "\n", [trim])),
     run_commands(T, NewState, ShouldIncrement).
 
 cleanup_output(In) ->
@@ -121,12 +121,12 @@ run_cmd(Command, State, ShouldIncrement) ->
     riak_shell:loop_TEST(Cmd, State).
 
 print_error(Format, Cmd, Expected, Got) ->
-    lager:info(?PREFIX ++ "Match Failure"),
-    lager:info("**************************************************************"),
-    lager:info(Format, [Cmd]),
-    lager:info("Exp: ~s", [list_to_binary(lists:flatten(Expected))]),
-    lager:info("Got: ~s", [list_to_binary(lists:flatten(Got))]),
-    lager:info("**************************************************************").
+    logger:info(?PREFIX ++ "Match Failure"),
+    logger:info("**************************************************************"),
+    logger:info(Format, [Cmd]),
+    logger:info("Exp: ~s", [list_to_binary(lists:flatten(Expected))]),
+    logger:info("Got: ~s", [list_to_binary(lists:flatten(Got))]),
+    logger:info("**************************************************************").
 
 loop() ->
     Return = receive

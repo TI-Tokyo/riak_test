@@ -70,18 +70,18 @@ fullsync_test({ClusterNodes, PBA, PBB}) ->
     {LeaderA, LeaderB, ANodes, _BNodes} = ClusterNodes,
 
     %% Enable RT replication from cluster "A" to cluster "B"
-    lager:info("Enabling fullsync between ~p and ~p", [LeaderA, LeaderB]),
+    logger:info("Enabling fullsync between ~p and ~p", [LeaderA, LeaderB]),
     enable_fullsync(LeaderA, ANodes),
 
     Bucket = <<"fullsync-kicked">>,
 
-    lager:info("doing untyped puts on A, bucket:~p", [Bucket]),
+    logger:info("doing untyped puts on A, bucket:~p", [Bucket]),
 
     write_n(10, Bucket, PBA),
 
     BucketTyped = {?B_TYPE, <<"fullsync-typekicked">>},
 
-    lager:info("doing typed puts on A, bucket:~p", [BucketTyped]),
+    logger:info("doing typed puts on A, bucket:~p", [BucketTyped]),
 
     write_n(10, BucketTyped, PBA),
 
@@ -89,7 +89,7 @@ fullsync_test({ClusterNodes, PBA, PBB}) ->
                               start_and_wait_until_fullsync_complete,
                               [LeaderA]),
 
-    lager:info("Fullsync completed in ~p seconds", [SyncTime1/1000/1000]),
+    logger:info("Fullsync completed in ~p seconds", [SyncTime1/1000/1000]),
 
     read_verify_n(10, Bucket, PBB),
     read_verify_n(10, BucketTyped, PBB),
@@ -104,15 +104,15 @@ enable_fullsync(LeaderA, ANodes) ->
 
 %% @doc Connect two clusters using a given name.
 connect_cluster(Source, Port, Name) ->
-    lager:info("Connecting ~p to ~p for cluster ~p.",
-               [Source, Port, Name]),
+    logger:info("Connecting ~p to ~p for cluster ~p.",
+                [Source, Port, Name]),
     repl_util:connect_cluster(Source, "127.0.0.1", Port),
     ?assertEqual(ok, repl_util:wait_for_connection(Source, Name)).
 
 %% @doc Connect two clusters for replication using their respective leader nodes.
 connect_clusters(LeaderA, LeaderB) ->
     Port = repl_util:get_port(LeaderB),
-    lager:info("connect cluster A:~p to B on port ~p", [LeaderA, Port]),
+    logger:info("connect cluster A:~p to B on port ~p", [LeaderA, Port]),
     repl_util:connect_cluster(LeaderA, "127.0.0.1", Port),
     ?assertEqual(ok, repl_util:wait_for_connection(LeaderA, "B")).
 
@@ -125,16 +125,16 @@ make_clusters() ->
     NumNodes = rt_config:get(num_nodes, 2),
     ClusterASize = rt_config:get(cluster_a_size, 1),
 
-    lager:info("Deploy ~p nodes", [NumNodes]),
+    logger:info("Deploy ~p nodes", [NumNodes]),
     Nodes = deploy_nodes(NumNodes),
     {ANodes, BNodes} = lists:split(ClusterASize, Nodes),
-    lager:info("ANodes: ~p", [ANodes]),
-    lager:info("BNodes: ~p", [BNodes]),
+    logger:info("ANodes: ~p", [ANodes]),
+    logger:info("BNodes: ~p", [BNodes]),
 
-    lager:info("Build cluster A"),
+    logger:info("Build cluster A"),
     repl_util:make_cluster(ANodes),
 
-    lager:info("Build cluster B"),
+    logger:info("Build cluster B"),
     repl_util:make_cluster(BNodes),
 
     AFirst = hd(ANodes),
@@ -144,26 +144,26 @@ make_clusters() ->
     repl_util:name_cluster(AFirst, "A"),
     repl_util:name_cluster(BFirst, "B"),
 
-    lager:info("Waiting for convergence."),
+    logger:info("Waiting for convergence."),
     rt:wait_until_ring_converged(ANodes),
     rt:wait_until_ring_converged(BNodes),
 
-    lager:info("Waiting for transfers to complete."),
+    logger:info("Waiting for transfers to complete."),
     rt:wait_until_transfers_complete(ANodes),
     rt:wait_until_transfers_complete(BNodes),
 
     %% get the leader for the first cluster
-    lager:info("waiting for leader to converge on cluster A"),
+    logger:info("waiting for leader to converge on cluster A"),
     ?assertEqual(ok, repl_util:wait_until_leader_converge(ANodes)),
 
     %% get the leader for the second cluster
-    lager:info("waiting for leader to converge on cluster B"),
+    logger:info("waiting for leader to converge on cluster B"),
     ?assertEqual(ok, repl_util:wait_until_leader_converge(BNodes)),
 
     ALeader = repl_util:get_leader(hd(ANodes)),
     BLeader = repl_util:get_leader(hd(BNodes)),
 
-    lager:info("ALeader: ~p BLeader: ~p", [ALeader, BLeader]),
+    logger:info("ALeader: ~p BLeader: ~p", [ALeader, BLeader]),
     {ALeader, BLeader, ANodes, BNodes}.
 
 write_n(0, _B, _C) ->

@@ -40,12 +40,12 @@ confirm() ->
     {_KVBackendMod, KVDataDir} = backend_mod_dir(KVBackend),
     Bucket = <<"scotts_spam">>,
 
-    lager:info("Build a cluster"),
-    lager:info("ring_creation_size: ~p", [RingSize]),
-    lager:info("n_val: ~p", [NVal]),
-    lager:info("num nodes: ~p", [NumNodes]),
-    lager:info("riak_core handoff_concurrency: ~p", [HOConcurrency]),
-    lager:info("riak_core vnode_management_timer 1000"),
+    logger:info("Build a cluster"),
+    logger:info("ring_creation_size: ~p", [RingSize]),
+    logger:info("n_val: ~p", [NVal]),
+    logger:info("num nodes: ~p", [NumNodes]),
+    logger:info("riak_core handoff_concurrency: ~p", [HOConcurrency]),
+    logger:info("riak_core vnode_management_timer 1000"),
     Conf = [
             {riak_core,
              [
@@ -73,14 +73,14 @@ confirm() ->
         undefined ->
             ok;
         _ ->
-            lager:info("Set n_val to ~p", [NVal])
+            logger:info("Set n_val to ~p", [NVal])
     end,
 
-    lager:info("Insert Scott's spam emails"),
+    logger:info("Insert Scott's spam emails"),
     Pbc = rt:pbc(hd(Nodes)),
     rt:pbc_put_dir(Pbc, Bucket, SpamDir),
 
-    lager:info("Stash ITFs for each partition"),
+    logger:info("Stash ITFs for each partition"),
     %% @todo Should riak_test guarantee that the scratch pad is clean instead?
     ?assertCmd("rm -rf " ++ base_stash_path()),
     %% need to load the module so riak can see the fold fun
@@ -89,14 +89,14 @@ confirm() ->
     Owners = riak_core_ring:all_owners(Ring),
     [stash_data(riak_search, Owner) || Owner <- Owners],
 
-    lager:info("Stash KV data for each partition"),
+    logger:info("Stash KV data for each partition"),
     [stash_data(riak_kv, Owner) || Owner <- Owners],
 
     %% TODO: parameterize backend
-    lager:info("Emulate data loss for riak_kv, repair, verify correct data"),
+    logger:info("Emulate data loss for riak_kv, repair, verify correct data"),
     [kill_repair_verify(Owner, KVDataDir, riak_kv) || Owner <- Owners],
 
-    lager:info("TEST PASSED"),
+    logger:info("TEST PASSED"),
     pass.
 
 kill_repair_verify({Partition, Node}, DataSuffix, Service) ->
@@ -107,11 +107,11 @@ kill_repair_verify({Partition, Node}, DataSuffix, Service) ->
 
     %% kill the partition data
     Path = DataSuffix ++ "/" ++ integer_to_list(Partition),
-    lager:info("Killing data for ~p on ~p at ~s", [Partition, Node, Path]),
+    logger:info("Killing data for ~p on ~p at ~s", [Partition, Node, Path]),
     rt:clean_data_dir([Node], Path),
 
     %% force restart of vnode since some data is kept in memory
-    lager:info("Restarting ~p vnode for ~p on ~p", [Service, Partition, Node]),
+    logger:info("Restarting ~p vnode for ~p on ~p", [Service, Partition, Node]),
     {ok, Pid} = rpc:call(Node, riak_core_vnode_manager, get_vnode_pid,
                          [Partition, VNodeName]),
     ?assert(rpc:call(Node, erlang, exit, [Pid, kill_for_test])),
@@ -125,11 +125,11 @@ kill_repair_verify({Partition, Node}, DataSuffix, Service) ->
                                     [Partition, VNodeName])
                   end),
 
-    lager:info("Verify data is missing"),
+    logger:info("Verify data is missing"),
     ?assertEqual(0, count_data({Partition, Node})),
 
     %% repair the partition, ignore return for now
-    lager:info("Invoking repair for ~p on ~p", [Partition, Node]),
+    logger:info("Invoking repair for ~p on ~p", [Partition, Node]),
     %% TODO: Don't ignore return, check version of Riak and if greater
     %% or equal to 1.x then expect OK.
     Return = rpc:call(Node, riak_kv_vnode, repair, [Partition]),
@@ -138,18 +138,18 @@ kill_repair_verify({Partition, Node}, DataSuffix, Service) ->
     %% {ok, [{KPart, KNode}|_]} = Return,
     %% {ok, NewPid} = rpc:call(KNode, riak_core_vnode_manager, get_vnode_pid,
     %%                         [KPart, VNodeName]),
-    %% lager:info("killing src pid: ~p/~p ~p", [KNode, KPart, NewPid]),
+    %% logger:info("killing src pid: ~p/~p ~p", [KNode, KPart, NewPid]),
     %% KR = rpc:call(KNode, erlang, exit, [NewPid, kill]),
-    %% lager:info("result of kill: ~p", [KR]),
+    %% logger:info("result of kill: ~p", [KR]),
     %% timer:sleep(1000),
     %% ?assertNot(rpc:call(KNode, erlang, is_process_alive, [NewPid])),
 
 
-    lager:info("return value of repair_index ~p", [Return]),
-    lager:info("Wait for repair to finish"),
+    logger:info("return value of repair_index ~p", [Return]),
+    logger:info("Wait for repair to finish"),
     wait_for_repair({Partition, Node}, 30),
 
-    lager:info("Verify ~p on ~p is fully repaired", [Partition, Node]),
+    logger:info("Verify ~p on ~p is fully repaired", [Partition, Node]),
     Data2 = get_data({Partition, Node}),
     {Verified, NotFound} = dict:fold(verify(Node, Service, Data2), {0, []}, Stash),
 
@@ -157,7 +157,7 @@ kill_repair_verify({Partition, Node}, DataSuffix, Service) ->
         [] -> ok;
         _ ->
             NF = StashPath ++ ".nofound",
-            lager:info("Some data not found, writing that to ~s", [NF]),
+            logger:info("Some data not found, writing that to ~s", [NF]),
             ?assertEqual(ok, file:write_file(NF, io_lib:format("~p.", [NotFound])))
     end,
     %% NOTE: If the following assert fails then check the .notfound
@@ -166,7 +166,7 @@ kill_repair_verify({Partition, Node}, DataSuffix, Service) ->
     ?assertEqual({Service, ExpectToVerify}, {Service, Verified}),
 
     {ok, [{BeforeP, _BeforeOwner}=B, _, {AfterP, _AfterOwner}=A]} = Return,
-    lager:info("Verify before src partition ~p still has data", [B]),
+    logger:info("Verify before src partition ~p still has data", [B]),
     StashPathB = stash_path(Service, BeforeP),
     {ok, [StashB]} = file:consult(StashPathB),
     ExpectToVerifyB = dict:size(StashB),
@@ -182,7 +182,7 @@ kill_repair_verify({Partition, Node}, DataSuffix, Service) ->
     end,
     ?assertEqual(ExpectToVerifyB, VerifiedB),
 
-    lager:info("Verify after src partition ~p still has data", [A]),
+    logger:info("Verify after src partition ~p still has data", [A]),
     StashPathA = stash_path(Service, AfterP),
     {ok, [StashA]} = file:consult(StashPathA),
     ExpectToVerifyA = dict:size(StashA),
@@ -253,7 +253,7 @@ get_data({Partition, Node}) ->
 stash_data(Service, {Partition, Node}) ->
     File = stash_path(Service, Partition),
     ?assertEqual(ok, filelib:ensure_dir(File)),
-    lager:info("Stashing ~p/~p at ~p to ~p", [Service, Partition, Node, File]),
+    logger:info("Stashing ~p/~p at ~p to ~p", [Service, Partition, Node, File]),
     Postings = get_data({Partition, Node}),
     ?assertEqual(ok, file:write_file(File, io_lib:format("~p.", [Postings]))).
 

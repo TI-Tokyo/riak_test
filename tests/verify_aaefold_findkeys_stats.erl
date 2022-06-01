@@ -54,7 +54,7 @@
 
 confirm() ->
     
-    lager:info("Testing AAE with HTTP Client"),
+    logger:info("Testing AAE with HTTP Client"),
 
     ModH = rhc,
     NodesH = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD),
@@ -63,17 +63,17 @@ confirm() ->
     ok = verify_aae_fold(ModH, ClientH, NodesH),
     ok = verify_stats(ModH, ClientH, hd(NodesH)),
 
-    lager:info("Creating bucket types"),
+    logger:info("Creating bucket types"),
     rt:create_and_activate_bucket_type(hd(NodesH),
                                         <<"_maps">>, 
                                         [{datatype, map}, {allow_mult, true}]),
     
     ok = verify_stats_crdt(ModH, ClientH, hd(NodesH), <<"_maps">>),
 
-    lager:info("Cleaning cluster for next test"),
+    logger:info("Cleaning cluster for next test"),
     ok = rt:clean_cluster(NodesH),
 
-    lager:info("Testing AAE with PB Client"),
+    logger:info("Testing AAE with PB Client"),
     ModP = riakc_pb_socket,
     NodesP = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD),
     ClientP = rt:pbc(hd(NodesP)),
@@ -86,7 +86,7 @@ confirm() ->
 
 verify_aae_fold(Mod, Client, Nodes) ->
 
-    lager:info("Find Keys for no data "),
+    logger:info("Find Keys for no data "),
 
     {ok, {keys, SiblingCnts}} =
         Mod:aae_find_keys(Client, ?BUCKET, all, all, {sibling_count, 1}),
@@ -96,7 +96,7 @@ verify_aae_fold(Mod, Client, Nodes) ->
     ?assertEqual([], SiblingCnts),
     ?assertEqual([], ObjSize),
 
-    lager:info("Commencing object load"),
+    logger:info("Commencing object load"),
     KeyLoadFun =
         fun(Node, KeyCount) ->
                 KVs = test_data(KeyCount + 1,
@@ -107,17 +107,17 @@ verify_aae_fold(Mod, Client, Nodes) ->
         end,
 
     lists:foldl(KeyLoadFun, 0, Nodes),
-    lager:info("Loaded ~w objects", [?NUM_KEYS_PERNODE * length(Nodes)]),
+    logger:info("Loaded ~w objects", [?NUM_KEYS_PERNODE * length(Nodes)]),
 
     SibSize = 50,
-    lager:info("Add siblings with values of size ~w", [SibSize]),
+    logger:info("Add siblings with values of size ~w", [SibSize]),
     ExpectedSibs = write_siblings(hd(Nodes), SibSize),
 
-    lager:info("Find keys with siblings"),
+    logger:info("Find keys with siblings"),
     {ok, {keys, SiblingCnts2}} = 
         Mod:aae_find_keys(Client, ?BUCKET, all, all, {sibling_count, 1}),
     
-    lager:info("Expect only keys with siblings to be at least 160 bytes"),
+    logger:info("Expect only keys with siblings to be at least 160 bytes"),
     {ok, {keys, ObjSize2}} =
         Mod:aae_find_keys(Client, ?BUCKET, all, all, {object_size, 160}),
 
@@ -128,7 +128,7 @@ verify_aae_fold(Mod, Client, Nodes) ->
     ?assertEqual(ExpectedKeys, [K || {K, _S} <- ObjSize2]),
     [?assertMatch(S when S > 160, S) || {_K, S} <- ObjSize2],
 
-    lager:info("Find range of keys with siblings"),
+    logger:info("Find range of keys with siblings"),
     Range = {Lo, Hi} = {to_key(50), to_key(69)},
     ExpectedSibsRange = [{K, C} || {K, C} <- ExpectedSibs, K >= Lo, K =< Hi],
 
@@ -136,7 +136,7 @@ verify_aae_fold(Mod, Client, Nodes) ->
         Mod:aae_find_keys(Client, ?BUCKET, Range , all, {sibling_count, 1}),
     ?assertEqual(ExpectedSibsRange, SiblingCntsRange),
 
-    lager:info("Only keys from 95-100 should be returned as over 160 bytes"),
+    logger:info("Only keys from 95-100 should be returned as over 160 bytes"),
     {ok, {keys, ObjSizeRange}} =
         Mod:aae_find_keys(Client, ?BUCKET,
                             {to_key(95), to_key(105)}, all,
@@ -144,15 +144,15 @@ verify_aae_fold(Mod, Client, Nodes) ->
     ExpectedKeysRange = [to_key(N) || N <- lists:seq(95, 100)],
     ?assertEqual(ExpectedKeysRange, [K || {K, _S} <- ObjSizeRange]),
 
-    lager:info("Discover size of 60th object"),
+    logger:info("Discover size of 60th object"),
     {ok, {keys, ObjSize60L}} = 
         Mod:aae_find_keys(Client, ?BUCKET,
                             {to_key(60), to_key(60)}, all,
                             {object_size, 160}),
     [{_, Key60Size}] = ObjSize60L,
-    lager:info("60th object has size ~w", [Key60Size]),
+    logger:info("60th object has size ~w", [Key60Size]),
 
-    lager:info("find all keys bigger then the 60th with ~w byte margin",
+    logger:info("find all keys bigger then the 60th with ~w byte margin",
                 [SibSize]),
     {ok, {keys, ObjSizeBig}} =
         Mod:aae_find_keys(Client, ?BUCKET, all, all,
@@ -163,13 +163,13 @@ verify_aae_fold(Mod, Client, Nodes) ->
     ok.
 
 verify_stats(Mod, Client, Node) ->
-    lager:info("Taking initial timestamp for modified range"),
+    logger:info("Taking initial timestamp for modified range"),
     timer:sleep(1000),
     InitialTS = os:timestamp(),
-    lager:info("get stats"),
+    logger:info("get stats"),
     {ok, {stats, Stats}} =
         Mod:aae_object_stats(Client, ?BUCKET, all, all),
-    lager:info("Stats returned ~p", [Stats]),
+    logger:info("Stats returned ~p", [Stats]),
     %% Erm, what do we know? They should have keys
     ExpectedKeyNumber = ?NUM_KEYS_PERNODE * ?NUM_NODES,
     ?assertEqual(ExpectedKeyNumber, proplists:get_value(<<"total_count">>, Stats)),
@@ -179,7 +179,7 @@ verify_stats(Mod, Client, Node) ->
     ?assertMatch(L when is_list(L), proplists:get_value(<<"sizes">>, Stats)),
     ?assertMatch(L when is_list(L), proplists:get_value(<<"siblings">>, Stats)),
 
-    lager:info("Taking another timestamp for modified range"),
+    logger:info("Taking another timestamp for modified range"),
     timer:sleep(1000),
     NextTS = os:timestamp(),
     {ok, {stats, NoStats}} =
@@ -187,10 +187,10 @@ verify_stats(Mod, Client, Node) ->
                                 convert_to_modified_range(InitialTS, NextTS)),
     ?assertEqual(0, proplists:get_value(<<"total_count">>, NoStats)),
 
-    lager:info("Add more siblings"),
+    logger:info("Add more siblings"),
     write_siblings(Node, 40),
 
-    lager:info("Taking closing timestamp for modified range"),
+    logger:info("Taking closing timestamp for modified range"),
     timer:sleep(1000),
     LastTS = os:timestamp(),
 
@@ -202,7 +202,7 @@ verify_stats(Mod, Client, Node) ->
     ok.
 
 verify_stats_crdt(Mod, ClientH, Node, Type) ->
-    lager:info("Taking initial timestamp for modified range"),
+    logger:info("Taking initial timestamp for modified range"),
     timer:sleep(1000),
     InitialTS = os:timestamp(),
     ClientP = rt:pbc(Node),
@@ -239,14 +239,14 @@ verify_stats_crdt(Mod, ClientH, Node, Type) ->
         [{{<<"followers">>, counter}, 10},
             {{<<"friends">>, set}, [<<"Russell">>]},
             {{<<"name">>, register}, <<"Original">>}],
-    lager:info("Read own write"),
+    logger:info("Read own write"),
     nextgenrepl_rtq_autocrdt:check_value(ClientP,
                                             riakc_pb_socket,
                                             {<<"_maps">>, <<"test_map">>},
                                             <<"TestKey">>,
                                             riakc_map,
                                             ExpVal1),
-    lager:info("Taking another timestamp for modified range"),
+    logger:info("Taking another timestamp for modified range"),
     timer:sleep(1000),
     NextTS = os:timestamp(),
     {ok, {stats, OneMap}} =

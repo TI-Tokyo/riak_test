@@ -10,10 +10,10 @@ confirm() ->
     BinSize = rt_config:get(perf_bin_size),
 
     Config = rtperf:standard_config(Count),
-    lager:info("Generated configuration is: ~p", [Config]),
+    logger:info("Generated configuration is: ~p", [Config]),
 
     [Nodes] = rt:build_clusters([Count]),
-    lager:info("Built cluster: ~p", [Nodes]),
+    logger:info("Built cluster: ~p", [Nodes]),
 
     SetSize = rtperf:target_size(rt_config:get(perf_target_pct),
                                  BinSize,

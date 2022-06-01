@@ -109,7 +109,7 @@ mapred_tester(Node, Count, Pid, Vsn, ReportPid) ->
         {ok, [{1, [10000]}]} ->
             ok;
         {ok, R} ->
-            lager:warning("Bad MR result: ~p", [R]),
+            logger:warning("Bad MR result: ~p", [R]),
             ReportPid ! {mapred, Node, bad_result};
         {error, disconnected} ->
             ok;
@@ -144,7 +144,7 @@ mapred_tester(Node, Count, Pid, Vsn, ReportPid) ->
     mapred_tester(Node, Count + 1, PBC, Vsn, ReportPid).
 
 twoi_tester(Node, 0, undefined, legacy, ReportPid) ->
-    lager:warning("Legacy nodes do not have 2i load applied"),
+    logger:warning("Legacy nodes do not have 2i load applied"),
     twoi_tester(Node, 1, undefined, legacy, ReportPid);
 twoi_tester(Node, Count, Pid, legacy, ReportPid) ->
     twoi_tester(Node, Count + 1, Pid, legacy, ReportPid);
@@ -187,7 +187,7 @@ twoi_tester(Node, Count, Pid, Vsn, ReportPid) ->
 assert_equal(Expected, Actual) ->
     case Expected -- Actual of
         [] -> ok;
-        Diff -> lager:info("Expected -- Actual: ~p", [Diff])
+        Diff -> logger:info("Expected -- Actual: ~p", [Diff])
     end,
     Actual == Expected.
 

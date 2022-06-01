@@ -148,7 +148,7 @@ big_circle_tests(Nodes) ->
                            end}
     ],
     lists:foreach(fun({Name, Eval}) ->
-        lager:info("===== big circle: ~s =====", [Name]),
+        logger:info("===== big circle: ~s =====", [Name]),
         Eval()
                   end, Tests).
 

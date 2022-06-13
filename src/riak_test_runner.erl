@@ -74,16 +74,24 @@ confirm(TestModule, TestType, Outdir, TestMetaData, HarnessArgs)
                 {fail, all_prereqs_not_present}
         end,
 
-    logger:notice("~s Test Run Complete ~p", [TestModule, Status]),
-    {ok, ThisModLogContent} = file:read_file(ThisModLog),
-    file:delete(ThisModLog),
+    logger:notice("---------------- ~s Test Run Complete: ~p", [TestModule, Status]),
 
     RetList = [{test, TestModule}, {status, Status}, {backend, Backend},
-               {logs, ThisModLogContent} | proplists:delete(backend, TestMetaData)],
+               {logs, get_test_logs(ThisModLog)} | proplists:delete(backend, TestMetaData)],
     case Status of
         fail -> RetList ++ [{reason, iolist_to_binary(io_lib:format("~p", [Reason]))}];
         _ -> RetList
     end.
+
+get_test_logs(ThisModLog) ->
+    case file:read_file(ThisModLog) of
+        {ok, Log} ->
+            Log;
+        {error, enoent} ->
+            logger:notice("test ~s did not profuce any logs", [ThisModLog]),
+            []
+    end.
+
 
 %% does some group_leader swapping, in the style of EUnit.
 execute(TestModule, TestType, {Mod, Fun}, TestMetaData) ->

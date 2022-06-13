@@ -276,8 +276,12 @@ get_test_with_valid_prefix(Test, [FirstPath|Rest]) ->
 which_tests_to_run(undefined, CommandLineTests) ->
     {Tests, NonTests} =
         lists:foldl(fun is_runnable/2, {[], []}, CommandLineTests),
-    logger:info("These modules are not runnable tests: ~p",
-                [[NTMod || {NTMod, _} <- NonTests]]),
+    if NonTests /= [] ->
+            logger:info("These modules are not runnable tests: ~p",
+                        [[NTMod || {NTMod, _} <- NonTests]]);
+       true ->
+            ok
+    end,
     Tests;
 which_tests_to_run(Platform, []) -> giddyup:get_suite(Platform);
 which_tests_to_run(Platform, CommandLineTests) ->
@@ -286,8 +290,12 @@ which_tests_to_run(Platform, CommandLineTests) ->
         lists:foldl(fun is_runnable/2, {[], []},
                         lists:foldr(fun filter_merge_tests/2, [], Suite)),
 
-    logger:info("These modules are not runnable tests: ~p",
-                [[NTMod || {NTMod, _} <- NonTests]]),
+    if NonTests /= [] ->
+            logger:info("These modules are not runnable tests: ~p",
+                        [[NTMod || {NTMod, _} <- NonTests]]);
+       el/=se ->
+            fine
+    end,
     Tests.
 
 filter_zip_suite(Platform, CommandLineTests) ->

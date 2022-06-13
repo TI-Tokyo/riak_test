@@ -158,7 +158,7 @@ confirm_delete(C, {Pooter1, Pooter2, Timepoint, _} = Record) ->
 
 confirm_nx_delete(C) ->
     ?assertEqual(
-        ok,
+        {error, {1021,<<"notfound">>}},
         riakc_ts:delete(C, ?BUCKET, ?BADKEY, [])
     ),
     ok.

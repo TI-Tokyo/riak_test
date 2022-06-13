@@ -43,7 +43,6 @@ run_tests(PvalP1, PvalP2) ->
     application:set_env(riakc, allow_listing, true),
 
     Data = make_data(PvalP1, PvalP2),
-    io:format("Data to be written:\n~p\n...\n~p\n", [hd(Data), lists:last(Data)]),
 
     Cluster = ts_setup:start_cluster(3),
 

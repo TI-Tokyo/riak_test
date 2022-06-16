@@ -61,7 +61,7 @@ confirm(TestModule, TestType, Outdir, TestMetaData, HarnessArgs)
     {Status, Reason} =
         case check_prereqs(Mod) of
             true ->
-                logger:notice("Running Test ~s", [TestModule]),
+                logger:notice("================== BEGIN TEST ~s ==========", [TestModule]),
                 execute(TestModule, TestType, {Mod, Fun}, TestMetaData);
             not_present ->
                 {fail, test_does_not_exist};
@@ -70,9 +70,9 @@ confirm(TestModule, TestType, Outdir, TestMetaData, HarnessArgs)
         end,
     logger:remove_handler(tested_mod_capture),
 
-    logger:notice("---------------- ~s Test Run Complete: ~p", [TestModule, Status]),
+    logger:notice("------------------ END TEST ~s (~p) -------", [TestModule, Status]),
 
-    RetList = [{test, TestModule}, {status, Status}, {backend, Backend},
+    RetList = [{test, TestModule}, {status, Status},
                {logs, get_test_logs(ThisModLog)} | proplists:delete(backend, TestMetaData)],
     case Status of
         fail -> RetList ++ [{reason, iolist_to_binary(io_lib:format("~p", [Reason]))}];
@@ -97,12 +97,12 @@ execute(TestModule, TestType, {Mod, Fun}, TestMetaData) ->
     group_leader(NewGroupLeader, self()),
 
     UName = os:cmd("uname -a"),
-    logger:info("Test Runner `uname -a` : ~s", [UName]),
+    logger:info("Test Runner `uname -a`: ~s", [UName]),
 
     Pid = case TestType of
               riak_test   -> spawn_link(?MODULE, return_to_exit, [Mod, Fun, []]);
               common_test -> spawn_link(?MODULE, run_common_test, [TestModule])
-   end,
+          end,
     Ref = case rt_config:get(test_timeout, undefined) of
         Timeout when is_integer(Timeout) ->
             erlang:send_after(Timeout, self(), test_took_too_long);
@@ -120,11 +120,11 @@ execute(TestModule, TestType, {Mod, Fun}, TestMetaData) ->
     riak_test_group_leader:tidy_up(OldGroupLeader),
     case Status of
         fail ->
-            ErrorHeader = "================ " ++ atom_to_list(TestModule) ++ 
+            ErrorHeader = "================ " ++ atom_to_list(TestModule) ++
                 " failure stack trace =====================",
             ErrorFooter = [ $= || _X <- lists:seq(1,length(ErrorHeader))],
-            Error = io_lib:format("~n~s~n~p~n~s~n", [ErrorHeader, Reason, ErrorFooter]),
-            logger:error(Error);
+            Error = io_lib:format("\n~s\n~p\n~s\n\n", [ErrorHeader, Reason, ErrorFooter]),
+            io:format(Error);
         _ -> meh
     end,
     {Status, Reason}.
@@ -148,11 +148,11 @@ run_common_test(TestModule) ->
                            ]}
            ],
     case ct:run_test(Opts) of
-        {Pass, 0, {UserSkip, 0}} -> 
+        {Pass, 0, {UserSkip, 0}} ->
             ct:print(default, info,"Common Test: all passed ~p skipped ~p at the users request~n", [Pass, UserSkip]),
             'pass all the tests';
         {Pass, Fail, {UserSkip, AutoSkip}} ->
-            ct:print(default, info,"Common Test: passed ~p failed ~p common test skipped ~p skipped at the users request ~p~n", 
+            ct:print(default, info,"Common Test: passed ~p failed ~p common test skipped ~p skipped at the users request ~p~n",
                       [Pass, Fail, UserSkip, AutoSkip]),
             exit('tests failing');
         Other ->
@@ -183,7 +183,6 @@ rec_loop(Pid, TestModule, TestMetaData) ->
             rec_loop(Pid, TestModule, TestMetaData);
         {'EXIT', Pid, normal} -> {pass, undefined};
         {'EXIT', Pid, Error} ->
-            logger:warning("~s failed: ~p", [TestModule, Error]),
             {fail, Error}
     end.
 
@@ -206,7 +205,12 @@ check_prereqs(Module) ->
         Attrs ->
             Prereqs = proplists:get_all_values(prereq, Attrs),
             P2 = [ {Prereq, rt_local:which(Prereq)} || Prereq <- Prereqs],
-            logger:info("~s prereqs: ~p", [Module, P2]),
+            case P2 of
+                [] ->
+                    logger:debug("~s has no prereqs", [P2]);
+                _ ->
+                    logger:info("~s prereqs: ~p", [Module, P2])
+            end,
             [ logger:warning("~s prereq '~s' not installed.", [Module, P]) || {P, false} <- P2],
             lists:all(fun({_, Present}) -> Present end, P2)
     catch

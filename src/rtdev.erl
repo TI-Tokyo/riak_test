@@ -89,8 +89,8 @@ setup_harness(_Test, _Args) ->
     %% otherwise, if the next test boots a legacy node we'll end up with cover
     %% incompatabilities and crash the cover server
     rt_cover:maybe_stop_on_nodes(),
-    %% Stop all discoverable nodes, not just nodes we'll be using for this test.
-    rt:pmap(fun(X) -> stop_all(X ++ "/dev") end, devpaths()),
+    %% %% Stop all discoverable nodes, not just nodes we'll be using for this test.
+    %% rt:pmap(fun(X) -> stop_all(X ++ "/dev") end, devpaths()),
 
     logger:info("Cleaning up lingering pipe directories"),
     rt:pmap(fun(Dir) ->
@@ -197,16 +197,8 @@ copy_node_conf(NodeNum, FromPath, ToPath) ->
     ok.
 
 -spec set_conf(atom() | string(), [{string(), string()}]) -> ok.
-set_conf(all, NameValuePairs) ->
-    logger:info("rtdev:set_conf(all, ~p)", [NameValuePairs]),
-    [ set_conf(DevPath, NameValuePairs) || DevPath <- devpaths()],
-    ok;
 set_conf(Node, NameValuePairs) when is_atom(Node) ->
     append_to_conf_file(get_riak_conf(Node), NameValuePairs),
-    ok;
-set_conf(DevPath, NameValuePairs) ->
-    [append_to_conf_file(RiakConf, NameValuePairs)
-     || RiakConf <- all_the_files(DevPath, "etc/riak.conf")],
     ok.
 
 set_advanced_conf(all, NameValuePairs) ->
@@ -215,17 +207,6 @@ set_advanced_conf(all, NameValuePairs) ->
     ok;
 set_advanced_conf(Node, NameValuePairs) when is_atom(Node) ->
     update_app_config_file(get_advanced_riak_conf(Node), NameValuePairs),
-    ok;
-set_advanced_conf(DevPath, NameValuePairs) ->
-    AdvancedConfs = case all_the_files(DevPath, "etc/advanced.config") of
-                        [] ->
-                            %% no advanced conf? But we _need_ them, so make 'em
-                            make_advanced_confs(DevPath);
-                        Confs ->
-                            Confs
-                    end,
-    logger:info("AdvancedConfs = ~p~n", [AdvancedConfs]),
-    [update_app_config_file(RiakConf, NameValuePairs) || RiakConf <- AdvancedConfs],
     ok.
 
 make_advanced_confs(DevPath) ->
@@ -261,29 +242,9 @@ append_to_conf_file(File, NameValuePairs) ->
                   || {Name, Value} <- NameValuePairs]),
     file:write_file(File, Settings, [append]).
 
-all_the_files(DevPath, File) ->
-    case filelib:is_dir(DevPath) of
-        true ->
-            Wildcard = io_lib:format("~s/dev/dev*/riak/~s", [DevPath, File]),
-            filelib:wildcard(Wildcard);
-        _ ->
-            logger:debug("~s is not a directory.", [DevPath]),
-            []
-    end.
-
-all_the_app_configs(DevPath) ->
-    AppConfigs = all_the_files(DevPath, "etc/app.config"),
-    case length(AppConfigs) =:= 0 of
-        true ->
-            AdvConfigs = filelib:wildcard(DevPath ++ "/dev/dev*/riak/etc"),
-            [ filename:join(AC, "advanced.config") || AC <- AdvConfigs];
-        _ ->
-            AppConfigs
-    end.
-
-update_app_config(all, Config) ->
-    logger:info("rtdev:update_app_config(all, ~p)", [Config]),
-    [ update_app_config(DevPath, Config) || DevPath <- devpaths()];
+%% update_app_config(all, Config) ->
+%%     logger:debug("rtdev:update_app_config(all, ~p)", [Config]),
+%%     [ update_app_config(DevPath, Config) || DevPath <- devpaths()];
 update_app_config(Node, Config) when is_atom(Node) ->
     N = node_id(Node),
     Path = relpath(node_version(N)),
@@ -298,9 +259,7 @@ update_app_config(Node, Config) when is_atom(Node) ->
             update_app_config_file(AppConfigFile, Config);
         _ ->
             update_app_config_file(AdvConfigFile, Config)
-    end;
-update_app_config(DevPath, Config) ->
-    [update_app_config_file(AppConfig, Config) || AppConfig <- all_the_app_configs(DevPath)].
+    end.
 
 update_app_config_file(ConfigFile, Config) ->
     logger:debug("rtdev:update_app_config_file(~s, ~p)", [ConfigFile, Config]),

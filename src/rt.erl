@@ -239,8 +239,6 @@ str_mult(String, Substrs) ->
     lists:any(fun(S) -> str(String, S) end, Substrs).
 
 -spec set_conf(atom(), [{string(), string()}]) -> ok.
-set_conf(all, NameValuePairs) ->
-    ?HARNESS:set_conf(all, NameValuePairs);
 set_conf(Node, NameValuePairs) when is_atom(Node) ->
     stop(Node),
     ?assertEqual(ok, rt:wait_until_unpingable(Node)),
@@ -248,8 +246,6 @@ set_conf(Node, NameValuePairs) when is_atom(Node) ->
     start(Node).
 
 -spec set_advanced_conf(atom(), [{string(), string()}]) -> ok.
-set_advanced_conf(all, NameValuePairs) ->
-    ?HARNESS:set_advanced_conf(all, NameValuePairs);
 set_advanced_conf(Node, NameValuePairs) when is_atom(Node) ->
     stop(Node),
     ?assertEqual(ok, rt:wait_until_unpingable(Node)),
@@ -258,8 +254,6 @@ set_advanced_conf(Node, NameValuePairs) when is_atom(Node) ->
 
 %% @doc Rewrite the given node's app.config file, overriding the varialbes
 %%      in the existing app.config with those in `Config'.
-update_app_config(all, Config) ->
-    ?HARNESS:update_app_config(all, Config);
 update_app_config(Node, Config) ->
     stop(Node),
     ?assertEqual(ok, rt:wait_until_unpingable(Node)),

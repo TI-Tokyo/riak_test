@@ -68,6 +68,7 @@ confirm(TestModule, TestType, Outdir, TestMetaData, HarnessArgs)
             _ ->
                 {fail, all_prereqs_not_present}
         end,
+    logger:remove_handler(tested_mod_capture),
 
     logger:notice("---------------- ~s Test Run Complete: ~p", [TestModule, Status]),
 

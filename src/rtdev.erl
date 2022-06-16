@@ -455,6 +455,8 @@ gen_stop_fun(Timeout) ->
                     %% below will timeout and the process will get cleaned
                     %% up by the kill_stragglers/2 function
                     wait_for_pid(PidStr, Timeout);
+                {badrpc, nodedown} ->
+                    ok;
                 BadRpc ->
                     Cmd = C ++ "/bin/riak stop",
                     logger:debug("RPC to node ~p returned ~p, will try stop anyway... ~s",

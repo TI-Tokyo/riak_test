@@ -452,6 +452,7 @@ deploy_nodes(NodeConfig) ->
     rt_config:set(rt_versions, VersionMap),
 
     create_dirs(Nodes),
+    clean_data_dir(Nodes, ""),
 
     %% Set initial config
     add_default_node_config(Nodes),

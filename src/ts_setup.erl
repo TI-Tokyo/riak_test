@@ -40,8 +40,6 @@ start_cluster(NumNodes) ->
 -spec start_cluster(NumNodes :: pos_integer(),
                     Config :: list(tuple())) -> list(node()).
 start_cluster(NumNodes, Config) ->
-    rt:set_backend(eleveldb),
-    logger:info("Building cluster of ~p~n", [NumNodes]),
     rt:build_cluster(NumNodes, Config).
 
 -spec conn(list(node())) -> pid().

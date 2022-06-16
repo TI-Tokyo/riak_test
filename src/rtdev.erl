@@ -319,15 +319,13 @@ update_app_config_file(ConfigFile, Config) ->
     NewConfigOut = io_lib:format("~p.", [NewConfig]),
     ?assertEqual(ok, file:write_file(ConfigFile, NewConfigOut)),
     ok.
-get_backends() ->
-    lists:usort(
-        lists:flatten([ get_backends(DevPath) || DevPath <- devpaths()])).
 
-get_backends(DevPath) ->
-    rt:pmap(fun get_backend/1, all_the_app_configs(DevPath)).
+get_backend(Node) ->
+    N = node_id(Node),
+    Path = relpath(node_version(N)),
+    AppConfig = io_lib:format("~s/dev/dev~b/riak/etc/~s.config", [Path, N, "advanced"]),
 
-get_backend(AppConfig) ->
-    logger:info("get_backend(~s)", [AppConfig]),
+    logger:debug("get_backend(~s)", [AppConfig]),
     Tokens = lists:reverse(filename:split(AppConfig)),
     ConfigFile = case Tokens of
         ["app.config"| _ ] ->
@@ -761,14 +759,15 @@ check_node({_N, Version}) ->
         _ -> ok
     end.
 
-set_backend(Backend) ->
-    set_backend(Backend, []).
+%% not applicable for riak_ts
+set_backend(Node, Backend) ->
+    set_backend(Node, Backend, []).
 
-set_backend(Backend, OtherOpts) ->
-    logger:info("rtdev:set_backend(~p, ~p)", [Backend, OtherOpts]),
+set_backend(Node, Backend, OtherOpts) ->
+    logger:debug("rtdev:set_backend(~p, ~p, ~p)", [Node, Backend, OtherOpts]),
     Opts = [{storage_backend, Backend} | OtherOpts],
-    update_app_config(all, [{riak_kv, Opts}]),
-    get_backends().
+    update_app_config(Node, [{riak_kv, Opts}]),
+    get_backend(Node).
 
 %% @doc Read the VERSION file from an arbitrarily tagged
 %% version (e.g. current,

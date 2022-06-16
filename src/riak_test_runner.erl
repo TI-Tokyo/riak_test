@@ -46,11 +46,6 @@ confirm(TestModule, TestType, Outdir, TestMetaData, HarnessArgs)
   when TestType =:= riak_test orelse
        TestType =:= common_test ->
     rt:setup_harness(TestModule, HarnessArgs),
-    BackendExtras = case proplists:get_value(multi_config, TestMetaData) of
-                        undefined -> [];
-                        Value -> [{multi_config, Value}]
-                    end,
-    Backend = rt:set_backend(proplists:get_value(backend, TestMetaData), BackendExtras),
     {Mod, Fun} = function_name(TestModule),
     ThisModLog = filename:join([Outdir, atom_to_list(TestModule) ++ "-test.log"]),
     logger:add_handler(

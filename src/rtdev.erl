@@ -107,6 +107,11 @@ setup_harness(_Test, _Args) ->
     lists:map(fun(X) -> clean_data_dir_all(X) end,
               devpaths()),
 
+    NodesN = lists:seq(1, 8),
+    Nodes = [?DEV(N) || N <- NodesN],
+    NodeMap = orddict:from_list(lists:zip(Nodes, NodesN)),
+    rt_config:set(rt_nodes, NodeMap),
+
     ok.
 
 clean_data_dir_all(DevPath) ->
@@ -434,17 +439,16 @@ deploy_clusters(ClusterConfigs) ->
 
 deploy_nodes(NodeConfig) ->
     Path = relpath(root),
-    logger:info("Riak path: ~p", [Path]),
+    logger:debug("Riak path: ~p", [Path]),
     NumNodes = length(NodeConfig),
     NodesN = lists:seq(1, NumNodes),
     Nodes = [?DEV(N) || N <- NodesN],
-    NodeMap = orddict:from_list(lists:zip(Nodes, NodesN)),
     {Versions, Configs} = lists:unzip(NodeConfig),
     VersionMap = lists:zip(NodesN, Versions),
 
     %% Check that you have the right versions available
     [ check_node(Version) || Version <- VersionMap ],
-    rt_config:set(rt_nodes, NodeMap),
+
     rt_config:set(rt_versions, VersionMap),
 
     create_dirs(Nodes),
@@ -901,6 +905,9 @@ search_file(Device, File, Pattern, LineNum, Accum) ->
 -spec node_name(node()) -> string().
 node_name(Node) ->
     lists:takewhile(fun(C) -> C /= $@ end, atom_to_list(Node)).
+
+node_by_idx(N) ->
+    ?DEV(N).
 
 -ifdef(TEST).
 

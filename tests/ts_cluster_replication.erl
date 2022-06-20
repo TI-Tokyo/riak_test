@@ -35,7 +35,6 @@
              wait_until_no_pending_changes/1]).
 
 confirm() ->
-    rt:set_backend(eleveldb),
     NumNodes = rt_config:get(num_nodes, 6),
     ClusterASize = rt_config:get(cluster_a_size, 3),
 

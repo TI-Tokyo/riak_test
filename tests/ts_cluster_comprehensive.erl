@@ -177,7 +177,6 @@ confirm_select(C, PvalP1, PvalP2, Options) ->
             ?PKEY_P1, PvalP1,
             ?PKEY_P2, PvalP2,
             ?PKEY_P3, ?TIMEBASE + 10, ?PKEY_P3, ?TIMEBASE + 20])),
-    io:format("Running query: ~ts\n", [Query]),
     {ok, {_Columns, Rows}} = riakc_ts:query(C, Query, Options),
     io:format("Got ~b rows back\n~p\n", [length(Rows), Rows]),
     ?assertEqual(10 - 1 - 1, length(Rows)),

@@ -52,7 +52,6 @@ confirm() ->
 
 %%
 shuffle_list(List) ->
-    rand:seed(),
     RSeqd1 = [{rand:uniform(), E} || E <- List],
     RSeqd2 = lists:sort(RSeqd1),
     [E || {_, E} <- RSeqd2].

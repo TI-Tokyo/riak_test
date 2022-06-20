@@ -39,10 +39,7 @@ confirm() ->
     Got1 = ts_setup:activate_bucket_type(Cluster, Table),
     ?assertEqual(Expected1, Got1),
 
-    Expected2 =
-        {ok,
-         "Error creating bucket type GeoCheckin:\n"
-         "already_active\n"},
-    Got2 = ts_setup:create_bucket_type(Cluster, DDL, Table),
-    ?assertEqual(Expected2, Got2),
+    Expected2 = "already_active",
+    {ok, Got2} = ts_setup:create_bucket_type(Cluster, DDL, Table),
+    ?assert(string:str(Got2, Expected2) > 0),
     pass.

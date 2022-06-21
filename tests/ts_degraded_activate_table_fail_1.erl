@@ -30,12 +30,12 @@
 
 confirm() ->
     DDL = ts_data:get_ddl(),
-    Expected = {ok, "GeoCheckin has been created but cannot be activated yet\n"},
+    Expected = "GeoCheckin has been created but cannot be activated yet",
 
     [_Node|Rest]= Cluster = ts_setup:start_cluster(3),
     ok = rt:stop(hd(tl(Rest))),
     Table = ts_data:get_default_bucket(),
-    {ok,_} = ts_setup:create_bucket_type(Cluster, DDL, Table),
-    Got = ts_setup:activate_bucket_type(Cluster, Table),
-    ?assertEqual(Expected, Got),
+    {ok, _} = ts_setup:create_bucket_type(Cluster, DDL, Table),
+    {ok, Got} = ts_setup:activate_bucket_type(Cluster, Table),
+    ?assert(string:str(Got, Expected) > 0),
     pass.

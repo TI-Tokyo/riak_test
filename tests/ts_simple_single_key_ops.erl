@@ -121,7 +121,7 @@ delete_single_key_def_3_test(Pid) ->
 
 
 create_table_def_4(Pid) ->
-    ?assertEqual({ok, {[],[]}}, riakc_ts:query(Pid, 
+    ?assertEqual({ok, {[],[]}}, riakc_ts:query(Pid,
         "CREATE TABLE table4 ("
         "a SINT64 NOT NULL, "
         "b SINT64 NOT NULL, "

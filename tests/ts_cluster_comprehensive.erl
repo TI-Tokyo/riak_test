@@ -80,7 +80,7 @@ confirm_all_from_node(Node, Data, PvalP1, PvalP2) ->
     %% 3. list keys and delete one
     ok = confirm_nx_list_keys(C),
     {ok, First} = confirm_list_keys(C, ?LIFESPAN),
-    io:format("Before delete = ~p", [length(First)]),
+    ?assertEqual(300, length(First)),
 
     ok = confirm_delete(C, lists:nth(14, Data)),
     ok = confirm_nx_delete(C),

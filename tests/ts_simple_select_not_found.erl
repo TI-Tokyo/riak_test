@@ -47,7 +47,7 @@ confirm() ->
     Cluster = ts_setup:start_cluster(1),
     ts_setup:create_bucket_type(Cluster, DDL, Table),
     ts_setup:activate_bucket_type(Cluster, Table),
-    ts_ops:put(Cluster, Table, Data),
+    ?assertEqual(ok, ts_ops:put(Cluster, Table, Data)),
     Got = ts_ops:query(Cluster, Qry),
     ?assertEqual(Expected, Got),
     pass.

@@ -43,9 +43,9 @@ query(Nodes, Qry) ->
     query(Nodes, Qry, []).
 
 query(Nodes, Qry, Options) ->
-    logger:info("Running query: \"~s\"", [Qry]),
+    logger:info("Running query: \"~999s\"", [Qry]),
     Got = riakc_ts:query(ts_setup:conn(Nodes), Qry, [], undefined, Options),
-    logger:info("Result is ~p", [Got]),
+    logger:info("Result is ~999p", [Got]),
     Got.
 
 insert_term_format(Data, Acc) when is_binary(Data) ->

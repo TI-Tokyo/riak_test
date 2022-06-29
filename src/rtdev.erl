@@ -379,7 +379,7 @@ add_default_node_config(Nodes) ->
     end.
 
 deploy_clusters(ClusterConfigs) ->
-    NumNodes = rt_config:get(num_nodes, 6),
+    NumNodes = rt_config:get(num_nodes),
     RequestedNodes = lists:flatten(ClusterConfigs),
 
     case length(RequestedNodes) > NumNodes of

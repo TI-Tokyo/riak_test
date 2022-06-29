@@ -426,6 +426,8 @@ deploy_nodes(NodeConfig) ->
     %% create snmp dirs, for EE
     create_dirs(Nodes),
 
+    create_or_restore_config_backups(Nodes),
+
     %% Start nodes
     %%[run_riak(N, relpath(node_version(N)), "start") || N <- Nodes],
     lists:map(fun(N) -> run_riak(N, relpath(node_version(N)), "start") end, NodesN),
@@ -442,6 +444,25 @@ deploy_nodes(NodeConfig) ->
 
     logger:info("Deployed nodes: ~p", [Nodes]),
     Nodes.
+
+create_or_restore_config_backups(Nodes) ->
+    lists:foreach(
+      fun(Node) ->
+              NodePath = node_path(Node),
+              ConfFile = io_lib:format("~s/etc/riak.conf", [NodePath]),
+              AdvCfgFile = io_lib:format("~s/etc/advanced.config", [NodePath]),
+              [begin
+                   case filelib:is_regular(F ++ ".backup") of
+                       true ->
+                           logger:debug("found existing backup of ~s; restoring it", [F]),
+                           [] = os:cmd(io_lib:format("cp -a \"~s.backup\" \"~s\"", [F, F]));
+                       false ->
+                           logger:debug("backing up ~s", [F]),
+                           [] = os:cmd(io_lib:format("cp -a \"~s\" \"~s.backup\"", [F, F]))
+                   end
+               end || F <- [ConfFile, AdvCfgFile]]
+      end,
+      Nodes).
 
 gen_stop_fun(Timeout) ->
     fun({C,Node}) ->

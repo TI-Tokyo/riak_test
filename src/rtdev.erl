@@ -397,7 +397,6 @@ deploy_clusters(ClusterConfigs) ->
 
 deploy_nodes(NodeConfig) ->
     Path = relpath(root),
-    logger:debug("Riak path: ~p", [Path]),
     NumNodes = length(NodeConfig),
     NodesN = lists:seq(1, NumNodes),
     Nodes = [?DEV(N) || N <- NodesN],

@@ -180,7 +180,7 @@ maybe_start_on_node(Node, Version) ->
         {current, _} -> true;
         _            -> false
     end,
-    CoverMods = cover:modules(), 
+    CoverMods = cover:modules(),
     ShouldStart = IsCurrent andalso
                   CoverMods /= [] andalso
                   erlang:whereis(?COVER_SERVER) /= undefined,
@@ -188,8 +188,8 @@ maybe_start_on_node(Node, Version) ->
         false ->
             ok;
         true ->
-            logger:info("Cover modules on start ~w~n", [CoverMods]),
-            logger:info("CoverServer is ~w~n", [erlang:whereis(?COVER_SERVER)]),
+            logger:info("Cover modules on start ~w", [CoverMods]),
+            logger:info("CoverServer is ~w", [erlang:whereis(?COVER_SERVER)]),
             logger:info("Starting cover on node ~p", [Node]),
             rt:wait_until_pingable(Node),
             {ok, _Node} = cover:start(Node),

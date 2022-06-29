@@ -78,7 +78,7 @@ overload_config() ->
                 {anti_entropy_concurrency, 100},
                 {anti_entropy_tick, 100},
                 {anti_entropy, {on, []}},
-                {anti_entropy_timeout, 5000}]}, 
+                {anti_entropy_timeout, 5000}]},
      {riak_api, [{pb_backlog, 1024}]}].
 
 generate_mixed_rw_traffic(Nodes, Table) ->

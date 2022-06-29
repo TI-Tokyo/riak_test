@@ -428,8 +428,7 @@ deploy_nodes(NodeConfig) ->
     create_or_restore_config_backups(Nodes),
 
     %% Start nodes
-    %%[run_riak(N, relpath(node_version(N)), "start") || N <- Nodes],
-    lists:map(fun(N) -> run_riak(N, relpath(node_version(N)), "start") end, NodesN),
+    rt:pmap(fun(N) -> run_riak(N, relpath(node_version(N)), "start") end, NodesN),
 
     %% Ensure nodes started
     [ok = rt:wait_until_pingable(N) || N <- Nodes],

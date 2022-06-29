@@ -36,6 +36,11 @@
 
 confirm() ->
     Cluster = ts_setup:start_cluster(1),
+    Table = ts_data:get_default_bucket(),
+    DDL = ts_data:get_ddl(),
+    ts_setup:create_bucket_type(Cluster, DDL, Table),
+    ts_setup:activate_bucket_type(Cluster, Table),
+
     %% First try quantum boundaries. 135309600000 is a boundary value
     %% for a 15 minute quantum
     Base = 135309599999,
@@ -50,8 +55,6 @@ confirm() ->
     try_gap(Cluster, 5, 6).
 
 try_gap(Cluster, Lower, Upper) ->
-    Table = ts_data:get_default_bucket(),
-    DDL = ts_data:get_ddl(),
     Qry = ts_data:flat_format(
         "select * from GeoCheckin "
         "where time > ~B and time < ~B "
@@ -62,10 +65,6 @@ try_gap(Cluster, Lower, Upper) ->
         {error,
             {1001,
                 <<"boundaries are equal or adjacent">>}},
-
-    Cluster = ts_setup:start_cluster(1),
-    ts_setup:create_bucket_type(Cluster, DDL, Table),
-    ts_setup:activate_bucket_type(Cluster, Table),
     Got = ts_ops:query(Cluster, Qry),
     ts_data:assert_error_regex("No gap between times", Expected, Got).
 

@@ -30,7 +30,7 @@
 
 -spec put(list(node()), string(), list(tuple())) -> ok | {error, term()}.
 put(Nodes, Table, Records) ->
-    logger:info("Putting data ~p", [Records]),
+    logger:info("Putting data ~999p", [Records]),
     riakc_ts:put(ts_setup:conn(Nodes), Table, Records).
 
 get(Nodes, Table, Key) ->
@@ -43,7 +43,7 @@ query(Nodes, Qry) ->
     query(Nodes, Qry, []).
 
 query(Nodes, Qry, Options) ->
-    logger:info("Running query: \"~999s\"", [Qry]),
+    logger:info("Running query: ~s", [string:slice(Qry, 0, 999)]),
     Got = riakc_ts:query(ts_setup:conn(Nodes), Qry, [], undefined, Options),
     logger:info("Result is ~999p", [Got]),
     Got.
@@ -63,9 +63,9 @@ insert(Nodes, Table, Columns, Data) ->
     ValClause = string:strip(lists:foldl(TermFn, [], tuple_to_list(Data)), right, $,),
     SQL = flat_format("INSERT INTO ~s (~s) VALUES (~ts)",
                       [Table, ColClause, ValClause]),
-    logger:info("~ts", [SQL]),
+    logger:info("Running query: ~s", [string:slice(SQL, 0, 999)]),
     Got = riakc_ts:query(Conn, SQL),
-    logger:info("Result is ~p", [Got]),
+    logger:info("Result is ~999p", [Got]),
     Got.
 
 insert_no_columns(Nodes, Table, Data) ->
@@ -74,7 +74,7 @@ insert_no_columns(Nodes, Table, Data) ->
     ValClause = string:strip(lists:foldl(TermFn, [], tuple_to_list(Data)), right, $,),
     SQL = flat_format("INSERT INTO ~s VALUES (~ts)",
         [Table, ValClause]),
-    logger:info("~ts", [SQL]),
+    logger:info("Running query: ~ts", [string:slice(SQL, 0, 999)]),
     Got = riakc_ts:query(Conn, SQL),
     logger:info("Result is ~p", [Got]),
     Got.

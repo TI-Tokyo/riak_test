@@ -341,7 +341,7 @@ deploy_nodes(NumNodes, InitialConfig) when is_integer(NumNodes) ->
 deploy_nodes(Versions, Services) ->
     NodeConfig = [ version_to_config(Version) || Version <- Versions ],
     Nodes = ?HARNESS:deploy_nodes(NodeConfig),
-    logger:info("Waiting for services ~p to start on ~p.", [Services, Nodes]),
+    logger:info("Waiting for services ~p to start on ~p", [Services, Nodes]),
     [ ok = wait_for_service(Node, Service) || Node <- Nodes,
                                               Service <- Services ],
     Nodes.

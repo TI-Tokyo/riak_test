@@ -396,7 +396,6 @@ deploy_clusters(ClusterConfigs) ->
     end.
 
 deploy_nodes(NodeConfig) ->
-    Path = relpath(root),
     NumNodes = length(NodeConfig),
     NodesN = lists:seq(1, NumNodes),
     Nodes = [?DEV(N) || N <- NodesN],

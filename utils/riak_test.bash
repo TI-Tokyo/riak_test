@@ -19,7 +19,7 @@ _riak_test()
                                       --upgrade --report --file" -- "$cur") )
             ;;
         -t|--tests)
-            tests=$(grep -l confirm/0 ./tests/*.erl 2>/dev/null \
+            tests=$(grep -l "confirm/0\|suite()" ./tests/*.erl 2>/dev/null \
                 | xargs basename -s .erl)
             COMPREPLY=( $(compgen -W "$tests" -- "$cur") )
             ;;

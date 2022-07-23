@@ -149,14 +149,14 @@ run_common_test(TestModule) ->
            ],
     case ct:run_test(Opts) of
         {Pass, 0, {UserSkip, 0}} ->
-            ct:print(default, info,"Common Test: all passed ~p skipped ~p at the users request~n", [Pass, UserSkip]),
+            ct:print(default, 50, "Common Test: all passed ~p skipped ~p at the users request\n", [Pass, UserSkip]),
             'pass all the tests';
         {Pass, Fail, {UserSkip, AutoSkip}} ->
-            ct:print(default, info,"Common Test: passed ~p failed ~p common test skipped ~p skipped at the users request ~p~n",
+            ct:print(default, 50, "Common Test: passed ~p failed ~p common test skipped ~p skipped at the users request ~p~n",
                       [Pass, Fail, UserSkip, AutoSkip]),
             exit('tests failing');
         Other ->
-            ct:print(default, info,"Common test failed with ~p~n", [Other]),
+            ct:print(default, 50, "Common test failed with ~p~n", [Other]),
             exit('tests failing')
     end.
 

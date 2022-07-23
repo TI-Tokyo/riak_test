@@ -142,9 +142,7 @@ run_common_test(TestModule) ->
             {suite,        TestModule},
             {logdir,       LogDir},
             {include,      [
-                            "include",
-                            "deps/*/ebin",
-                            "deps/*/include"
+                            "include"
                            ]}
            ],
     case ct:run_test(Opts) of

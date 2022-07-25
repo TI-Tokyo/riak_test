@@ -410,6 +410,8 @@ deploy_nodes(NodeConfig) ->
     create_dirs(Nodes),
     clean_data_dir(Nodes, ""),
 
+    create_or_restore_config_backups(Nodes),
+
     %% Set initial config
     add_default_node_config(Nodes),
     rt:pmap(fun({_, default}) ->
@@ -420,11 +422,6 @@ deploy_nodes(NodeConfig) ->
                     update_app_config(Node, Config)
             end,
             lists:zip(Nodes, Configs)),
-
-    %% create snmp dirs, for EE
-    create_dirs(Nodes),
-
-    create_or_restore_config_backups(Nodes),
 
     %% Start nodes
     rt:pmap(fun(N) -> run_riak(N, relpath(node_version(N)), "start") end, NodesN),

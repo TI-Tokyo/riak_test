@@ -33,12 +33,6 @@ suite() ->
 
 init_per_suite(Config) ->
     [_Node|_] = Cluster = ts_setup:start_cluster(3),
-    proc_lib:spawn(
-        fun() ->
-            register(random_num_proc, self()),
-            rand:seed(),
-            random_num_proc()
-        end),
     [{cluster, Cluster} | Config].
 
 end_per_suite(_Config) ->
@@ -75,25 +69,12 @@ all() ->
 %% UTILS
 %%--------------------------------------------------------------------
 
+table_suffix(Config) ->
+    case proplists:get_value(use_ttb, Config) of true -> "_ttb"; false -> "_nottb" end.
+
 run_query(Pid, Query, Config) when is_pid(Pid) ->
     UseTTB = proplists:get_value(use_ttb, Config),
     riakc_ts:query(Pid, Query, [{use_ttb, UseTTB}]).
-
-random_num_proc() ->
-    receive
-        {get_random_number, Pid} ->
-            {_, Reds} = erlang:process_info(self(), reductions),
-            Pid ! {return_random_number, rand:uniform(Reds * 1000)},
-            random_num_proc()
-    end.
-
-table_name() ->
-    random_num_proc ! {get_random_number, self()},
-    receive
-        {return_random_number, Num} ->
-            ok
-    end,
-    "table_" ++ integer_to_list(Num).
 
 %%--------------------------------------------------------------------
 %% TESTS
@@ -104,7 +85,7 @@ table_name() ->
 select_def_basic_test(Config) ->
     [Node|_] = proplists:get_value(cluster, Config),
     Pid = rt:pbc(Node),
-    Table = table_name(),
+    Table = "ts_cluster_select_desc_SUITE_1" ++ table_suffix(Config),
     Table_def =
         "CREATE TABLE "++Table++"("
         "a SINT64 NOT NULL, "
@@ -123,7 +104,7 @@ select_def_basic_test(Config) ->
 create_data_def_multi_quanta_test(Config) ->
     [Node|_] = proplists:get_value(cluster, Config),
     Pid = rt:pbc(Node),
-    Table = table_name(),
+    Table = "ts_cluster_select_desc_SUITE_2" ++ table_suffix(Config),
     Table_def =
         "CREATE TABLE "++Table++"("
         "a SINT64 NOT NULL, "
@@ -144,7 +125,7 @@ create_data_def_multi_quanta_test(Config) ->
 descending_keys_on_varchar_test(Config) ->
     [Node|_] = proplists:get_value(cluster, Config),
     Pid = rt:pbc(Node),
-    Table = table_name(),
+    Table = "ts_cluster_select_desc_SUITE_3" ++ table_suffix(Config),
     Table_def =
         "CREATE TABLE "++Table++"("
         "a SINT64 NOT NULL, "

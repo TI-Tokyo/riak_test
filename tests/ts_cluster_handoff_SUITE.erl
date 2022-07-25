@@ -35,6 +35,10 @@ suite() ->
 
 init_per_suite(Config) ->
     % ct:pal("VERSION 1.4 ~p", [rt:find_version_by_name(["riak_ts-1.4.0", "riak_ts_ee-1.4.0"])]),
+    rtdev:setup_harness('_', '_'),
+    Cluster = rt:deploy_nodes([?TS_VERSION_CURRENT, ?TS_VERSION_CURRENT, ?TS_VERSION_CURRENT]),
+    ok = rt:join_cluster(Cluster),
+    ok = rt:wait_until_ring_converged(Cluster),
     Config.
 
 end_per_suite(_Config) ->
@@ -50,7 +54,6 @@ end_per_group(_GroupName, _Config) ->
 
 init_per_testcase(_TestCase, Config) ->
     %% tear down the whole cluster before every test
-    rtdev:setup_harness('_', '_'),
     ct:pal("TEST CASE ~p", [_TestCase]),
     Config.
 
@@ -63,7 +66,7 @@ groups() ->
      % ,{use_ttb_false, [sequence], rt:grep_test_functions(?MODULE)}
     ].
 
-all() -> 
+all() ->
     [
      {group, use_ttb_true}
      % ,{group, use_ttb_false}
@@ -82,25 +85,22 @@ run_query(Pid, Query, Config) when is_pid(Pid) ->
 %%--------------------------------------------------------------------
 
 basic_table_hinted_handoff_test(Config) ->
-    [Node_A, Node_B, Node_C] =
-        rt:deploy_nodes([?TS_VERSION_CURRENT, ?TS_VERSION_CURRENT, ?TS_VERSION_CURRENT]),
-    ok = rt:join_cluster([Node_A,Node_B,Node_C]),
-    ok = rt:wait_until_ring_converged([Node_A,Node_B,Node_C]),
+    Cluster = [Node_A, Node_B, Node_C] = [rtdev:node_by_idx(N) || N <- [1, 2, 3]],
     {ok, _} =
         riakc_ts:query(rt:pbc(Node_A),
-            "CREATE TABLE mytab ("
-            "a SINT64 NOT NULL, "   
+            "CREATE TABLE mytab1 ("
+            "a SINT64 NOT NULL, "
             "b TIMESTAMP NOT NULL, "
             "PRIMARY KEY ((a,quantum(b,1,s)), a,b))"
         ),
     ok = rt:stop(Node_A),
-    ok = rt:wait_until_no_pending_changes([Node_B,Node_C]),
-    ok = riakc_ts:put(rt:pbc(Node_B), "mytab",
+    ok = rt:wait_until_no_pending_changes([Node_B, Node_C]),
+    ok = riakc_ts:put(rt:pbc(Node_B), "mytab1",
         [{1,B} || B <- lists:seq(1000,5000,1000)]),
     ok = rt:start(Node_A),
-    ok = rt:wait_until_no_pending_changes([Node_A,Node_B,Node_C]),
+    ok = rt:wait_until_no_pending_changes(Cluster),
     Query =
-        "SELECT * FROM mytab "
+        "SELECT * FROM mytab1 "
         "WHERE a = 1 AND b >= 1000 AND b <= 5000",
     ExpectedResultSet = [{1,B} || B <- lists:seq(1000,5000,1000)],
     ts_data:assert_row_sets(
@@ -110,26 +110,23 @@ basic_table_hinted_handoff_test(Config) ->
     ok.
 
 additional_columns_on_local_key_table_hinted_handoff_test(Config) ->
-    [Node_A, Node_B, Node_C] =
-        rt:deploy_nodes([?TS_VERSION_CURRENT, ?TS_VERSION_CURRENT, ?TS_VERSION_CURRENT]),
-    ok = rt:join_cluster([Node_A,Node_B,Node_C]),
-    ok = rt:wait_until_ring_converged([Node_A,Node_B,Node_C]),
+    Cluster = [Node_A, Node_B, Node_C] = [rtdev:node_by_idx(N) || N <- [1, 2, 3]],
     {ok, _} =
         riakc_ts:query(rt:pbc(Node_A),
-            "CREATE TABLE mytab ("
-            "a SINT64 NOT NULL, "   
+            "CREATE TABLE mytab2 ("
+            "a SINT64 NOT NULL, "
             "b TIMESTAMP NOT NULL, "
             "c TIMESTAMP NOT NULL, "
             "PRIMARY KEY ((a,quantum(b,1,s)), a,b,c))"
         ),
     ok = rt:stop(Node_A),
-    ok = rt:wait_until_no_pending_changes([Node_B,Node_C]),
-    ok = riakc_ts:put(rt:pbc(Node_B), "mytab",
+    ok = rt:wait_until_no_pending_changes([Node_B, Node_C]),
+    ok = riakc_ts:put(rt:pbc(Node_B), "mytab2",
         [{1,B,C} || B <- lists:seq(1000,5000,1000), C <- lists:seq(1000,5000,1000)]),
     ok = rt:start(Node_A),
-    ok = rt:wait_until_no_pending_changes([Node_A,Node_B,Node_C]),
+    ok = rt:wait_until_no_pending_changes(Cluster),
     Query =
-        "SELECT * FROM mytab "
+        "SELECT * FROM mytab2 "
         "WHERE a = 1 AND b >= 1000 AND b <= 5000",
     ExpectedResultSet = [{1,B,C} || B <- lists:seq(1000,5000,1000), C <- lists:seq(1000,5000,1000)],
     ts_data:assert_row_sets(
@@ -137,8 +134,3 @@ additional_columns_on_local_key_table_hinted_handoff_test(Config) ->
         run_query(rt:pbc(Node_B), Query, Config)
     ),
     ok.
-
-
-
-
-

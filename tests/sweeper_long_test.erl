@@ -11,7 +11,22 @@
 %% Sweeper AAE tree rebuild and Sweeper reaper
 -behavior(riak_test).
 -include_lib("eunit/include/eunit.hrl").
+
 -export([confirm/0]).
+-export([leave_join/1,
+         random_action/1,
+         add_actions/2,
+         node_a_leave/1,
+         node_b_leave/1,
+         node_a_join/1,
+         node_b_join/1,
+         node_a_leave/2,
+         node_b_leave/2,
+         node_a_join/2,
+         node_b_join/2,
+         leave/1,
+         join/2,
+         random_up_down/2]).
 
 -record(state, {a_up = [], a_down = [], a_left = [], b_up= [], b_down= [], b_left =[]}).
 

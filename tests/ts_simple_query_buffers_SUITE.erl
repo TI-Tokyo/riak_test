@@ -36,7 +36,7 @@
 
 -module(ts_simple_query_buffers_SUITE).
 
--export([suite/0, init_per_suite/1, groups/0, all/0,
+-export([suite/0, init_per_suite/1, end_per_suite/1, groups/0, all/0,
          init_per_testcase/2, end_per_testcase/2]).
 -export([query_orderby_comprehensive/1,
          query_orderby_cleanup/1,
@@ -69,6 +69,9 @@ init_per_suite(Cfg) ->
      {data, Data},
      {extra_data, ExtraData}
      | Cfg].
+
+end_per_suite(_Cfg) ->
+    ok.
 
 groups() ->
     [].

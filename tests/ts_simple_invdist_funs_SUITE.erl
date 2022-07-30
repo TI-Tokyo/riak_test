@@ -21,7 +21,7 @@
 
 -module(ts_simple_invdist_funs_SUITE).
 
--export([suite/0, init_per_suite/1, groups/0, all/0]).
+-export([suite/0, init_per_suite/1, end_per_suite/1, groups/0, all/0]).
 -export([query_invdist_selftest/1,
          query_invdist_percentile/1,
          query_invdist_percentile_backends/1,
@@ -52,6 +52,9 @@ init_per_suite(Cfg) ->
     ok = insert_data(C, ?TABLE_D, Data),
     [{cluster, Cluster},
      {data, Data} | Cfg].
+
+end_per_suite(_Cfg) ->
+    ok.
 
 groups() ->
     [].

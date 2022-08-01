@@ -81,12 +81,18 @@ all() ->
      %% check how error conditions are reported
      query_orderby_max_quanta_error,
      query_orderby_max_data_size_error,
-     %% check transition of inmem->ldb during data collection
-     query_orderby_inmem2ldb,
+
      %% check that no temp tables are left behind
+     %% first time, it is to ensure cleanup happens on queries that get aborted
      query_orderby_cleanup,
      %% check LIMIT and ORDER BY, in various combinations of columns and qualifiers
-     query_orderby_comprehensive
+     query_orderby_comprehensive,
+     %% cleanup check again, all good queries
+     query_orderby_cleanup,
+
+     %% check transition of inmem->ldb during data collection
+     %% do it at the end, because intercepts
+     query_orderby_inmem2ldb
      %% query_orderby_ldb_io_error
      %% with single-instance, always-open leveldb, the renaming trick doesn't work.
     ].

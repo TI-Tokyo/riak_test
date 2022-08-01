@@ -346,7 +346,7 @@ with_security_when_user_is_given_permissions_user_can_query_data_test(Ctx) ->
     {ok,_} = riak_admin(Ctx,
         ["security", "add-source", "all", "127.0.0.1/32", "trust"]),
     {ok,_} = riak_admin(Ctx,
-        ["security", "grant", "riak_ts.create_table,riak_ts.put,riak_ts.query_select", "on", "any", "to", User]),
+        ["security", "grant", "riak_ts.create_table,riak_ts.put,riak_ts.select", "on", "any", "to", User]),
     {ok, Pid} = client_pid(Ctx, User, Password),
     ?assertEqual(
         {ok,{[],[]}},

@@ -155,7 +155,7 @@ query_select_test(Ctx) ->
     ct:log("no permissions:\n~s", [Query]),
     ?assertMatch({error, {401, _}}, rhc_ts:query(Client, Query)),
 
-    ok = security_command(Ctx, grant, ["riak_ts.query_select", "on", ?TABLE1, "to", ?USER]),
+    ok = security_command(Ctx, grant, ["riak_ts.select", "on", ?TABLE1, "to", ?USER]),
     ct:log("with permissions:\n~s", [Query]),
     Res = rhc_ts:query(Client, Query),
     {ok, {_Columns, Rows}} = Res,

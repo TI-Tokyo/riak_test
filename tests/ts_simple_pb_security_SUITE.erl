@@ -89,7 +89,7 @@ end_per_testcase(_TestCase, _Config) ->
 groups() ->
     [].
 
-all() -> 
+all() ->
     rt:grep_test_functions(?MODULE).
 
 %%--------------------------------------------------------------------
@@ -138,7 +138,7 @@ client_pid(Ctx, User, Password) ->
         "127.0.0.1", Port,
         [{credentials, iolist_to_binary(User), Password},
          {cacertfile, filename:join([CertDir, "rootCA/cert.pem"])}]).
-    
+
 riak_admin(Ctx, Args) ->
     [Node|_] = proplists:get_value(cluster, Ctx),
     {ok,_Out} = Result = rt:admin(Node, Args),
@@ -158,19 +158,19 @@ user_name() ->
 receive_keys(Pid, Acc) ->
     receive
         {ReqId, {keys, Keys}} ->
-            logger:info("received batch of ~b\n", [length(Keys)]),
+            logger:info("received batch of ~b", [length(Keys)]),
             receive_keys(ReqId, lists:append(Keys, Acc));
         {ReqId, {error, Reason}} ->
-            logger:info("list_keys(~p) at ~b got an error: ~p\n", [ReqId, length(Acc), Reason]),
+            logger:info("list_keys(~p) at ~b got an error: ~p", [ReqId, length(Acc), Reason]),
             {error, Reason};
         {ReqId, done} ->
-            logger:info("done receiving from one quantum (~p) \n", [ReqId]),
+            logger:info("done receiving from one quantum (~p) ", [ReqId]),
             receive_keys(Pid, Acc);
         Else ->
-            logger:info("What's that? ~p\n", [Else]),
+            logger:info("What's that? ~p", [Else]),
             receive_keys(Pid, Acc)
     after 3000 ->
-        logger:info("Consider streaming done\n", []),
+        logger:info("Consider streaming done", []),
         {ok, Acc}
     end.
 

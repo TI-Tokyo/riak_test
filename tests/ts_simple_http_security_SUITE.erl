@@ -21,7 +21,7 @@
 %% -------------------------------------------------------------------
 -module(ts_simple_http_security_SUITE).
 
--export([suite/0, init_per_suite/1, groups/0, all/0]).
+-export([suite/0, init_per_suite/1, end_per_suite/1, groups/0, all/0]).
 -export([
          put_test/1,
          query_create_table_test/1,
@@ -97,6 +97,8 @@ init_per_suite(Config) ->
     [{cluster, [Node]},
      {client, Client} | Config].
 
+end_per_suite(_Cfg) ->
+    ok.
 
 %% Tests
 %%--------------------------------------------------------------------

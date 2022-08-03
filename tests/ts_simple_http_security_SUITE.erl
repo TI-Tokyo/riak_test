@@ -89,7 +89,7 @@ init_per_suite(Config) ->
                        {credentials, ?USER, ?PASSWORD},
                        {ssl_options, [
                                       {cacertfile, filename:join([CertDir, "rootCA/cert.pem"])},
-                                      {verify, verify_peer},
+                                      %% {verify, verify_peer},
                                       {reuse_sessions, false}
                                      ]}
                       ]),

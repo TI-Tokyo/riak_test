@@ -46,9 +46,9 @@ confirm() ->
     Got2 = lists:reverse(lists:foldl(Fn, [], WrongColumns)),
     ?assertEqual(
         lists:duplicate(length(TooMuchData),
-                        {error,{1018,<<"too many values in row index(es) 1">>}}) ++
+                        {error,{1018,<<"too many values">>}}) ++
         lists:duplicate(length(TooLittleData),
-                        {error,{1003,<<"Invalid data found at row index(es) 1">>}}),
+                        {error,{1003,<<"Invalid data at column(s) 1">>}}),
         Got2
     ),
     pass.

@@ -167,16 +167,13 @@ confirm_select(C, PvalP1, PvalP2) ->
     confirm_select(C, PvalP1, PvalP2, []).
 confirm_select(C, PvalP1, PvalP2, Options) ->
     Query =
-        lists:flatten(
-          io_lib:format(
-            "select score, pooter2 from ~s where"
-            "     ~s = '~ts'"
-            " and ~s = '~ts'"
-            " and ~s > ~b and ~s < ~b",
-           [?BUCKET,
-            ?PKEY_P1, PvalP1,
-            ?PKEY_P2, PvalP2,
-            ?PKEY_P3, ?TIMEBASE + 10, ?PKEY_P3, ?TIMEBASE + 20])),
+        unicode:characters_to_nfc_binary(
+          ["select score, pooter2 from ", ?BUCKET, " where"
+           "     ", ?PKEY_P1, " = '", PvalP1, "'"
+           " and ", ?PKEY_P2, " = '", PvalP2, "'"
+           " and ", ?PKEY_P3, " > ", integer_to_list(?TIMEBASE + 10),
+           " and ", ?PKEY_P3, " < ", integer_to_list(?TIMEBASE + 20)]
+         ),
     {ok, {_Columns, Rows}} = riakc_ts:query(C, Query, Options),
     io:format("Got ~b rows back\n~p\n", [length(Rows), Rows]),
     ?assertEqual(10 - 1 - 1, length(Rows)),

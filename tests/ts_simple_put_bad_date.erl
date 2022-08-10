@@ -35,7 +35,7 @@ confirm() ->
             <<"abc">>,
             ts_data:get_varchar(),
             ts_data:get_float()}],
-    Expected = {error, {1003, <<"Invalid data found at row index(es) 1">>}},
+    Expected = {error, {1003, <<"Invalid data at column(s) 1">>}},
 
     Cluster = ts_setup:start_cluster(1),
     ts_setup:create_bucket_type(Cluster, DDL, Table),

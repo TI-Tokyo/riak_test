@@ -39,14 +39,14 @@ confirm() ->
     Conn = ts_setup:conn(Cluster),
     ts_setup:create_bucket_type(Cluster, DDL, Table),
     ts_setup:activate_bucket_type(Cluster, Table),
-    
+
     ValidObj = ts_data:get_valid_obj(),
     InvalidObj = ts_data:get_invalid_obj(),
     ShortObj = ts_data:get_short_obj(),
     LongObj = ts_data:get_long_obj(),
 
-    Expected1 = {error, {1003, <<"Invalid data found at row index(es) 1">>}},
-    Expected2 = {error, {1003, <<"Invalid data found at row index(es) 2">>}},
+    Expected1 = {error, {1003, <<"Invalid data at column(s) 1">>}},
+    Expected2 = {error, {1003, <<"Invalid data at column(s) 2">>}},
     Got = riakc_ts:put(Conn, Table, [InvalidObj]),
     ?assertEqual(Expected1, Got),
 

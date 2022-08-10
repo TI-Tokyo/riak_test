@@ -59,8 +59,18 @@ end_per_testcase(_TestCase, _Config) ->
 groups() ->
     [].
 
-all() -> 
-    rt:grep_test_functions(?MODULE).
+all() ->
+    [capabilities_are_mixed_test,
+     capabilities_are_same_on_all_nodes_test,
+     other_nodes_do_not_have_capability_test,
+     capability_not_specified_on_one_node_test,
+
+     sql_select_upgrade_a_node_from_legacy_test,
+     sql_select_join_with_all_nodes_upgraded_test,
+     %sql_select_downgrade_a_node_test,
+
+     query_in_mixed_version_cluster_test
+    ].
 
 %%--------------------------------------------------------------------
 %% Utils

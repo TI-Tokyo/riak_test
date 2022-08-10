@@ -29,7 +29,6 @@
 %% COMMON TEST CALLBACK FUNCTIONS
 %%--------------------------------------------------------------------
 
--define(TS_VERSION_CURRENT, "current").
 -define(SQL_SELECT_CAP, {riak_kv, sql_select_version}).
 
 suite() ->
@@ -54,6 +53,7 @@ init_per_testcase(_TestCase, Config) ->
     Config.
 
 end_per_testcase(_TestCase, _Config) ->
+    rt:clean_cluster([rtdev:node_by_idx(N) || N <- [1,2,3]]),
     ok.
 
 groups() ->
@@ -109,7 +109,7 @@ capabilities_are_same_on_all_nodes_test(_Ctx) ->
     Cap_name = {rt, cap_2},
     V1 = 1,
     V2 = 2,
-    ok = rpc:call(Node_A, riak_core_capability, register, [Cap_name, [V2,V1], V1, V1]), %% if the preference is [1,2] then the cap 
+    ok = rpc:call(Node_A, riak_core_capability, register, [Cap_name, [V2,V1], V1, V1]), %% if the preference is [1,2] then the cap
     ok = rpc:call(Node_B, riak_core_capability, register, [Cap_name, [V2,V1], V1, V1]), %% value will be 1 for all nodes
     ok = rpc:call(Node_C, riak_core_capability, register, [Cap_name, [V2,V1], V1, V1]),
     ok = rt:join_cluster([Node_A,Node_B,Node_C]),
@@ -135,7 +135,7 @@ capability_not_specified_on_one_node_test(_Ctx) ->
     Cap_name = {rt, cap_4},
     V1 = 1,
     V2 = 2,
-    ok = rpc:call(Node_A, riak_core_capability, register, [Cap_name, [V2,V1], V1, V1]), %% if the preference is [1,2] then the cap 
+    ok = rpc:call(Node_A, riak_core_capability, register, [Cap_name, [V2,V1], V1, V1]), %% if the preference is [1,2] then the cap
     ok = rpc:call(Node_B, riak_core_capability, register, [Cap_name, [V2,V1], V1, V1]), %% value will be 1 for all nodes
     ok = rt:join_cluster([Node_A,Node_B,Node_C]),
     ok = rt:wait_until_ring_converged([Node_A,Node_B,Node_C]),
@@ -152,7 +152,7 @@ sql_select_upgrade_a_node_from_legacy_test(_Ctx) ->
         rt:deploy_nodes([legacy, legacy, legacy]),
     ok = rt:join_cluster([Node_A,Node_B,Node_C]),
     ok = rt:wait_until_ring_converged([Node_A,Node_B,Node_C]),
-    ok = rt:upgrade(Node_A, ?TS_VERSION_CURRENT),
+    ok = rt:upgrade(Node_A, current),
     ok = rt:wait_until_ring_converged([Node_A,Node_B,Node_C]),
     ok = rt:wait_until_capability(Node_A, ?SQL_SELECT_CAP, v2),
     ok.
@@ -162,9 +162,9 @@ sql_select_join_with_all_nodes_upgraded_test(_Ctx) ->
         rt:deploy_nodes([legacy, legacy, legacy]),
     ok = rt:join_cluster([Node_A,Node_B,Node_C]),
     rt:wait_until_ring_converged([Node_A,Node_B,Node_C]),
-    rt:upgrade(Node_A, ?TS_VERSION_CURRENT),
-    rt:upgrade(Node_B, ?TS_VERSION_CURRENT),
-    rt:upgrade(Node_C, ?TS_VERSION_CURRENT),
+    rt:upgrade(Node_A, current),
+    rt:upgrade(Node_B, current),
+    rt:upgrade(Node_C, current),
     rt:wait_until_capability(Node_A, ?SQL_SELECT_CAP, v3),
     rt:wait_until_capability(Node_B, ?SQL_SELECT_CAP, v3),
     rt:wait_until_capability(Node_C, ?SQL_SELECT_CAP, v3),
@@ -172,13 +172,13 @@ sql_select_join_with_all_nodes_upgraded_test(_Ctx) ->
 
 sql_select_downgrade_a_node_test(_Ctx) ->
     [Node_A, Node_B, Node_C] =
-        rt:deploy_nodes([legacy, ?TS_VERSION_CURRENT, ?TS_VERSION_CURRENT]),
+        rt:deploy_nodes([legacy, current, current]),
     ok = rt:join_cluster([Node_A,Node_B,Node_C]),
     rt:wait_until_ring_converged([Node_A,Node_B,Node_C]),
     % rt:wait_until_capability(Node_A, ?SQL_SELECT_CAP, v3),
     rt:wait_until_capability(Node_B, ?SQL_SELECT_CAP, v2),
     rt:wait_until_capability(Node_C, ?SQL_SELECT_CAP, v2),
-    rt:upgrade(Node_A, ?TS_VERSION_CURRENT),
+    rt:upgrade(Node_A, current),
     rt:wait_until_ring_converged([Node_A,Node_B,Node_C]),
     rt:wait_until_capability(Node_A, ?SQL_SELECT_CAP, v3),
     rt:wait_until_capability(Node_B, ?SQL_SELECT_CAP, v3),
@@ -200,7 +200,7 @@ sql_select_downgrade_a_node_test(_Ctx) ->
 
 query_in_mixed_version_cluster_test(_Ctx) ->
     [Node_A, Node_B, Node_C] =
-        rt:deploy_nodes([?TS_VERSION_CURRENT, previous, ?TS_VERSION_CURRENT]),
+        rt:deploy_nodes([current, previous, current]),
     ok = rt:join_cluster([Node_A,Node_B,Node_C]),
     rt:wait_until_ring_converged([Node_A,Node_B,Node_C]),
     Table = "grouptab1",
@@ -236,4 +236,3 @@ query_in_mixed_version_cluster_test(_Ctx) ->
         {rt_ignore_columns, ExpectedResultSet},
         {ok,{Cols, Rows}}
     ).
-

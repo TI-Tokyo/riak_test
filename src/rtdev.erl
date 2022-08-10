@@ -564,15 +564,9 @@ stop_all(DevPath) ->
     ok.
 
 stop(Node) ->
-    RiakPid = rpc:call(Node, os, getpid, []),
     N = node_id(Node),
     rt_cover:maybe_stop_on_node(Node),
-    run_riak(N, relpath(node_version(N)), "stop"),
-    F = fun(_N) ->
-            os:cmd("kill -0 " ++ RiakPid) =/= []
-    end,
-    ?assertEqual(ok, rt:wait_until(Node, F)),
-    ok.
+    run_riak(N, relpath(node_version(N)), "stop").
 
 start(Node) ->
     N = node_id(Node),

@@ -400,7 +400,11 @@ stop_and_wait(Node) ->
 
 %% @doc Upgrade a Riak `Node' to the specified `NewVersion'.
 upgrade(Node, current) ->
-    upgrade(Node, current, fun replication2_upgrade:remove_jmx_from_conf/1);
+    upgrade(Node, current,
+            fun(Params) ->
+                    replication2_upgrade:remove_jmx_from_conf(Params),
+                    ts_setup:keep_advanced_conf_when_upgrading_to_3_0(Params)
+            end);
 upgrade(Node, NewVersion) ->
     upgrade(Node, NewVersion, fun no_op/1).
 

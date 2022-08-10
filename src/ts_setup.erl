@@ -27,7 +27,9 @@
 -export([start_cluster/0, start_cluster/1, start_cluster/2,
          conn/1, conn/2, stop_a_node/1, stop_a_node/2,
          create_bucket_type/3, create_bucket_type/4,
-         activate_bucket_type/2, activate_bucket_type/3]).
+         activate_bucket_type/2, activate_bucket_type/3,
+         keep_advanced_conf_when_upgrading_to_3_0/1
+        ]).
 
 -spec start_cluster() -> list(node()).
 start_cluster() ->
@@ -104,3 +106,11 @@ table_to_list(Table) when is_binary(Table) ->
     binary_to_list(Table);
 table_to_list(Table) ->
     Table.
+
+
+keep_advanced_conf_when_upgrading_to_3_0(Params) ->
+    NewConfPath = proplists:get_value(new_conf_dir, Params),
+    F = filename:join(NewConfPath, "advanced.config"),
+    logger:info("Keeping 3.0 advanced.config ~s", [F]),
+    [] = os:cmd(io_lib:format("cp -a \"~s.last_working_version\" \"~s\"", [F, F])),
+    ok.

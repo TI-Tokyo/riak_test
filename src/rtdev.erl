@@ -147,6 +147,9 @@ upgrade(Node, NewVersion, Config, UpgradeCallback) ->
     OldPath = relpath(Version),
     NewPath = relpath(NewVersion),
 
+    AdvancedConfig = io_lib:format("~s/dev/dev~b/riak/etc/advanced.config", [NewPath, N]),
+    [] = os:cmd(io_lib:format("cp -a \"~s\" \"~s.last_working_version\"", [AdvancedConfig, AdvancedConfig])),
+
     Commands = [
         io_lib:format("cp -p -P -R \"~s/dev/dev~b/riak/data\" \"~s/dev/dev~b/riak\"",
                        [OldPath, N, NewPath, N]),
@@ -454,7 +457,14 @@ create_or_restore_config_backups(Nodes) ->
                            logger:debug("backing up ~s", [F]),
                            [] = os:cmd(io_lib:format("cp -a \"~s\" \"~s.backup\"", [F, F]))
                    end
-               end || F <- [ConfFile, AdvCfgFile]]
+               end || F <- [ConfFile, AdvCfgFile]],
+              case filelib:is_regular(AdvCfgFile ++ ".last_working_version") of
+                  true ->
+                      logger:debug("found existing last_working_version backup of ~s; restoring it", [AdvCfgFile]),
+                      [] = os:cmd(io_lib:format("cp -a \"~s.last_working_version\" \"~s\"", [AdvCfgFile, AdvCfgFile]));
+                  false ->
+                      fine
+              end
       end,
       Nodes).
 

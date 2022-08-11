@@ -93,12 +93,12 @@ basic_table_hinted_handoff_test(Config) ->
             "b TIMESTAMP NOT NULL, "
             "PRIMARY KEY ((a,quantum(b,1,s)), a,b))"
         ),
-    ok = rt:stop(Node_A),
-    ok = rt:wait_until_no_pending_changes([Node_B, Node_C]),
-    ok = riakc_ts:put(rt:pbc(Node_B), "mytab1",
+    rt:stop(Node_A),
+    rt:wait_until_no_pending_changes([Node_B, Node_C]),
+    riakc_ts:put(rt:pbc(Node_B), "mytab1",
         [{1,B} || B <- lists:seq(1000,5000,1000)]),
-    ok = rt:start(Node_A),
-    ok = rt:wait_until_no_pending_changes(Cluster),
+    rt:start(Node_A),
+    rt:wait_until_no_pending_changes(Cluster),
     Query =
         "SELECT * FROM mytab1 "
         "WHERE a = 1 AND b >= 1000 AND b <= 5000",
@@ -119,12 +119,12 @@ additional_columns_on_local_key_table_hinted_handoff_test(Config) ->
             "c TIMESTAMP NOT NULL, "
             "PRIMARY KEY ((a,quantum(b,1,s)), a,b,c))"
         ),
-    ok = rt:stop(Node_A),
-    ok = rt:wait_until_no_pending_changes([Node_B, Node_C]),
-    ok = riakc_ts:put(rt:pbc(Node_B), "mytab2",
+    rt:stop(Node_A),
+    rt:wait_until_no_pending_changes([Node_B, Node_C]),
+    riakc_ts:put(rt:pbc(Node_B), "mytab2",
         [{1,B,C} || B <- lists:seq(1000,5000,1000), C <- lists:seq(1000,5000,1000)]),
-    ok = rt:start(Node_A),
-    ok = rt:wait_until_no_pending_changes(Cluster),
+    rt:start(Node_A),
+    rt:wait_until_no_pending_changes(Cluster),
     Query =
         "SELECT * FROM mytab2 "
         "WHERE a = 1 AND b >= 1000 AND b <= 5000",

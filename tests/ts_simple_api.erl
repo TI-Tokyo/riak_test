@@ -34,20 +34,20 @@ confirm() ->
     DDL  = ts_data:get_ddl(api),
     Data = ts_data:get_data(api),
 
-    Cluster = ts_setup:start_cluster(1),
+    Cluster = [NodeA] = ts_setup:start_cluster(1),
+    Client = rt:pbc(NodeA),
 
     Table = ts_data:get_default_bucket(),
-    {ok,_} = ts_setup:create_bucket_type(Cluster, DDL, Table),
-    ok = ts_setup:activate_bucket_type(Cluster, Table),
+    {ok, {[],[]}} = riakc_ts:query(Client, DDL),
 
-    ?assertEqual(ok, ts_ops:put(Cluster, Table, Data)),
+    ok = ts_ops:put(Cluster, Table, Data),
 
-    confirm_GtOps(Cluster),
-    confirm_GtEqOps(Cluster),
-    confirm_LtOps(Cluster),
-    confirm_LtEqOps(Cluster),
-    confirm_EqOps(Cluster),
-    confirm_NeqOps(Cluster),
+    confirm_GtOps(Client),
+    confirm_GtEqOps(Client),
+    confirm_LtOps(Client),
+    confirm_LtEqOps(Client),
+    confirm_EqOps(Client),
+    confirm_NeqOps(Client),
     pass.
 
 %------------------------------------------------------------
@@ -117,7 +117,8 @@ confirm_NeqOps(C) ->
 %------------------------------------------------------------
 
 confirm_pass(C, Qry, Expected) ->
-    Got = ts_ops:query(C, Qry),
+    logger:info("Running query: ~s", [Qry]),
+    Got = riakc_ts:query(C, Qry, [], undefined, []),
     {ok, {_Cols, Records}} = Got,
     N = length(Records),
     ?assertEqual(Expected, Got),

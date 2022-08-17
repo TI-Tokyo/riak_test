@@ -50,7 +50,8 @@
         " ORDER BY c").
 
 make_initial_config(Config) ->
-    [{use_previous_client, false} | Config].
+    [{use_previous_client, false},
+     {starting_version, previous} | Config].
 
 make_scenarios() ->
     BaseScenarios =

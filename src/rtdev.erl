@@ -141,26 +141,23 @@ upgrade(Node, NewVersion, UpgradeCallback) when is_function(UpgradeCallback) ->
 upgrade(Node, NewVersion, Config, UpgradeCallback) ->
     N = node_id(Node),
     Version = node_version(N),
-    logger:info("Upgrading ~p : ~p -> ~p", [Node, Version, NewVersion]),
+    logger:info("Transitioning ~p from version ~p to ~p", [Node, Version, NewVersion]),
     stop(Node),
     rt:wait_until_unpingable(Node),
     OldPath = relpath(Version),
     NewPath = relpath(NewVersion),
 
     AdvancedConfig = io_lib:format("~s/dev/dev~b/riak/etc/advanced.config", [NewPath, N]),
-    [] = os:cmd(io_lib:format("cp -a \"~s\" \"~s.last_working_version\"", [AdvancedConfig, AdvancedConfig])),
 
-    Commands = [
-        io_lib:format("cp -p -P -R \"~s/dev/dev~b/riak/data\" \"~s/dev/dev~b/riak\"",
-                       [OldPath, N, NewPath, N]),
-        io_lib:format("rm -rf ~s/dev/dev~b/riak/data/*",
-                       [OldPath, N]),
-        io_lib:format("cp -p -P -R \"~s/dev/dev~b/riak/etc\" \"~s/dev/dev~b/riak\"",
-                       [OldPath, N, NewPath, N])
-    ],
+    Commands = [ io_lib:format("cp -p -P -R \"~s/dev/dev~b/riak/data\" \"~s/dev/dev~b/riak\"", [OldPath, N, NewPath, N])
+               , io_lib:format("rm -rf ~s/dev/dev~b/riak/data/*", [OldPath, N])
+               , io_lib:format("mv \"~s\" \"~s.keep\"", [AdvancedConfig, AdvancedConfig])
+               , io_lib:format("cp -p -P -R \"~s/dev/dev~b/riak/etc\" \"~s/dev/dev~b/riak\"", [OldPath, N, NewPath, N])
+               , io_lib:format("mv \"~s.keep\" \"~s\"", [AdvancedConfig, AdvancedConfig])
+               ],
     [ begin
         logger:info("Running: ~s", [Cmd]),
-        os:cmd(Cmd)
+        [] = os:cmd(Cmd)
     end || Cmd <- Commands],
     VersionMap = orddict:store(N, NewVersion, rt_config:get(rt_versions)),
     rt_config:set(rt_versions, VersionMap),
@@ -457,14 +454,7 @@ create_or_restore_config_backups(Nodes) ->
                            logger:debug("backing up ~s", [F]),
                            [] = os:cmd(io_lib:format("cp -a \"~s\" \"~s.backup\"", [F, F]))
                    end
-               end || F <- [ConfFile, AdvCfgFile]],
-              case filelib:is_regular(AdvCfgFile ++ ".last_working_version") of
-                  true ->
-                      logger:debug("found existing last_working_version backup of ~s; restoring it", [AdvCfgFile]),
-                      [] = os:cmd(io_lib:format("cp -a \"~s.last_working_version\" \"~s\"", [AdvCfgFile, AdvCfgFile]));
-                  false ->
-                      fine
-              end
+               end || F <- [ConfFile, AdvCfgFile]]
       end,
       Nodes).
 

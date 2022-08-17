@@ -747,10 +747,7 @@ set_backend(Node, Backend, OtherOpts) ->
 %% version (e.g. current,
 -spec(get_version(atom()) -> binary()).
 get_version(Vsn) ->
-    case file:read_file(relpath(Vsn) ++ "/VERSION") of
-        {error, enoent} -> unknown;
-        {ok, Version} -> Version
-    end.
+    os:cmd(io_lib:format("(cd ~s && git describe --tags)", [relpath(Vsn)])).
 
 %% @doc Read the VERSION file for the `current` version
 get_version() ->

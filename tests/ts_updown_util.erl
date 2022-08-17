@@ -76,7 +76,7 @@ setup(Config) ->
 setup_cluster(Config) ->
     %% build the starting (old = upgraded, current) cluster
     Nodes = rt:build_cluster(
-              lists:duplicate(3, current)),
+              lists:duplicate(3, ?CFG(starting_version, Config))),
     Config ++
         [
          {nodes, Nodes}

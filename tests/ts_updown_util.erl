@@ -381,11 +381,12 @@ query_with_client(Query, Node, PrevClientNode) ->
     case Version of
         current ->
             Client = rt:pbc(Node),
+            ct:print("using ~p client to contact node ~p", [Version, Node]),
             riakc_ts:query(Client, Query);
         previous ->
             ConnInfo = proplists:get_value(Node, rt:connection_info([Node])),
             {IP, Port} = proplists:get_value(pb, ConnInfo),
-            ct:log("using ~p client to contact node ~p at ~p:~p", [Version, Node, IP, Port]),
+            ct:print("using ~p client to contact node ~p at ~p:~p", [Version, Node, IP, Port]),
             {ok, Client} =
                 rpc:call(
                   PrevClientNode,

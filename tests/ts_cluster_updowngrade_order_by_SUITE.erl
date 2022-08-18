@@ -64,12 +64,12 @@ make_scenarios() ->
                    ensure_full_caps     = ts_updown_util:caps_to_ensure(full),
                    ensure_degraded_caps = ts_updown_util:caps_to_ensure(degraded),
                    convert_config_to_previous = fun ts_updown_util:convert_riak_conf_to_previous/1}
-         || TableNodeVsn            <- [previous, current],
-            QueryNodeVsn            <- [current],
-            NeedTableNodeTransition <- [false, true],
+         || TableNodeVsn            <- [previous],
+            QueryNodeVsn            <- [previous, current],
+            NeedTableNodeTransition <- [true, false],
             NeedQueryNodeTransition <- [false],
-            NeedPreClusterMixed     <- [false, true],
-            NeedPostClusterMixed    <- [false, true]],
+            NeedPreClusterMixed     <- [false],
+            NeedPostClusterMixed    <- [false]],
     [add_tests(X) || X <- BaseScenarios].
 
 %% This test will not use config invariants

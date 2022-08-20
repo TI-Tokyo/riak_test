@@ -31,40 +31,40 @@
 
 -type cap_with_ver() :: {{atom(), atom()}, term()}.
 
--record(create, {
-          should_skip = false :: boolean(),
+-record(create,
+        { should_skip = false :: boolean(),
           ddl      :: binary,
           expected :: term()
-         }).
+        }).
 
--record(insert, {
-          should_skip = false :: boolean(),
+-record(insert,
+        { should_skip = false :: boolean(),
           %% A list of data to write to the table
           data     :: [row()],
           expected :: term()
-         }).
+        }).
 
--record(select, {
-          should_skip = false :: boolean(),
+-record(select,
+        { should_skip = false :: boolean(),
           %% the select query is an io_lib:format containing a single "~s" placeholder
           %% for the table name
           qry        :: binary(),
           expected   :: term(),
           assert_mod :: atom(),
           assert_fun :: atom()
-         }).
+        }).
 
--record(test_set, {
-          testname     :: string(),
+-record(test_set,
+        { testname     :: string(),
           create       :: #create{},
           insert       :: #insert{},
           selects = [] :: [#select{}],
           timestamp    :: string()
-         }).
+        }).
 
 %% Scenario description and requirements
--record(scenario, {
-          %% riak version on the node where CREATE TABLE query will be issued
+-record(scenario,
+        { %% riak version on the node where CREATE TABLE query will be issued
           table_node_vsn :: version(),
 
           %% riak version on the node where SELECT queries will be issued
@@ -95,11 +95,11 @@
           ensure_full_caps = [] :: [cap_with_ver()],
           %% - when the cluster is mixed or fully downgraded:
           ensure_degraded_caps = [] :: [cap_with_ver()]
-         }).
+        }).
 
 %% Error report
--record(failure_report, {
-          cluster  :: [{node(), version()}],
+-record(failure_report,
+        { cluster  :: [{node(), version()}],
           %% node where table was created
           table_node :: node(),
           %% node where the failing SELECT was issued
@@ -112,6 +112,6 @@
           message  :: binary(),
           expected :: term(),
           got      :: term()
-         }).
+        }).
 
 -endif.

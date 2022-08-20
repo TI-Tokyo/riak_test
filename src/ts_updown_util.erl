@@ -133,7 +133,7 @@ run_scenarios(Config, Scenarios) ->
 run_scenario(Config,
              #scenario{tests = Tests} = Scenario) ->
     ct:pal("Scenario: table/query node vsn: ~p/~p\n"
-           "          Need table/query node transition: ~p/~p",
+           "          Need table/query node transition: ~p/~p\n",
            [Scenario#scenario.table_node_vsn,
             Scenario#scenario.query_node_vsn,
             Scenario#scenario.need_table_node_transition,

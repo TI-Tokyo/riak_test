@@ -60,24 +60,17 @@ groups() ->
     [].
 
 all() ->
-    [capabilities_are_mixed_test,
-     capabilities_are_same_on_all_nodes_test,
-     other_nodes_do_not_have_capability_test,
-     capability_not_specified_on_one_node_test,
+    [capabilities_are_mixed,
+     capabilities_are_same_on_all_nodes,
+     other_nodes_do_not_have_capability,
+     capability_not_specified_on_one_node,
 
-     sql_select_upgrade_a_node_from_legacy_test,
-     sql_select_join_with_all_nodes_upgraded_test,
-     %sql_select_downgrade_a_node_test,
+     sql_select_upgrade_a_node_from_legacy,
+     sql_select_join_with_all_nodes_upgraded,
+     sql_select_downgrade_a_node,
 
-     query_in_mixed_version_cluster_test
+     query_in_mixed_version_cluster
     ].
-
-%%--------------------------------------------------------------------
-%% Utils
-%%--------------------------------------------------------------------
-
-run_query(Pid, Query) when is_pid(Pid) ->
-    riakc_ts:query(Pid, Query).
 
 %%--------------------------------------------------------------------
 %% Basic Capability System Tests
@@ -89,7 +82,7 @@ run_query(Pid, Query) when is_pid(Pid) ->
 %%     two nodes have version 2
 %% Join the cluster
 %% Assert that all nodes return version 1 for the capability
-capabilities_are_mixed_test(_Ctx) ->
+capabilities_are_mixed(_Ctx) ->
     [Node_A, Node_B, Node_C] = rt:deploy_nodes(3),
     Cap_name = {rt, cap_1},
     V1 = 1,
@@ -104,7 +97,7 @@ capabilities_are_mixed_test(_Ctx) ->
     rt:wait_until_capability(Node_C, Cap_name, V1),
     ok.
 
-capabilities_are_same_on_all_nodes_test(_Ctx) ->
+capabilities_are_same_on_all_nodes(_Ctx) ->
     [Node_A, Node_B, Node_C] = rt:deploy_nodes(3),
     Cap_name = {rt, cap_2},
     V1 = 1,
@@ -119,7 +112,7 @@ capabilities_are_same_on_all_nodes_test(_Ctx) ->
     rt:wait_until_capability(Node_C, Cap_name, V2),
     ok.
 
-other_nodes_do_not_have_capability_test(_Ctx) ->
+other_nodes_do_not_have_capability(_Ctx) ->
     [Node_A, Node_B, Node_C] = rt:deploy_nodes(3),
     Cap_name = {rt, cap_3},
     V1 = 1,
@@ -130,7 +123,7 @@ other_nodes_do_not_have_capability_test(_Ctx) ->
     rt:wait_until_capability(Node_B, Cap_name, V1),
     ok.
 
-capability_not_specified_on_one_node_test(_Ctx) ->
+capability_not_specified_on_one_node(_Ctx) ->
     [Node_A, Node_B, Node_C] = rt:deploy_nodes(3),
     Cap_name = {rt, cap_4},
     V1 = 1,
@@ -147,7 +140,7 @@ capability_not_specified_on_one_node_test(_Ctx) ->
 %% Riak TS Capability Tests
 %%--------------------------------------------------------------------
 
-sql_select_upgrade_a_node_from_legacy_test(_Ctx) ->
+sql_select_upgrade_a_node_from_legacy(_Ctx) ->
     [Node_A, Node_B, Node_C] =
         rt:deploy_nodes([legacy, legacy, legacy]),
     ok = rt:join_cluster([Node_A,Node_B,Node_C]),
@@ -157,7 +150,7 @@ sql_select_upgrade_a_node_from_legacy_test(_Ctx) ->
     ok = rt:wait_until_capability(Node_A, ?SQL_SELECT_CAP, v2),
     ok.
 
-sql_select_join_with_all_nodes_upgraded_test(_Ctx) ->
+sql_select_join_with_all_nodes_upgraded(_Ctx) ->
     [Node_A, Node_B, Node_C] =
         rt:deploy_nodes([previous, previous, previous]),
     ok = rt:join_cluster([Node_A,Node_B,Node_C]),
@@ -170,7 +163,7 @@ sql_select_join_with_all_nodes_upgraded_test(_Ctx) ->
     rt:wait_until_capability(Node_C, ?SQL_SELECT_CAP, v3),
     ok.
 
-sql_select_downgrade_a_node_test(_Ctx) ->
+sql_select_downgrade_a_node(_Ctx) ->
     [Node_A, Node_B, Node_C] =
         rt:deploy_nodes([legacy, previous, previous]),
     ok = rt:join_cluster([Node_A,Node_B,Node_C]),
@@ -198,11 +191,11 @@ sql_select_downgrade_a_node_test(_Ctx) ->
 %% Perform queries in mixed version cluster
 %%--------------------------------------------------------------------
 
-query_in_mixed_version_cluster_test(_Ctx) ->
-    [Node_A, Node_B, Node_C] =
-        rt:deploy_nodes([current, previous, current]),
-    ok = rt:join_cluster([Node_A,Node_B,Node_C]),
-    rt:wait_until_ring_converged([Node_A,Node_B,Node_C]),
+query_in_mixed_version_cluster(_Ctx) ->
+    [Node_A | _] = Cluster =
+        rt:deploy_nodes([previous, current, current]),
+    ok = rt:join_cluster(Cluster),
+    rt:wait_until_ring_converged(Cluster),
     Table = "grouptab1",
     ?assertEqual(
         {ok, {[],[]}},

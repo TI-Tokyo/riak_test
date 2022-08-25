@@ -27,8 +27,7 @@
 -export([start_cluster/0, start_cluster/1, start_cluster/2,
          conn/1, conn/2, stop_a_node/1, stop_a_node/2,
          create_bucket_type/3, create_bucket_type/4,
-         activate_bucket_type/2, activate_bucket_type/3,
-         keep_advanced_conf_when_upgrading_to_3_0/1
+         activate_bucket_type/2, activate_bucket_type/3
         ]).
 
 -spec start_cluster() -> list(node()).
@@ -86,6 +85,7 @@ activate_bucket_type(Cluster, Table, Retries) ->
 
 -spec activate_bucket_type([node()], string(), non_neg_integer(), non_neg_integer()) -> ok | term().
 activate_bucket_type(Cluster, Table, RetriesSoFar, RetriesLeft) ->
+    logger:info("Waiting for table ~s to become active", [Table]),
     [Node|_Rest] = Cluster,
     {ok, Msg} = Result = rt:admin(Node, ["bucket-type", "activate", table_to_list(Table)]),
     %% Look for a successful message
@@ -106,11 +106,3 @@ table_to_list(Table) when is_binary(Table) ->
     binary_to_list(Table);
 table_to_list(Table) ->
     Table.
-
-
-keep_advanced_conf_when_upgrading_to_3_0(Params) ->
-    NewConfPath = proplists:get_value(new_conf_dir, Params),
-    F = filename:join(NewConfPath, "advanced.config"),
-    logger:info("Keeping 3.0 advanced.config ~s", [F]),
-    [] = os:cmd(io_lib:format("cp -a \"~s.last_working_version\" \"~s\"", [F, F])),
-    ok.

@@ -402,8 +402,7 @@ stop_and_wait(Node) ->
 upgrade(Node, current) ->
     upgrade(Node, current,
             fun(Params) ->
-                    replication2_upgrade:remove_jmx_from_conf(Params),
-                    ts_setup:keep_advanced_conf_when_upgrading_to_3_0(Params)
+                    replication2_upgrade:remove_jmx_from_conf(Params)
             end);
 upgrade(Node, NewVersion) ->
     upgrade(Node, NewVersion, fun no_op/1).

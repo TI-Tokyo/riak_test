@@ -147,13 +147,8 @@ upgrade(Node, NewVersion, Config, UpgradeCallback) ->
     OldPath = relpath(Version),
     NewPath = relpath(NewVersion),
 
-    AdvancedConfig = io_lib:format("~s/dev/dev~b/riak/etc/advanced.config", [NewPath, N]),
-
-    Commands = [ io_lib:format("cp -p -P -R \"~s/dev/dev~b/riak/data\" \"~s/dev/dev~b/riak\"", [OldPath, N, NewPath, N])
-               , io_lib:format("rm -rf ~s/dev/dev~b/riak/data/*", [OldPath, N])
-               , io_lib:format("mv \"~s\" \"~s.keep\"", [AdvancedConfig, AdvancedConfig])
-               , io_lib:format("cp -p -P -R \"~s/dev/dev~b/riak/etc\" \"~s/dev/dev~b/riak\"", [OldPath, N, NewPath, N])
-               , io_lib:format("mv \"~s.keep\" \"~s\"", [AdvancedConfig, AdvancedConfig])
+    Commands = [ io_lib:format("rm -rf ~s/dev/dev~b/riak/data/*", [NewPath, N])
+               , io_lib:format("cp -p -P -R \"~s/dev/dev~b/riak/data\" \"~s/dev/dev~b/riak\"", [OldPath, N, NewPath, N])
                ],
     [ begin
         logger:info("Running: ~s", [Cmd]),

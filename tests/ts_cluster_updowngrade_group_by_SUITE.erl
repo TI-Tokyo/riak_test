@@ -97,39 +97,6 @@ make_select_grouped_field_test(DoesSelectPass) ->
               insert  = Insert,
               selects = [Select]}.
 
-make_group_by_2_test(DoesSelectPass) ->
-    Create = #create{ddl = "CREATE TABLE ~s ("
-                     "a SINT64 NOT NULL, "
-                     "b SINT64 NOT NULL, "
-                     "c TIMESTAMP NOT NULL, "
-                     "d SINT64 NOT NULL, "
-                     "e SINT64 NOT NULL, "
-                     "PRIMARY KEY ((a,b,quantum(c,1,s)), a,b,c,d))",
-                     expected   = {ok, {[], []}}},
-
-    Insert = #insert{data = [{1,1,CE,D,CE} || CE <- lists:seq(1,1000),
-                                              D <- [1,2,3]],
-                     expected = ok},
-
-    {SelExp, AssertFn}
-        = case DoesSelectPass of
-              select_passes -> {{ok, {[<<"d">>, <<"AVG(e)">>],
-                                      [{2,500.5}, {3,500.5}, {1,500.5}]}},
-                                sorted_assert};
-              select_fails  -> {?SELECTERROR, plain_assert}
-          end,
-    Select = #select{qry = "SELECT d, AVG(e) FROM ~s "
-                     "WHERE a = 1 AND b = 1 AND c >= 1 AND c <= 1000 "
-                     "GROUP BY d",
-                     expected = SelExp,
-                     assert_mod = ?MODULE,
-                     assert_fun = AssertFn},
-
-    #test_set{testname = "group_by_2",
-              create  = Create,
-              insert  = Insert,
-              selects = [Select]}.
-
 sorted_assert(String, {ok, {ECols, Exp}}, {ok, {GCols, Got}}) ->
     Exp2 = lists:sort(Exp),
     Got2 = lists:sort(Got),

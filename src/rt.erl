@@ -1611,7 +1611,6 @@ pbc(Node) ->
 
 -spec pbc(node(), proplists:proplist()) -> pid().
 pbc(Node, Options) ->
-    rt:wait_for_service(Node, riak_kv),
     ConnInfo = proplists:get_value(Node, connection_info([Node])),
     {IP, PBPort} = proplists:get_value(pb, ConnInfo),
     {ok, Pid} = riakc_pb_socket:start_link(IP, PBPort, Options),

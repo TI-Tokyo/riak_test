@@ -35,80 +35,79 @@ confirm() ->
     Data = ts_data:get_data(api),
 
     Cluster = [NodeA] = ts_setup:start_cluster(1),
-    Client = rt:pbc(NodeA),
 
     Table = ts_data:get_default_bucket(),
-    {ok, {[],[]}} = riakc_ts:query(Client, DDL),
+    {ok, {[],[]}} = riakc_ts:query(rt:pbc(NodeA), DDL),
 
     ok = ts_ops:put(Cluster, Table, Data),
 
-    confirm_GtOps(Client),
-    confirm_GtEqOps(Client),
-    confirm_LtOps(Client),
-    confirm_LtEqOps(Client),
-    confirm_EqOps(Client),
-    confirm_NeqOps(Client),
+    confirm_GtOps(NodeA),
+    confirm_GtEqOps(NodeA),
+    confirm_LtOps(NodeA),
+    confirm_LtEqOps(NodeA),
+    confirm_EqOps(NodeA),
+    confirm_NeqOps(NodeA),
     pass.
 
 %------------------------------------------------------------
 % Test > Ops
 %------------------------------------------------------------
 
-confirm_GtOps(C) ->
-    confirm_Pass(C, {myint,   int,     '>', 1}),
-    confirm_Pass(C, {myfloat, float,   '>', 1.0}),
-    confirm_Error(C, {mybin,   varchar, '>', test2}),
-    confirm_Error(C, {mybool,  boolean, '>', true}).
+confirm_GtOps(Node) ->
+    confirm_Pass(Node, {myint,   int,     '>', 1}),
+    confirm_Pass(Node, {myfloat, float,   '>', 1.0}),
+    confirm_Error(Node, {mybin,   varchar, '>', test2}),
+    confirm_Error(Node, {mybool,  boolean, '>', true}).
 
 %------------------------------------------------------------
 % Test >= Ops
 %------------------------------------------------------------
 
-confirm_GtEqOps(C) ->
-    confirm_Pass(C, {myint,   int,     '>=', 1}),
-    confirm_Pass(C, {myfloat, float,   '>=', 1.0}),
-    confirm_Error(C, {mybin,   varchar, '>=', test2}),
-    confirm_Error(C, {mybool,  boolean, '>=', true}).
+confirm_GtEqOps(Node) ->
+    confirm_Pass(Node, {myint,   int,     '>=', 1}),
+    confirm_Pass(Node, {myfloat, float,   '>=', 1.0}),
+    confirm_Error(Node, {mybin,   varchar, '>=', test2}),
+    confirm_Error(Node, {mybool,  boolean, '>=', true}).
 
 %------------------------------------------------------------
 % Test < Ops
 %------------------------------------------------------------
 
-confirm_LtOps(C) ->
-    confirm_Pass(C, {myint,   int,     '<', 4}),
-    confirm_Pass(C, {myfloat, float,   '<', 4.0}),
-    confirm_Error(C, {mybin,   varchar, '<', test2}),
-    confirm_Error(C, {mybool,  boolean, '<', true}).
+confirm_LtOps(Node) ->
+    confirm_Pass(Node, {myint,   int,     '<', 4}),
+    confirm_Pass(Node, {myfloat, float,   '<', 4.0}),
+    confirm_Error(Node, {mybin,   varchar, '<', test2}),
+    confirm_Error(Node, {mybool,  boolean, '<', true}).
 
 %------------------------------------------------------------
 % Test <= Ops
 %------------------------------------------------------------
 
-confirm_LtEqOps(C) ->
-    confirm_Pass(C, {myint,   int,     '<=', 4}),
-    confirm_Pass(C, {myfloat, float,   '<=', 4.0}),
-    confirm_Error(C, {mybin,   varchar, '<=', test2}),
-    confirm_Error(C, {mybool,  boolean, '<=', true}).
+confirm_LtEqOps(Node) ->
+    confirm_Pass(Node, {myint,   int,     '<=', 4}),
+    confirm_Pass(Node, {myfloat, float,   '<=', 4.0}),
+    confirm_Error(Node, {mybin,   varchar, '<=', test2}),
+    confirm_Error(Node, {mybool,  boolean, '<=', true}).
 
 %------------------------------------------------------------
 % Test == Ops
 %------------------------------------------------------------
 
-confirm_EqOps(C) ->
-    confirm_Pass(C, {myint,   int,     '=', 2}),
-    confirm_Pass(C, {myfloat, float,   '=', 2.0}),
-    confirm_Pass(C, {mybin,   varchar, '=', test2}),
-    confirm_Pass(C, {mybool,  boolean, '=', true}).
+confirm_EqOps(Node) ->
+    confirm_Pass(Node, {myint,   int,     '=', 2}),
+    confirm_Pass(Node, {myfloat, float,   '=', 2.0}),
+    confirm_Pass(Node, {mybin,   varchar, '=', test2}),
+    confirm_Pass(Node, {mybool,  boolean, '=', true}).
 
 %------------------------------------------------------------
 % Test != Ops
 %------------------------------------------------------------
 
-confirm_NeqOps(C) ->
-    confirm_Pass(C, {myint,   int,     '!=', 2}),
-    confirm_Pass(C, {myfloat, float,   '!=', 2.0}),
-    confirm_Pass(C, {mybin,   varchar, '!=', test2}),
-    confirm_Pass(C, {mybool,  boolean, '!=', true}).
+confirm_NeqOps(Node) ->
+    confirm_Pass(Node, {myint,   int,     '!=', 2}),
+    confirm_Pass(Node, {myfloat, float,   '!=', 2.0}),
+    confirm_Pass(Node, {mybin,   varchar, '!=', test2}),
+    confirm_Pass(Node, {mybool,  boolean, '!=', true}).
 
 %------------------------------------------------------------
 % Runs a query, and checks that the result is non-trivial (ie, returns
@@ -116,9 +115,9 @@ confirm_NeqOps(C) ->
 % tests that have no expected matches
 %------------------------------------------------------------
 
-confirm_pass(C, Qry, Expected) ->
-    logger:info("Running query: ~s", [Qry]),
-    Got = riakc_ts:query(C, Qry, [], undefined, []),
+confirm_pass(Node, Qry, Expected) ->
+    Client = rt:pbc(Node),
+    Got = riakc_ts:query(Client, Qry),
     {ok, {_Cols, Records}} = Got,
     N = length(Records),
     ?assertEqual(Expected, Got),
@@ -128,8 +127,9 @@ confirm_pass(C, Qry, Expected) ->
 % Runs a query, and checks that the result is an error
 %------------------------------------------------------------
 
-confirm_error(C, Qry, _Expected) ->
-    Got = ts_ops:query(C, Qry),
+confirm_error(Node, Qry, _Expected) ->
+    Client = rt:pbc(Node),
+    Got = riakc_ts:query(Client, Qry),
     {Status, _Reason} = Got,
     ?assertEqual(Status, error).
 

@@ -33,7 +33,7 @@ confirm() ->
     Expected = "GeoCheckin has been created but cannot be activated yet",
 
     [_Node|Rest]= Cluster = ts_setup:start_cluster(3),
-    ok = rt:stop(hd(tl(Rest))),
+    rt:stop(hd(tl(Rest))),
     Table = ts_data:get_default_bucket(),
     {ok, _} = ts_setup:create_bucket_type(Cluster, DDL, Table),
     {ok, Got} = ts_setup:activate_bucket_type(Cluster, Table),

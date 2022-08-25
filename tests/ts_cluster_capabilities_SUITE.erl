@@ -209,23 +209,21 @@ query_in_mixed_version_cluster(_Ctx) ->
     ok = riakc_ts:put(rt:pbc(Node_A), Table,
         [{1,1,B*C} || B <- lists:seq(1,10), C <- lists:seq(1000,5000,1000)]),
     ExpectedResultSet = [{N} || N <- lists:seq(1000,5000,1000)],
-    %%
-    %% Test that the current version can query older version
-    %%
+
     Query =
         "SELECT c FROM grouptab1 "
         "WHERE a = 1 AND b = 1 AND c >= 1000 AND c <= 5000 ",
-    % ct:pal("COVERAGE ~p", [riakc_ts:get_coverage(rt:pbc(Node_A), <<"grouptab1">>, Query)]),
-    {ok, {Cols, Rows}} = run_query(rt:pbc(Node_A), Query),
-    ts_data:assert_row_sets(
-        {rt_ignore_columns, ExpectedResultSet},
-        {ok,{Cols, Rows}}
-    ),
-    %%
-    %% Test that the previous can query the current version
-    %%
-    {ok, {Cols, Rows}} = run_query(rt:pbc(Node_B), Query),
-    ts_data:assert_row_sets(
-        {rt_ignore_columns, ExpectedResultSet},
-        {ok,{Cols, Rows}}
-    ).
+
+    rt:upgrade(Node_A, current),
+    rt:wait_until_ring_converged(Cluster),
+
+    query_from_all_nodes(Query, Cluster, ExpectedResultSet).
+
+query_from_all_nodes(Query, Cluster, ExpectedResultSet) ->
+    [begin
+         {ok, {Cols, Rows}} = riakc_ts:query(rt:pbc(Node), Query),
+         ts_data:assert_row_sets(
+           {rt_ignore_columns, ExpectedResultSet},
+           {ok,{Cols, Rows}}
+          )
+     end || Node <- Cluster].

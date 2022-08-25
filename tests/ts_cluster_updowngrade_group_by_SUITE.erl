@@ -30,7 +30,8 @@
 -define(SELECTERROR, {error, {1020, <<"Used group as a measure of time in 1000group. Only s, m, h and d are allowed.">>}}).
 
 make_initial_config(Config) ->
-    [{use_previous_client, false} | Config].
+    [{use_previous_client, false},
+     {starting_version, previous} | Config].
 
 make_scenarios() ->
     BaseScenarios =
@@ -43,12 +44,12 @@ make_scenarios() ->
                    ensure_full_caps     = ts_updown_util:caps_to_ensure(full),
                    ensure_degraded_caps = ts_updown_util:caps_to_ensure(degraded),
                    convert_config_to_previous = fun ts_updown_util:convert_riak_conf_to_previous/1}
-         || TableNodeVsn            <- [previous, current],
+         || TableNodeVsn            <- [previous],
             QueryNodeVsn            <- [previous, current],
             NeedTableNodeTransition <- [true, false],
-            NeedQueryNodeTransition <- [true, false],
-            NeedPreClusterMixed     <- [true, false],
-            NeedPostClusterMixed    <- [true, false]],
+            NeedQueryNodeTransition <- [true],
+            NeedPreClusterMixed     <- [false],
+            NeedPostClusterMixed    <- [false]],
     [add_tests(X) || X <- BaseScenarios].
 
 
@@ -62,8 +63,7 @@ make_scenario_invariants(Config) ->
 %% newer versions
 add_tests(Scen) ->
     Tests = [
-             make_select_grouped_field_test(select_passes),
-             make_group_by_2_test(select_passes)
+             make_select_grouped_field_test(select_passes)
             ],
     Scen#scenario{tests = Tests}.
 

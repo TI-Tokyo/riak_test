@@ -26,7 +26,8 @@
 -define(PRECIPITATION_COL_INDEX, 6).
 
 make_initial_config(Config) ->
-    [{use_previous_client, false} | Config].
+    [{use_previous_client, false},
+     {starting_version, previous} | Config].
 
 make_scenarios() ->
     [#scenario{table_node_vsn             = TableNodeVsn,
@@ -39,8 +40,8 @@ make_scenarios() ->
                ensure_degraded_caps = ts_updown_util:caps_to_ensure(degraded),
                convert_config_to_previous = fun ts_updown_util:convert_riak_conf_to_previous/1}
      || TableNodeVsn            <- [previous, current],
-        QueryNodeVsn            <- [previous, current],
-        NeedTableNodeTransition <- [false, true],
+        QueryNodeVsn            <- [current],
+        NeedTableNodeTransition <- [false],
         NeedQueryNodeTransition <- [false],
         NeedPreClusterMixed     <- [false],
         NeedPostClusterMixed    <- [false]].

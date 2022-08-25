@@ -67,7 +67,7 @@ make_scenarios() ->
          || TableNodeVsn            <- [previous],
             QueryNodeVsn            <- [previous, current],
             NeedTableNodeTransition <- [true, false],
-            NeedQueryNodeTransition <- [false],
+            NeedQueryNodeTransition <- [true],
             NeedPreClusterMixed     <- [false],
             NeedPostClusterMixed    <- [false]],
     [add_tests(X) || X <- BaseScenarios].

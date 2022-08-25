@@ -29,6 +29,7 @@
          assert_error_regex/3,
          assert_float/3,
          assert_row_sets/2,
+         assert_row_sets/3,
          exclusive_result_from_data/3,
          flat_format/2,
          get_bool/1,
@@ -390,24 +391,26 @@ assert_error_regex_result(_, _String, _Expected, _Got) ->
     pass.
 
 %% If `ColExpected' is the atom `rt_ignore_columns' then do not assert columns.
-assert_row_sets(_, {error,_} = Error) ->
+assert_row_sets(A, B) ->
+    assert_row_sets(A, B, "undefined").
+assert_row_sets(_, {error,_} = Error, _) ->
     ct:fail(Error);
-assert_row_sets({rt_ignore_columns, Expected}, {_, {_, Actual}}) ->
-    ct_verify_rows(Expected, Actual);
-assert_row_sets({_, {ColExpected, Expected}}, {_, {ColsActual, Actual}}) ->
+assert_row_sets({rt_ignore_columns, Expected}, {_, {_, Actual}}, Query) ->
+    ct_verify_rows(Expected, Actual, Query);
+assert_row_sets({_, {ColExpected, Expected}}, {_, {ColsActual, Actual}}, Query) ->
     ?assertEqual(ColExpected, ColsActual),
-    ct_verify_rows(Expected, Actual);
-assert_row_sets(Expected, Actual) when is_list(Expected), is_list(Actual) ->
-    ct_verify_rows(Expected, Actual).
+    ct_verify_rows(Expected, Actual, Query);
+assert_row_sets(Expected, Actual, Query) when is_list(Expected), is_list(Actual) ->
+    ct_verify_rows(Expected, Actual, Query).
 
-ct_verify_rows(Expected, Actual) ->
+ct_verify_rows(Expected, Actual, Query) ->
     case tdiff:diff(Expected, Actual) of
         [{eq,_}] ->
             pass;
         [] ->
             pass;
         Diff ->
-            ct:pal("ROW DIFF~n" ++ format_diff(0, Diff)),
+            ct:pal("In query " ++ Query ++ "\nROW DIFF\n" ++ format_diff(0, Diff)),
             ct:fail(row_set_mismatch)
     end.
 

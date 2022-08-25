@@ -159,7 +159,7 @@ sql_select_upgrade_a_node_from_legacy_test(_Ctx) ->
 
 sql_select_join_with_all_nodes_upgraded_test(_Ctx) ->
     [Node_A, Node_B, Node_C] =
-        rt:deploy_nodes([legacy, legacy, legacy]),
+        rt:deploy_nodes([previous, previous, previous]),
     ok = rt:join_cluster([Node_A,Node_B,Node_C]),
     rt:wait_until_ring_converged([Node_A,Node_B,Node_C]),
     rt:upgrade(Node_A, current),
@@ -172,7 +172,7 @@ sql_select_join_with_all_nodes_upgraded_test(_Ctx) ->
 
 sql_select_downgrade_a_node_test(_Ctx) ->
     [Node_A, Node_B, Node_C] =
-        rt:deploy_nodes([legacy, current, current]),
+        rt:deploy_nodes([legacy, previous, previous]),
     ok = rt:join_cluster([Node_A,Node_B,Node_C]),
     rt:wait_until_ring_converged([Node_A,Node_B,Node_C]),
     % rt:wait_until_capability(Node_A, ?SQL_SELECT_CAP, v3),
@@ -188,7 +188,7 @@ sql_select_downgrade_a_node_test(_Ctx) ->
     %% section will expect v2. Once capabilities are changed in a future version of riak
     %% (or if testing 1.4.0 as current)
     %% the expected version should go back to v2.
-    rt:upgrade(Node_A, legacy),
+    rt:upgrade(Node_A, previous),
     rt:wait_until_ring_converged([Node_A,Node_B,Node_C]),
     rt:wait_until_capability(Node_B, ?SQL_SELECT_CAP, v3),
     rt:wait_until_capability(Node_C, ?SQL_SELECT_CAP, v3),

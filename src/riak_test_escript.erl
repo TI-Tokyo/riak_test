@@ -1,6 +1,7 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2013 Basho Technologies, Inc.
+%% Copyright (c) 2013-2016 Basho Technologies, Inc.
+%% Copyright (c) 2018-2022 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -25,10 +26,18 @@
 -export([add_deps/1]).
 
 add_deps(Path) ->
-    io:format("Adding path ~s~n", [Path]),
-    {ok, Deps} = file:list_dir(Path),
-    [code:add_path(lists:append([Path, "/", Dep, "/ebin"])) || Dep <- Deps],
-    ok.
+    case file:list_dir(Path) of
+        {ok, Deps} ->
+            io:format("Adding path ~s~n", [Path]),
+            lists:foreach(
+                fun(Dep) ->
+                    code:add_path(lists:flatten(filename:join([Path, Dep, "ebin"])))
+                end, Deps);
+        {error, enoent} ->
+            io:format(standard_error, "!!! Warning: Skipping path ~s~n", [Path]);
+        {error, Reason} ->
+            erlang:error(Reason, [Path])
+    end.
 
 cli_options() ->
 %% Option Name, Short Code, Long Code, Argument Spec, Help Message
@@ -42,6 +51,7 @@ cli_options() ->
  {verbose,            $v, "verbose",  undefined,  "verbose output"},
  {outdir,             $o, "outdir",   string,     "output directory"},
  {backend,            $b, "backend",  atom,       "backend to test [memory | bitcask | eleveldb | leveldb]"},
+ {junit,       undefined, "junit",    boolean,    "output junit xml to the outdir directory"},
  {upgrade_version,    $u, "upgrade",  atom,       "which version to upgrade from [ previous | legacy ]"},
  {keep,        undefined, "keep",     boolean,    "do not teardown cluster"},
  {batch,       undefined, "batch",    undefined,  "running a batch, always teardown, even on failure"},
@@ -119,7 +129,7 @@ main(Args) ->
         [{level, ConsoleLagerLevel},
             {formatter, ConsoleFormatter},
             {formatter_config, ConsoleFormatConfig}],
-    FileBackend = 
+    FileBackend =
         [{file, "log/test.log"}, {level, ConsoleLagerLevel}],
     application:set_env(lager, error_logger_hwm, 250), %% helpful for debugging
     application:set_env(lager, handlers, [{lager_console_backend, ConsoleBackend},
@@ -187,14 +197,22 @@ main(Args) ->
     net_kernel:start([ENode]),
     erlang:set_cookie(node(), Cookie),
 
+    StartUTC = calendar:universal_time(),
+
     TestResults = lists:filter(fun results_filter/1, [ run_test(Test, Outdir, TestMetaData, Report, HarnessArgs, length(Tests)) || {Test, TestMetaData} <- Tests]),
     [rt_cover:maybe_import_coverage(proplists:get_value(coverdata, R)) || R <- TestResults],
     Coverage = rt_cover:maybe_write_coverage(all, CoverDir),
-
+    case proplists:get_value(junit, ParsedArgs, false) of
+        true ->
+            OutFile = filename:join(junit_outdir(Outdir), junit_filename(StartUTC)),
+            file:write_file(OutFile, junit_xml(StartUTC, TestResults));
+        _ ->
+            ok
+    end,
     Teardown = not proplists:get_value(keep, ParsedArgs, false),
     Batch = lists:member(batch, ParsedArgs),
     maybe_teardown(Teardown, TestResults, Coverage, Verbose, Batch),
-    ok.
+    halt(exit_code(TestResults)).
 
 maybe_teardown(false, TestResults, Coverage, Verbose, _Batch) ->
     print_summary(TestResults, Coverage, Verbose),
@@ -208,8 +226,121 @@ maybe_teardown(true, TestResults, Coverage, Verbose, Batch) ->
             lager:info("Multiple tests run or no failure"),
             rt:teardown(),
             print_summary(TestResults, Coverage, Verbose)
+    end.
+
+exit_code(TestResults) ->
+    FailedTests = lists:filter(fun is_failed_test/1, TestResults),
+    case FailedTests of
+        [] ->
+            0;
+        _ ->
+            1
+    end.
+
+is_failed_test(Result) ->
+    proplists:get_value(status, Result) =:= fail.
+
+junit_outdir(undefined) -> "log";
+junit_outdir(Dir) -> Dir.
+
+junit_xml(StartUTC, TestResults) ->
+    {ElapsedMS, Failed} = lists:foldl(
+        fun(TR, {ET, FC}) ->
+            F = case proplists:get_value(status, TR) of
+                pass -> 0;
+                _ -> 1
+            end,
+            {(ET + test_et_ms(TR)), (FC + F)}
+        end, {0, 0}, TestResults),
+    %% Sadly, there doesn't appear to be any formal schema for junit output
+    %% files, so it's taken some experimentation to come up with something
+    %% that seems to be ok for generic processing ...
+    SuiteName = junit_suite(["RIAK_TEST_SUITE", "RIAK_TEST_CATEGORY"]),
+    Timestamp = junit_timestamp(StartUTC),
+    [
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n",
+        io_lib:format(
+            "<testsuite package=\"riak_test\" name=\"~s\" timestamp=\"~s\""
+            " tests=\"~b\" failures=\"~b\" time=\"~.3.0f\">~n",
+            [SuiteName, Timestamp, erlang:length(TestResults), Failed, (ElapsedMS / 1000)]),
+        [junit_xml_testcase(R) || R <- TestResults],
+        "</testsuite>\n"
+    ].
+
+%% property keys [coverdata,test,status,elapsed_ms,log,backend,id,platform,version,project]
+junit_xml_testcase(Result) ->
+    ETMS = test_et_ms(Result),
+    Test = proplists:get_value(test, Result),
+    Head = io_lib:format(
+        "  <testcase name=\"~s\" time=\"~.3.0f\"", [Test, (ETMS / 1000)]),
+    case proplists:get_value(status, Result) of
+        pass ->
+            [Head, " />\n"];
+        _ ->
+            [
+                Head, ">\n"
+                "    <failure message=\"\" type=\"ERROR\">\n",
+                junit_clean_error(Test, proplists:get_value(log, Result)),
+                "    </failure>\n"
+                "  </testcase>\n"
+            ]
+    end.
+
+junit_clean_error(Test, Log) ->
+    RE = io_lib:format(
+        "\\d\\d:\\d\\d:\\d\\d\\.\\d\\d\\d\\h+\\[notice\\]\\h+Running\\h+Test\\h+~s\\b",
+        [Test]),
+    Error = case re:run(Log, RE, [{capture, first, index}]) of
+        {match, [{Start, _}]} ->
+            binary:bin_to_list(Log, Start, (erlang:byte_size(Log) - Start));
+        _ ->
+            erlang:binary_to_list(Log)
     end,
-    ok.
+    junit_encode_error(Error, []).
+
+% xml-escape and strip CRs in one pass
+junit_encode_error([], Out) ->
+    lists:reverse(Out);
+junit_encode_error([$\r | In], Out) ->
+    junit_encode_error(In, Out);
+junit_encode_error([$< | In], Out) ->
+    junit_encode_error(In, [$;, $t, $l, $& | Out]);
+junit_encode_error([$> | In], Out) ->
+    junit_encode_error(In, [$;, $t, $g, $& | Out]);
+junit_encode_error([$& | In], Out) ->
+    junit_encode_error(In, [$;, $p, $m, $a, $& | Out]);
+junit_encode_error([Ch | In], Out) ->
+    junit_encode_error(In, [Ch | Out]).
+
+%% always return at least 1ms
+test_et_ms(Result) ->
+    case proplists:get_value(elapsed_ms, Result) of
+        I when erlang:is_integer(I) andalso I > 0 -> I;
+        _ -> 1
+    end.
+
+junit_timestamp({{Y, Mo, D}, {H, Mn, S}}) ->
+    io_lib:format(
+        "~4..0b-~2..0b-~2..0bT~2..0b:~2..0b:~2..0bZ",
+        [Y, Mo, D, H, Mn, S]).
+
+junit_filename({{Y, Mo, D}, {H, Mn, S}}) ->
+    io_lib:format(
+        "junit_~4..0b-~2..0b-~2..0bT~2..0b-~2..0b-~2..0bZ.xml",
+        [Y, Mo, D, H, Mn, S]).
+
+junit_suite([]) ->
+    "Riak Test";
+junit_suite([Var | Vars]) ->
+    case os:getenv(Var) of
+        % ugly special-case hack for our driver
+        "undefined" ->
+            junit_suite(Vars);
+        [_|_] = Val ->
+            Val;
+        _ ->
+            junit_suite(Vars)
+    end.
 
 parse_command_line_tests(ParsedArgs) ->
     Backends = case proplists:get_all_values(backend, ParsedArgs) of

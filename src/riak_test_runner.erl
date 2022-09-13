@@ -1,6 +1,7 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2013 Basho Technologies, Inc.
+%% Copyright (c) 2012-2016 Basho Technologies, Inc.
+%% Copyright (c) 2018 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -51,21 +52,24 @@ confirm(TestModule, Outdir, TestMetaData, HarnessArgs) ->
                     end,
     Backend = rt:set_backend(proplists:get_value(backend, TestMetaData), BackendExtras),
     {Mod, Fun} = function_name(TestModule),
-    {Status, Reason} = case check_prereqs(Mod) of
+    {ElapsedMS, Status, Reason} = case check_prereqs(Mod) of
         true ->
             lager:notice("Running Test ~s", [TestModule]),
-            execute(TestModule, {Mod, Fun}, TestMetaData);
+            {E, {S, R}} = timer:tc(fun execute/3, [TestModule, {Mod, Fun}, TestMetaData]),
+            {(E div 1000), S, R};
         not_present ->
-            {fail, test_does_not_exist};
+            {1, fail, test_does_not_exist};
         _ ->
-            {fail, all_prereqs_not_present}
+            {1, fail, all_prereqs_not_present}
     end,
 
     lager:notice("~s Test Run Complete ~p", [TestModule, Status]),
     {ok, Logs} = stop_lager_backend(),
     Log = unicode:characters_to_binary(Logs),
 
-    RetList = [{test, TestModule}, {status, Status}, {log, Log}, {backend, Backend} | proplists:delete(backend, TestMetaData)],
+    RetList = [{test, TestModule}, {status, Status},
+        {log, Log}, {backend, Backend}, {elapsed_ms, ElapsedMS}
+        | proplists:delete(backend, TestMetaData)],
     case Status of
         fail -> RetList ++ [{reason, iolist_to_binary(io_lib:format("~p", [Reason]))}];
         _ -> RetList

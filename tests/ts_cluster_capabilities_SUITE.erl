@@ -192,7 +192,7 @@ sql_select_downgrade_a_node(_Ctx) ->
 %%--------------------------------------------------------------------
 
 query_in_mixed_version_cluster(_Ctx) ->
-    [Node_A | _] = Cluster =
+    [Node_A, Node_B, Node_C] = Cluster =
         rt:deploy_nodes([previous, current, current]),
     ok = rt:join_cluster(Cluster),
     rt:wait_until_ring_converged(Cluster),
@@ -216,6 +216,11 @@ query_in_mixed_version_cluster(_Ctx) ->
 
     rt:upgrade(Node_A, current),
     rt:wait_until_ring_converged(Cluster),
+
+    rt:leave(Node_A),
+    ok = rt:wait_until_no_pending_changes([Node_A]),
+    ok = rt:wait_until_no_pending_changes([Node_B, Node_C]),
+    rt:join(Node_A, Node_B),
 
     query_from_all_nodes(Query, Cluster, ExpectedResultSet).
 

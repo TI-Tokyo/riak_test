@@ -1,6 +1,7 @@
 %% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2013-2016 Basho Technologies, Inc.
+%% Copyright (c) 2022 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -196,27 +197,111 @@
 -define(RT_ETS, rt_ets).
 -define(RT_ETS_OPTS, [public, named_table, {write_concurrency, true}]).
 
+%% @doc Attempts to locate the 'priv' directory.
+%% Since we're likely running as an escript, this can be easier said than done.
+%% Try, in order:
+%%  dirname(escript:script_name)/priv
+%%  CWD/priv
+%%  code:priv_dir()
+%% If none exists, throws error:bad_priv_dir
 priv_dir() ->
-    LocalPrivDir = "./priv",
-    %% XXX for some reason, codew:priv_dir returns riak_test/riak_test/priv,
-    %% which is wrong, so fix it.
-    DepPrivDir = re:replace(code:priv_dir(riak_test), "riak_test(/riak_test)*",
-        "riak_test", [{return, list}]),
-    PrivDir = case {filelib:is_dir(LocalPrivDir), filelib:is_dir(DepPrivDir)} of
-        {true, _} ->
-            lager:debug("Local ./priv detected, using that..."),
-            %% we want an absolute path!
-            filename:absname(LocalPrivDir);
-        {false, true} ->
-            lager:debug("riak_test dependency priv_dir detected, using that..."),
-            DepPrivDir;
+    case application:get_env(riak_test, priv_dir) of
+        {ok, SavedDir} ->
+            SavedDir;
         _ ->
-            error(bad_priv_dir)
-    end,
+            case find_priv_dir([escript, cwd, code]) of
+                false ->
+                    erlang:error(bad_priv_dir);
+                PrivDir ->
+                    ok = application:set_env(riak_test, priv_dir, PrivDir),
+                    lager:info("Using priv dir: '~s'", [PrivDir]),
+                    PrivDir
+            end
+    end.
 
-    lager:info("priv dir: ~p -> ~p", [code:priv_dir(riak_test), PrivDir]),
-    ?assert(filelib:is_dir(PrivDir)),
-    PrivDir.
+find_priv_dir([]) ->
+    false;
+find_priv_dir([code | Modes]) ->
+    %% Maybe not running as an escript ...
+    case code:priv_dir(riak_test) of
+        {error, _} ->
+            find_priv_dir(Modes);
+        CodePriv ->
+            lager:debug("code:priv_dir/1 returned '~s'", [CodePriv]),
+            %% In an escript, this is not going to be a real directory.
+            case filelib:is_dir(CodePriv) of
+                true ->
+                    CodePriv;
+                _ ->
+                    find_priv_dir(Modes)
+            end
+    end;
+find_priv_dir([cwd | Modes]) ->
+    {ok, CWD} = file:get_cwd(),
+    case find_priv_dir(CWD) of
+        false ->
+            find_priv_dir(Modes);
+        PrivDir ->
+            PrivDir
+    end;
+find_priv_dir([escript | Modes]) ->
+    %% escript:script_name/0 performs NO error handling, so it'll throw a
+    %% badmatch exception if there are no command-line arguments to init.
+    case (catch escript:script_name()) of
+        ScrName when erlang:is_list(ScrName) ->
+            lager:debug("escript:script_name/0 returned '~s'", [ScrName]),
+            case confirm_escript(ScrName) of
+                false ->
+                    find_priv_dir(Modes);
+                ScrFile ->
+                    case find_priv_dir(filename:dirname(ScrFile)) of
+                        false ->
+                            find_priv_dir(Modes);
+                        PrivDir ->
+                            PrivDir
+                    end
+            end;
+        _ ->
+            find_priv_dir(Modes)
+    end;
+find_priv_dir(BaseDir) ->
+    %% Assume BaseDir is absolute.
+    PrivDir = filename:join(BaseDir, "priv"),
+    case filelib:is_dir(PrivDir) of
+        true ->
+            lists:flatten(PrivDir);
+        _ ->
+            false
+    end.
+
+%% escript:script_name/0 is pretty weak - it just returns the first command-line
+%% argument - so just checking that it's a file doesn't confirm much. At least
+%% confirm that it *looks* like an escript with a suitable hashbang.
+%% Standard is "#!/usr/bin/env escript"
+confirm_escript(ScrFile) ->
+    case filelib:is_regular(ScrFile) of
+        true ->
+            case file:open(ScrFile, [read]) of
+                {ok, IoDev} ->
+                    ReadLine = file:read_line(IoDev),
+                    _ = file:close(IoDev),
+                    case ReadLine of
+                        {ok, Line} ->
+                            case re:run(Line, "^#!.+\\bescript\\b", [{capture, none}]) of
+                                match ->
+                                    filename:absname(ScrFile);
+                                _ ->
+                                    false
+                            end;
+                        _ ->
+                            false
+                    end;
+                _ ->
+                    false
+            end;
+        _ ->
+            false
+    end.
 
 %% @doc gets riak deps from the appropriate harness
 -spec get_deps() -> list().
@@ -761,7 +846,7 @@ wait_until_status_ready(Node) ->
 -spec wait_until_no_pending_changes([node()]) -> ok | fail.
 wait_until_no_pending_changes(Nodes) ->
     lager:info("Wait until no pending changes on ~p", [Nodes]),
-    F = 
+    F =
         fun() ->
             case no_pending_changes(Nodes) of
                 true ->
@@ -794,7 +879,7 @@ no_pending_changes(Nodes) ->
                 [Node ||
                     {Node, false} <- lists:zip(Nodes -- BadNodes, Changes)],
             lager:info("Changes not yet complete, or bad nodes. "
-                        ++ 
+                        ++
                         "BadNodes=~p, Nodes with Pending Changes=~p~n",
                         [BadNodes, NodesWithChanges]),
             false
@@ -939,7 +1024,7 @@ wait_until_unpingable(Node) ->
 wait_until_registered(Node, Name) ->
     lager:info("Wait until ~p is up on ~p", [Name, Node]),
 
-    F = 
+    F =
         fun() ->
             case rpc:call(Node, erlang, registered, []) of
                 NodeList when is_list(NodeList) ->

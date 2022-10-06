@@ -42,7 +42,7 @@ max_memory(Mode) ->
 
     ?assertEqual(ok, check_put_delete(NodeA)),
 
-    ?assertEqual(ok, check_put_consistent(NodeA)),
+    % ?assertEqual(ok, check_put_consistent(NodeA)),
 
     ?assertEqual(ok, check_eviction(NodeA)),
 
@@ -63,7 +63,7 @@ combo(Mode) ->
 
     ?assertEqual(ok, check_put_delete(NodeA)),
 
-    ?assertEqual(ok, check_put_consistent(NodeA)),
+    % ?assertEqual(ok, check_put_consistent(NodeA)),
 
     ?assertEqual(ok, check_eviction(NodeA)),
 
@@ -120,7 +120,7 @@ check_eviction(Node) ->
     {ok, C} = riak:client_connect(Node),
 
     [begin
-         C:delete(?BUCKET, <<N:32/integer>>),
+         riak_client:delete(?BUCKET, <<N:32/integer>>, C),
          timer:sleep(100)
      end
      || N <- lists:seq(1, 500)],
@@ -137,7 +137,7 @@ check_put_delete(Node) ->
 
     {ok, C} = riak:client_connect(Node),
 
-    ok = C:delete(?BUCKET, <<Key:32/integer>>),
+    ok = riak_client:delete(?BUCKET, <<Key:32/integer>>, C),
 
     timer:sleep(timer:seconds(5)),
 
@@ -163,9 +163,9 @@ check_put_consistent(Node) ->
     {ok, C} = riak:client_connect(Node),
 
     %% Write a slightly larger object than before
-    ok = C:put(riak_object:new(?BUCKET, <<Key:32/integer>>, <<0:8192>>)),
+    ok = riak_client:put(riak_object:new(?BUCKET, <<Key:32/integer>>, <<0:8192>>), C),
 
-    {ok, _} = C:get(?BUCKET, <<Key:32/integer>>),
+    {ok, _} = riak_client:get(?BUCKET, <<Key:32/integer>>, C),
 
     timer:sleep(timer:seconds(2)),
 
@@ -186,9 +186,9 @@ put_until_changed(Pid, Node, Key) ->
     {ok, C} = riak:client_connect(Node),
     {UsedSpace, _} = get_used_space(Pid),
 
-    C:put(riak_object:new(?BUCKET, <<Key:32/integer>>, <<0:8192>>)),
+    riak_client:put(riak_object:new(?BUCKET, <<Key:32/integer>>, <<0:8192>>), C),
 
-    timer:sleep(100),
+    timer:sleep(500),
 
     {UsedSpace1, PutObjSize} = get_used_space(Pid),
     case UsedSpace < UsedSpace1 of

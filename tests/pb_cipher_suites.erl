@@ -246,10 +246,10 @@ insufficient_check(Port, SingleCipherProps) ->
 
 check_reasons({protocol_version,
                 "TLS client: In state hello received SERVER ALERT:"
-                " Fatal - Protocol Version\n "}) ->
+                " Fatal - Protocol Version\n"}) ->
     ok;
 check_reasons(ProtocolVersionError) ->
-    lager:info("Unexpected error ~s", [ProtocolVersionError]),
+    lager:info("Unexpected error ~p", [ProtocolVersionError]),
     error.
 
 check_with_reenabled_protools(Port, CertDir) ->

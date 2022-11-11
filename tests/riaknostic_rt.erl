@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2012 Basho Technologies, Inc.
+%% Copyright (c) 2012-2017 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -67,7 +67,6 @@ check_riaknostic_command_list(Node) ->
     ?assert(rt:str(RiaknosticOut, "  ring_membership")),
     ?assert(rt:str(RiaknosticOut, "  ring_preflists ")),
     ?assert(rt:str(RiaknosticOut, "  ring_size      ")),
-    ?assert(rt:str(RiaknosticOut, "  search         ")),
     ok.
 
 %% Check that log levels can be set

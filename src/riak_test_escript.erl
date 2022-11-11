@@ -153,14 +153,6 @@ main(Args) ->
 
     CommandLineTests = parse_command_line_tests(ParsedArgs),
     Tests0 = which_tests_to_run(Report, CommandLineTests),
-
-    case Tests0 of
-        [] ->
-            lager:warning("No tests are scheduled to run"),
-            init:stop(1);
-        _ -> keep_on_keepin_on
-    end,
-
     Tests = case {rt_config:get(offset, undefined), rt_config:get(workers, undefined)} of
                 {undefined, undefined} ->
                     Tests0;
@@ -199,13 +191,16 @@ main(Args) ->
 
     StartUTC = calendar:universal_time(),
 
-    TestResults = lists:filter(fun results_filter/1, [ run_test(Test, Outdir, TestMetaData, Report, HarnessArgs, length(Tests)) || {Test, TestMetaData} <- Tests]),
+    NumTests = erlang:length(Tests),
+    TestResults = lists:filter(fun results_filter/1,
+        [run_test(Test, Outdir, TestMetaData, Report, HarnessArgs, NumTests)
+            || {Test, TestMetaData} <- Tests]),
     [rt_cover:maybe_import_coverage(proplists:get_value(coverdata, R)) || R <- TestResults],
     Coverage = rt_cover:maybe_write_coverage(all, CoverDir),
     case proplists:get_value(junit, ParsedArgs, false) of
         true ->
-            OutFile = filename:join(junit_outdir(Outdir), junit_filename(StartUTC)),
-            file:write_file(OutFile, junit_xml(StartUTC, TestResults));
+            JUnitFile = filename:join(junit_outdir(Outdir), junit_filename(StartUTC)),
+            write_junit_output(JUnitFile, StartUTC, TestResults);
         _ ->
             ok
     end,
@@ -243,6 +238,23 @@ is_failed_test(Result) ->
 junit_outdir(undefined) -> "log";
 junit_outdir(Dir) -> Dir.
 
+% -define(DEBUG_JUNIT_INPUT, true).
+
+-ifdef(DEBUG_JUNIT_INPUT).
+
+write_junit_output(JUnitFile, StartUTC, TestResults) ->
+    %% So editors will see it as Erlang terms
+    DumpFile = JUnitFile ++ ".config",
+    file:write_file(DumpFile, io_lib:format("~p.~n", [TestResults])),
+    file:write_file(JUnitFile, junit_xml(StartUTC, TestResults)).
+
+-else.
+
+write_junit_output(JUnitFile, StartUTC, TestResults) ->
+    file:write_file(JUnitFile, junit_xml(StartUTC, TestResults)).
+
+-endif.
+
 junit_xml(StartUTC, TestResults) ->
     {ElapsedMS, Failed} = lists:foldl(
         fun(TR, {ET, FC}) ->
@@ -267,21 +279,41 @@ junit_xml(StartUTC, TestResults) ->
         "</testsuite>\n"
     ].
 
-%% property keys [coverdata,test,status,elapsed_ms,log,backend,id,platform,version,project]
-junit_xml_testcase(Result) ->
-    ETMS = test_et_ms(Result),
-    Test = proplists:get_value(test, Result),
+%% TestResult properties [
+%%  {backend, atom()}
+%%  {coverdata, atom()}
+%%  {elapsed_ms, pos_integer()}
+%%  {id, integer()}
+%%  {log, binary()}
+%%  {platform, binary()} ex: <<"local">>
+%%  {project, binary()} ex: <<"riak">>
+%%  {reason, term()} only if status == fail
+%%  {result, pass | fail | test_does_not_exist | all_prereqs_not_present}
+%%  {status, pass | fail}
+%%  {test, atom()} test name
+%%  {version, binary()} ex: <<"riak-X.Y.Z">>
+%% ]
+junit_xml_testcase(TestResult) ->
+    ETMS = test_et_ms(TestResult),
+    Test = proplists:get_value(test, TestResult),
     Head = io_lib:format(
         "  <testcase name=\"~s\" time=\"~.3.0f\"", [Test, (ETMS / 1000)]),
-    case proplists:get_value(status, Result) of
+    Result = proplists:get_value(result, TestResult),
+    case Result of
         pass ->
             [Head, " />\n"];
-        _ ->
+        fail ->
             [
                 Head, ">\n"
-                "    <failure message=\"\" type=\"ERROR\">\n",
-                junit_clean_error(Test, proplists:get_value(log, Result)),
+                "    <failure message=\"fail\" type=\"ERROR\">\n",
+                junit_clean_error(Test, proplists:get_value(log, TestResult)),
                 "    </failure>\n"
+                "  </testcase>\n"
+            ];
+        _ ->
+            [
+                Head, ">\n", io_lib:format(
+                "    <failure message=\"~s\" type=\"ERROR\" />\n", [Result]),
                 "  </testcase>\n"
             ]
     end.
@@ -384,21 +416,12 @@ extract_test_names(Test, {CodePaths, TestNames}) ->
      [filename:rootname(filename:basename(Test)) | TestNames]}.
 
 which_tests_to_run(undefined, CommandLineTests) ->
-    {Tests, NonTests} =
-        lists:partition(fun is_runnable_test/1, CommandLineTests),
-    lager:info("These modules are not runnable tests: ~p",
-               [[NTMod || {NTMod, _} <- NonTests]]),
-    Tests;
-which_tests_to_run(Platform, []) -> giddyup:get_suite(Platform);
+    CommandLineTests;
+which_tests_to_run(Platform, []) ->
+    giddyup:get_suite(Platform);
 which_tests_to_run(Platform, CommandLineTests) ->
     Suite = filter_zip_suite(Platform, CommandLineTests),
-    {Tests, NonTests} =
-        lists:partition(fun is_runnable_test/1,
-                        lists:foldr(fun filter_merge_tests/2, [], Suite)),
-
-    lager:info("These modules are not runnable tests: ~p",
-               [[NTMod || {NTMod, _} <- NonTests]]),
-    Tests.
+    lists:foldr(fun filter_merge_tests/2, [], Suite).
 
 filter_zip_suite(Platform, CommandLineTests) ->
     [ {SModule, SMeta, CMeta} || {SModule, SMeta} <- giddyup:get_suite(Platform),
@@ -426,12 +449,6 @@ filter_merge_meta(SMeta, CMeta, [Field|Rest]) ->
         _ ->
             false
     end.
-
-%% Check for api compatibility
-is_runnable_test({TestModule, _}) ->
-    {Mod, Fun} = riak_test_runner:function_name(TestModule),
-    code:ensure_loaded(Mod),
-    erlang:function_exported(Mod, Fun, 0).
 
 run_test(Test, Outdir, TestMetaData, Report, HarnessArgs, NumTests) ->
     rt_cover:maybe_start(Test),

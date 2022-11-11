@@ -62,17 +62,31 @@ confirm(TestModule, Outdir, TestMetaData, HarnessArgs) ->
         _ ->
             {1, fail, all_prereqs_not_present}
     end,
-
-    lager:notice("~s Test Run Complete ~p", [TestModule, Status]),
+    Result = case Status of
+        fail ->
+            case Reason of
+                test_does_not_exist ->
+                    Reason;
+                all_prereqs_not_present ->
+                    Reason;
+                _ ->
+                    Status
+            end;
+        _ ->
+            Status
+    end,
+    lager:notice("~s Test Run Complete ~p", [TestModule, Result]),
     {ok, Logs} = stop_lager_backend(),
     Log = unicode:characters_to_binary(Logs),
 
-    RetList = [{test, TestModule}, {status, Status},
+    RetList = [{test, TestModule}, {status, Status}, {result, Result},
         {log, Log}, {backend, Backend}, {elapsed_ms, ElapsedMS}
         | proplists:delete(backend, TestMetaData)],
     case Status of
-        fail -> RetList ++ [{reason, iolist_to_binary(io_lib:format("~p", [Reason]))}];
-        _ -> RetList
+        fail ->
+            [{reason, iolist_to_binary(io_lib:format("~p", [Reason]))} | RetList];
+        _ ->
+            RetList
     end.
 
 start_lager_backend(TestModule, Outdir) ->

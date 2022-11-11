@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2013 Basho Technologies, Inc.
+%% Copyright (c) 2018 Martin Sumner.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -94,6 +94,7 @@
        ).
 -define(NUM_NODES, 4).
 -define(NUM_KEYS, 2000).
+-define(FUZZ_REPAIRS, 2).
 -define(BUCKET, <<"test_bucket">>).
 -define(ALT_BUCKET1, <<"alt_bucket1">>).
 -define(ALT_BUCKET2, <<"alt_bucket2">>).
@@ -126,7 +127,7 @@ confirm() ->
 
     OldVsn = previous,
     lager:info("Building previous version cluster ~p", [OldVsn]),
-    [Nodes5] = 
+    [Nodes5] =
         rt:build_clusters([{?NUM_NODES, OldVsn, ?CFG_NOREBUILD(true, false, 64, 15, false)}]),
 
     [NodeToUpgrade|_Rest] = Nodes5,
@@ -135,21 +136,21 @@ confirm() ->
         lists:keyfind(riak_kv,
             1,
             rpc:call(NodeToUpgrade, application, loaded_applications, [])),
-    
-    case RiakVer of
-        RiakVer when RiakVer >= "riak_kv-3.0.9" ->
-            lager:info("Skipping upgrade test - previous ~s > 3.0.8", [RiakVer]),
+
+    case check_capability(NodeToUpgrade) of
+        true ->
+            lager:info(
+                "Skipping upgrade test - previous version has prompted_repairs capability"),
+            lager:info("Previous ~s should be < 3.0.9", [RiakVer]),
             pass;
-        RiakVer ->
+        false ->
             lager:info("Running upgrade test with previous version ~s", [RiakVer]),
             rt:upgrade(NodeToUpgrade, current),
             rt:wait_for_service(NodeToUpgrade, riak_kv),
 
-            ?assertNot(check_capability(NodeToUpgrade)),
-
             ok = verify_aae_norebuild(Nodes5, false),
 
-            CheckFun = 
+            CheckFun =
                 fun(StatName) ->
                     proplists:get_value(StatName,
                         verify_riak_stats:get_stats(NodeToUpgrade, ?STATS_DELAY))
@@ -190,8 +191,11 @@ verify_aae_norebuild(Nodes, CheckTypeStats) ->
                         verify_riak_stats:get_stats(N, ?STATS_DELAY))
                 end,
                 Nodes)),
+    lager:info("Repairs ~w approx expected ~w", [Repairs, ?NUM_KEYS]),
     ?assert(Repairs >= ?NUM_KEYS),
-    ?assert(Repairs =< ?NUM_KEYS + 1),
+    ?assert(Repairs =< ?NUM_KEYS + ?FUZZ_REPAIRS),
+        % Allow a fuzz of 0.1%
+        % Some keys may have repair triggered twice.
 
     KV2 = [{K, <<V/binary, "a">>} || {K, V} <- KV1],
     lager:info("Writing additional n=1 data to require more repairs"),
@@ -212,7 +216,7 @@ verify_aae_norebuild(Nodes, CheckTypeStats) ->
             B_SN = <<"tictacaae_bucket_total">>,
             MT_SN = <<"tictacaae_modtime_total">>,
             E_SN = <<"tictacaae_exchange_total">>,
-            VerifyFun = 
+            VerifyFun =
                 fun(StatName) ->
                     fun(Node) ->
                         V = proplists:get_value(StatName,
@@ -340,7 +344,7 @@ verify_data(Node, KeyValues, Bucket) ->
     MaxTime = rt_config:get(rt_max_wait_time),
     Delay = 2000, % every two seconds until max time.
     Retry = MaxTime div Delay,
-    ok = 
+    ok =
         case rt:wait_until(CheckFun, Retry, Delay) of
             ok ->
                 lager:info("Data is now correct. Yay!");

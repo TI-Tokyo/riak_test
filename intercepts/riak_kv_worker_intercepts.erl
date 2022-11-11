@@ -1,6 +1,7 @@
 %% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2015 Basho Technologies, Inc.
+%% Copyright (c) 2018-2022 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -44,3 +45,28 @@ handle_work_intercept({fold, FoldFun, FinishFun}, Sender, State) ->
         FinishFun(X)
     end,
     ?M:handle_work_orig({fold, FoldFun, FinishWrapperFun}, Sender, State).
+
+%%
+%% This intercept works in tandem with the rt_kv_worker_proc module,
+%% which will be informed of when work starts and when work ends.
+%% Riak tests can install callbacks into the start and stop points,
+%% to test various conditions.
+%%
+handle_work_handoff_intercept({fold, FoldFun, FinishFun}, Sender, State) ->
+    FoldWrapperFun = fun() ->
+        Ref = erlang:make_ref(),
+        catch global:send(rt_kv_worker_proc, {work_started, {node(), Ref}, self()}),
+        receive
+            {Ref, ok} -> ok
+        end,
+        FoldFun()
+    end,
+    FinishWrapperFun = fun(X) ->
+        Ref = erlang:make_ref(),
+        catch global:send(rt_kv_worker_proc, {work_completed, {node(), Ref}, self()}),
+        receive
+            {Ref, ok} -> ok
+        end,
+        FinishFun(X)
+    end,
+    ?M:handle_work_orig({fold, FoldWrapperFun, FinishWrapperFun}, Sender, State).

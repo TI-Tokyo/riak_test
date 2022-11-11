@@ -2397,6 +2397,36 @@ assert_supported(Capabilities, Capability, Value) ->
 no_op(_Params) ->
     ok.
 
+get_stats(Node) ->
+    StatsCommand = io_lib:format("curl -s -S ~s/stats", [rt:http_url(Node)]),
+    lager:debug("Retrieving stats from ~p using command ~s", [Node, StatsCommand]),
+    StatString = os:cmd(StatsCommand),
+    {struct, Stats} = mochijson2:decode(StatString),
+    Stats.
+
+
+get_stat(Node, Key) when is_atom(Node) ->
+    Stats = get_stats(Node),
+    get_stat(Stats, Key);
+get_stat(Stats, Key) ->
+    proplists:get_value(list_to_binary(atom_to_list(Key)), Stats).
+
+
+expected_stat_values(Node, NameExpectedValues) ->
+    Stats = get_stats(Node),
+    lists:all(
+        fun({Name, ExpectedValue}) ->
+            case get_stat(Stats, Name) of
+                ExpectedValue ->
+                    true;
+                CurrentValue ->
+                    lager:info("Waiting until ~p stat equals ~p (currently ~p)", [Name, ExpectedValue, CurrentValue]),
+                    false
+            end
+        end,
+        NameExpectedValues
+    ).
+
 -ifdef(TEST).
 
 verify_product(Applications, ExpectedApplication) ->

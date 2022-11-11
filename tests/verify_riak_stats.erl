@@ -1,6 +1,7 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2012 Basho Technologies, Inc.
+%% Copyright (c) 2012-2016 Basho Technologies, Inc.
+%% Copyright (c) 2022 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -80,14 +81,14 @@ confirm() ->
 
     Stats2 = get_stats(Node1),
 
-    ExpectedNodeStats = 
+    ExpectedNodeStats =
         case HeadSupport of
             true ->
                 [{<<"node_gets">>, 10},
                     {<<"node_puts">>, 5},
                     {<<"node_gets_total">>, 10},
                     {<<"node_puts_total">>, 5},
-                    {<<"vnode_gets">>, 5}, 
+                    {<<"vnode_gets">>, 5},
                         % The five PUTS will require only HEADs
                     {<<"vnode_heads">>, 30},
                         % There is no reduction in the count of HEADs
@@ -507,11 +508,21 @@ common_stats() ->
         <<"executing_mappers">>,
         <<"exometer_core_version">>,
         <<"folsom_version">>,
-        % No yokozuna <<"fuse_version">>, 
+        % No yokozuna <<"fuse_version">>,
         <<"getopt_version">>,
         <<"goldrush_version">>,
         <<"gossip_received">>,
+        <<"handoff_acksync_wait_95">>,
+        <<"handoff_acksync_wait_99">>,
+        <<"handoff_acksync_wait_max">>,
+        <<"handoff_acksync_wait_mean">>,
+        <<"handoff_acksync_wait_median">>,
+        <<"handoff_acksync_wait_min">>,
         <<"handoff_timeouts">>,
+        <<"hinted_handoff_bytes_sent">>,
+        <<"hinted_handoff_inbound_active_transfers">>,
+        <<"hinted_handoff_objects_sent">>,
+        <<"hinted_handoff_outbound_active_transfers">>,
         <<"hll_bytes">>,
         <<"hll_bytes_mean">>,
         <<"hll_bytes_100">>,
@@ -544,7 +555,8 @@ common_stats() ->
         <<"lager_version">>,
         <<"lager_syslog_version">>,
         <<"late_put_fsm_coordinator_ack">>,
-        <<"leveldb_read_block_error">>,
+        %% disabled 937
+        %% <<"leveldb_read_block_error">>,
         <<"leveled_version">>,
         <<"list_fsm_active">>,
         <<"list_fsm_create">>,
@@ -719,6 +731,10 @@ common_stats() ->
         <<"node_puts_set">>,
         <<"node_puts_set_total">>,
         <<"node_puts_total">>,
+        <<"node_pb_put_requests_total">>,
+        <<"node_pb_get_requests_total">>,
+        <<"node_pb_delete_requests_total">>,
+        <<"node_put_fsm_tombstones_total">>,
         <<"nodename">>,
         <<"object_counter_merge">>,
         <<"object_counter_merge_time_100">>,
@@ -757,6 +773,10 @@ common_stats() ->
         <<"object_set_merge_total">>,
         <<"observer_version">>,
         <<"os_mon_version">>,
+        <<"ownership_handoff_bytes_sent">>,
+        <<"ownership_handoff_inbound_active_transfers">>,
+        <<"ownership_handoff_objects_sent">>,
+        <<"ownership_handoff_outbound_active_transfers">>,
         <<"parse_trans_version">>,
         <<"pbc_active">>,
         <<"pbc_connects">>,
@@ -797,6 +817,14 @@ common_stats() ->
         <<"recon_version">>,
         <<"redbug_version">>,
         <<"rejected_handoffs">>,
+        <<"repair_handoff_bytes_sent">>,
+        <<"repair_handoff_inbound_active_transfers">>,
+        <<"repair_handoff_objects_sent">>,
+        <<"repair_handoff_outbound_active_transfers">>,
+        <<"resize_handoff_bytes_sent">>,
+        <<"resize_handoff_inbound_active_transfers">>,
+        <<"resize_handoff_objects_sent">>,
+        <<"resize_handoff_outbound_active_transfers">>,
         <<"riak_api_version">>,
         <<"riak_auth_mods_version">>,
         <<"riak_core_version">>,

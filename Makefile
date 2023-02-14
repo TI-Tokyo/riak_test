@@ -1,7 +1,7 @@
 # -------------------------------------------------------------------
 #
 # Copyright (c) 2012-2016 Basho Technologies, Inc.
-# Copyright (c) 2017-2022 Workday, Inc.
+# Copyright (c) 2017-2023 Workday, Inc.
 #
 # This file is provided to you under the Apache License,
 # Version 2.0 (the "License"); you may not use this file
@@ -19,16 +19,21 @@
 #
 # -------------------------------------------------------------------
 #
-# Currently stripped down to irrelevance.
-# Just use rebar3 from the command line.
+# Mostly just a façade over rebar3 from the command line.
 #
 
 REBAR ?= ./rebar3
 
-all: compile
+all: escript
+
+docs:
+	$(REBAR) edoc
 
 docsclean:
-	@rm -rf doc/*.png doc/*.html doc/*.css edoc-info
+	@$(RM) -rf doc/*.png doc/*.html doc/*.css edoc-info
+
+escript:
+	$(REBAR) as prod compile
 
 compile:
 	$(REBAR) compile
@@ -37,6 +42,12 @@ clean:
 	$(REBAR) clean
 
 distclean: clean
-	rm -rf riak_test smoke_test _build
+	$(RM) -rf riak_test smoke_test _build
 
 quickbuild: compile
+
+xref:
+	$(REBAR) as check xref
+
+dialyzer:
+	$(REBAR) as check dialyzer

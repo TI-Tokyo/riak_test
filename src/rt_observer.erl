@@ -1,30 +1,84 @@
--module(observer).
--compile([export_all, nowarn_export_all]).
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2014 Basho Technologies, Inc.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 
--record(history, {network,
-                  disk,
-                  rate,
-                  nodes,
-                  lvlref,
-                  collector_sock}).
+%% @deprecated Previously only used by perf, which is no longer with us.
+%%  - Does it have any other value?
+-module(rt_observer).
+-deprecated(module).
 
--record(watcher, {nodes,
-          acceptor,
-                  collector,
-                  probes}).
+%% Public API?
+-export([
+    watch/2
+]).
+
+%% Spawned/RPCd
+-export([
+    collect/1,
+    init/5,
+    lloop/2,
+    start/5,
+    watcher/3
+]).
+
+-compile([
+    {nowarn_unused_function, [
+        %% Most of these are called from the commented-out ping/1 function.
+        {append_atoms, 2},
+        {filter, 3},
+        {get_disk2, 0},
+        {message_queues, 4},
+        {pid_name, 3},
+        {pmap, 2}
+    ]}
+]).
+
+-record(history, {
+    network,
+    disk,
+    rate,
+    nodes,
+    lvlref,
+    collector_sock
+}).
+
+-record(watcher, {
+    nodes,
+    acceptor,
+    collector,
+    probes
+}).
 
 %% See: https://www.kernel.org/doc/Documentation/iostats.txt
--record(disk, {read,
-               read_merged,
-               read_sectors,
-               read_wait_ms,
-               write,
-               write_merged,
-               write_sectors,
-               write_wait_ms,
-               io_pending,
-               io_wait_ms,
-               io_wait_weighted_ms}).
+-record(disk, {
+    read,
+    read_merged,
+    read_sectors,
+    read_wait_ms,
+    write,
+    write_merged,
+    write_sectors,
+    write_wait_ms,
+    io_pending,
+    io_wait_ms,
+    io_wait_weighted_ms
+}).
 
 watch(Nodes, Collector) ->
     Pid = spawn(?MODULE, watcher, [self(), Nodes, Collector]),
@@ -32,21 +86,20 @@ watch(Nodes, Collector) ->
     Pid.
 
 watcher(Master, Nodes, {_Host, Port, _Dir} = Collector) ->
-    case gen_tcp:listen(Port, [{active, false}, binary,
-                   {packet, 2}]) of
-    {ok, LSock} ->
-        Acceptor = spawn(?MODULE, lloop, [self(), LSock]),
-        monitor(process, Master),
-        Probes = [{Node, undefined} || Node <- Nodes],
-        W = #watcher{nodes=Nodes,
-             acceptor={Acceptor, LSock},
-             collector=Collector,
-             probes=Probes},
-        watcher_loop(W);
-    {error, eaddrinuse} ->
-        timer:sleep(100),
-        watcher(Master, Nodes, Collector)
-    %% case_clause other errors
+    case gen_tcp:listen(Port, [{active, false}, binary, {packet, 2}]) of
+        {ok, LSock} ->
+            Acceptor = spawn(?MODULE, lloop, [self(), LSock]),
+            monitor(process, Master),
+            Probes = [{Node, undefined} || Node <- Nodes],
+            W = #watcher{nodes=Nodes,
+                acceptor={Acceptor, LSock},
+                collector=Collector,
+                probes=Probes},
+            watcher_loop(W);
+        {error, eaddrinuse} ->
+            timer:sleep(100),
+            watcher(Master, Nodes, Collector)
+        %% case_clause other errors
     end.
 
 lloop(Master, LSock) ->
@@ -60,8 +113,7 @@ lloop(Master, LSock) ->
     end.
 
 watcher_loop(W=#watcher{probes=Probes,
-            acceptor={Acceptor,LSock},
-            collector={_,_,Dir}}) ->
+        acceptor={Acceptor,LSock}, collector={_,_,Dir}}) ->
     Missing = [Node || {Node, undefined} <- Probes],
     %% io:format("Missing: ~p~n", [Missing]),
     W2 = install_probes(Missing, W),
@@ -77,7 +129,7 @@ watcher_loop(W=#watcher{probes=Probes,
                     io:format("Probe exit. ~p: ~p~n", [Node, Reason]),
                     Probes3 = lists:keyreplace(Node, 1, Probes2, {Node, undefined}),
                     W3 = W2#watcher{probes=Probes3},
-                    ?MODULE:watcher_loop(W3)
+                    watcher_loop(W3)
             end;
     {tcp, Sock, Msg} ->
         inet:setopts(Sock, [{active, once}]),
@@ -95,34 +147,32 @@ watcher_loop(W=#watcher{probes=Probes,
                 dump_stats(Stats, FD)
             end
         end,
-        ?MODULE:watcher_loop(W2);
+        watcher_loop(W2);
     stop ->
         exit(Acceptor),
         gen_tcp:close(LSock),
-        [begin
-         file:close(FD),
-         gen_tcp:close(Sock)
-         end
-         || {Sock, FD} <- get()]
+        [begin file:close(FD), gen_tcp:close(Sock) end || {Sock, FD} <- get()]
     end.
 
 
 install_probes([], W) ->
     W;
-install_probes(Nodes, W=#watcher{collector=Collector, nodes=AllNodes, probes=Probes}) ->
+install_probes(Nodes,
+        W=#watcher{collector=Collector, nodes=AllNodes, probes=Probes}) ->
     load_modules_on_nodes([?MODULE], Nodes),
-    R = rpc:multicall(Nodes, ?MODULE, start, [self(), 5000, Collector, AllNodes, collect]),
-    {Pids, Down} = R,
-    Probes2 = lists:foldl(fun({Node, Pid}, Acc) ->
-                                  if is_pid(Pid) ->
-                                          lists:keystore(Node, 1, Acc, {Node, monitor(process, Pid)});
-                                     true ->
-                                          Acc
-                                  end
-                          end, Probes, Pids),
-    Probes3 = lists:foldl(fun(Node, Acc) ->
-                                  lists:keystore(Node, 1, Acc, {Node, undefined})
-                          end, Probes2, Down),
+    {Pids, Down} = rpc:multicall(
+        Nodes, ?MODULE, start, [self(), 5000, Collector, AllNodes, collect]),
+    Probes2 = lists:foldl(
+        fun
+            ({Node, Pid}, Acc) when erlang:is_pid(Pid) ->
+                lists:keystore(Node, 1, Acc, {Node, monitor(process, Pid)});
+            (_, Acc) ->
+                Acc
+        end, Probes, Pids),
+    Probes3 = lists:foldl(
+        fun(Node, Acc) ->
+            lists:keystore(Node, 1, Acc, {Node, undefined})
+        end, Probes2, Down),
     W#watcher{probes=Probes3}.
 
 start(Master, Rate, Collector, Nodes, Fun) ->
@@ -132,22 +182,22 @@ start(Master, Rate, Collector, Nodes, Fun) ->
 
 init(Master, Rate, {Host, Port, _Dir}, Nodes, Fun) ->
     lager:info("In init: ~p ~p~n", [node(), Host]),
-    {ok, Sock} = gen_tcp:connect(Host, Port,
-                                 [binary, {packet, 2},
-				 {send_timeout, 500}]),
+    {ok, Sock} = gen_tcp:connect(
+        Host, Port, [binary, {packet, 2}, {send_timeout, 500}]),
     case application:get_env(riak_kv, storage_backend) of
         {ok, riak_kv_eleveldb_backend} ->
             LRef = get_leveldb_ref();
         _ ->
             LRef = undefined
     end,
-    H = #history{network=undefined,
-                 %% disk=undefined,
-                 disk=[],
-                 rate=Rate div 5000,
-                 lvlref=LRef,
-                 nodes=Nodes,
-                 collector_sock=Sock},
+    H = #history{
+        network = undefined,
+        %% disk=undefined,
+        disk = [],
+        rate = Rate div 5000,
+        lvlref = LRef,
+        nodes = Nodes,
+        collector_sock = Sock},
     monitor(process, Master),
     loop(Fun, Rate, H).
 
@@ -158,8 +208,9 @@ loop(Fun, Rate, H) ->
         {'DOWN', _, process, _, _} ->
             %%io:format("shutting: ~p~n", [node()]),
             ok
-    after Rate ->
-            ?MODULE:loop(Fun, Rate, NewH)
+    after
+        Rate ->
+            loop(Fun, Rate, NewH)
     end.
 
 %% fix this later
@@ -204,11 +255,11 @@ collect(H0) ->
     DiskList =
     case get(disks) of
         undefined ->
-        Disks = determine_disks(),
-        put(disks, Disks),
-        Disks;
+            Disks = determine_disks(),
+            put(disks, Disks),
+            Disks;
         Disks ->
-        Disks
+            Disks
     end,
 
     {H3, D} = report_disk2(DiskList, H2),
@@ -220,29 +271,29 @@ collect(H0) ->
     Stats = term_to_binary(Stats0),
     %% catch TCP errors here
     case gen_tcp:send(H3#history.collector_sock, Stats) of
-	ok -> ok;
-	%% die on any error, we'll get restarted soon.
-	{error, _} ->
-	    gen_tcp:close(H3#history.collector_sock),
-	    error(splode)
+        ok ->
+            ok;
+        %% die on any error, we'll get restarted soon.
+        {error, _} ->
+            gen_tcp:close(H3#history.collector_sock),
+            error(splode)
     end,
     H3.
 
 %% this portion is meant to be run inside a VM instance running riak
 determine_disks() ->
-    DataDir =
-    case application:get_env(riak_kv, storage_backend) of
+    DataDir = case application:get_env(riak_kv, storage_backend) of
         {ok, riak_kv_bitcask_backend} ->
-        {ok, Dir} = application:get_env(bitcask, data_root),
-        Dir;
+            {ok, Dir} = application:get_env(bitcask, data_root),
+            Dir;
         {ok, riak_kv_eleveldb_backend} ->
-        {ok, Dir} = application:get_env(eleveldb, data_root),
-        Dir;
+            {ok, Dir} = application:get_env(eleveldb, data_root),
+            Dir;
         _ ->
-        error(unhandled_backend)
+            error(unhandled_backend)
     end,
-    Name0 = os:cmd("basename `df "++DataDir++
-               " | tail -1 | awk '{print $1}'`"),
+    Name0 = os:cmd(
+        "basename `df "++DataDir ++ " | tail -1 | awk '{print $1}'`"),
     {Name, _} = lists:split(length(Name0)-1, Name0),
     %% keep the old format just in case we need to extend this later.
     [{Name, Name}].
@@ -250,92 +301,94 @@ determine_disks() ->
 
 report_queues(H) ->
     Max = lists:max([Len || Pid <- processes(),
-                            {message_queue_len, Len} <- [process_info(Pid, message_queue_len)]]),
+        {message_queue_len, Len} <- [process_info(Pid, message_queue_len)]]),
     {H, [{message_queue_max, Max}]}.
 
 report_processes(H) ->
     Procs = erlang:system_info(process_count),
     {H, [{erlang_processes, Procs}]}.
 
-report_network(H=#history{network=LastStats, rate=Rate}) ->
+report_network(H = #history{network = LastStats, rate = Rate}) ->
     {RX, TX} = get_network(),
     Report =
-    case LastStats of
-        undefined ->
-        [];
-        {LastRX, LastTX} ->
-        RXRate = net_rate(LastRX, RX) div Rate,
-        TXRate = net_rate(LastTX, TX) div Rate,
-        [{net_rx, RXRate},
-         {net_tx, TXRate}]
-    end,
-    {H#history{network={RX, TX}}, Report}.
+        case LastStats of
+            undefined ->
+                [];
+            {LastRX, LastTX} ->
+                RXRate = net_rate(LastRX, RX) div Rate,
+                TXRate = net_rate(LastTX, TX) div Rate,
+                [{net_rx, RXRate},
+                    {net_tx, TXRate}]
+        end,
+    {H#history{network = {RX, TX}}, Report}.
 
-report_disk2(Disks, H=#history{disk=DiskStats}) ->
+report_disk2(Disks, H = #history{disk = DiskStats}) ->
     {NewStats, NewReport} =
-        lists:foldl(fun({Name, Dev}, {OrdAcc, LstAcc}) ->
-                            LastStats = case orddict:find(Dev, DiskStats) of
-                                            error ->
-                                                undefined;
-                                            {ok, LS} ->
-                                                LS
-                                        end,
-                            {Stats, Report} = report_disk2(Name, Dev, LastStats, H),
-                            {orddict:store(Dev, Stats, OrdAcc),
-                 LstAcc ++ Report}
-                    end, {DiskStats, []}, Disks),
-    {H#history{disk=NewStats}, NewReport}.
+        lists:foldl(
+            fun({Name, Dev}, {OrdAcc, LstAcc}) ->
+                LastStats = case orddict:find(Dev, DiskStats) of
+                    error ->
+                        undefined;
+                    {ok, LS} ->
+                        LS
+                end,
+                {Stats, Report} = report_disk2(Name, Dev, LastStats, H),
+                {orddict:store(Dev, Stats, OrdAcc),
+                        LstAcc ++ Report}
+            end, {DiskStats, []}, Disks),
+    {H#history{disk = NewStats}, NewReport}.
 
-report_disk2(_Name, Dev, LastStats, #history{rate=Rate}) ->
+report_disk2(_Name, Dev, LastStats, #history{rate = Rate}) ->
     Stats = get_disk2(Dev),
     Report =
-    case LastStats of
-        undefined ->
-        [];
-        _ ->
-        ReadRate = disk_rate(#disk.read_sectors, LastStats, Stats) div Rate,
-        WriteRate = disk_rate(#disk.write_sectors, LastStats, Stats) div Rate,
-        {AwaitR, AwaitW} = disk_await(LastStats, Stats),
-        Svctime = disk_svctime(LastStats, Stats),
-        QueueLen = disk_qlength(LastStats, Stats),
-        Util = disk_util(LastStats, Stats),
-        [{disk_read, ReadRate},
-         {disk_write, WriteRate},
-         {disk_await_r, AwaitR},
-         {disk_await_w, AwaitW},
-         {disk_svctime, Svctime},
-         {disk_queue_size, QueueLen},
-         {disk_utilization, Util}]
-    end,
+        case LastStats of
+            undefined ->
+                [];
+            _ ->
+                ReadRate = disk_rate(#disk.read_sectors, LastStats, Stats) div Rate,
+                WriteRate = disk_rate(#disk.write_sectors, LastStats, Stats) div Rate,
+                {AwaitR, AwaitW} = disk_await(LastStats, Stats),
+                Svctime = disk_svctime(LastStats, Stats),
+                QueueLen = disk_qlength(LastStats, Stats),
+                Util = disk_util(LastStats, Stats),
+                [{disk_read, ReadRate},
+                    {disk_write, WriteRate},
+                    {disk_await_r, AwaitR},
+                    {disk_await_w, AwaitW},
+                    {disk_svctime, Svctime},
+                    {disk_queue_size, QueueLen},
+                    {disk_utilization, Util}]
+        end,
     {Stats, Report}.
 
 append_atoms(Atom, List) ->
     list_to_atom(List ++
-             "_" ++ atom_to_list(Atom)).
+        "_" ++ atom_to_list(Atom)).
 
 report_memory(H) ->
     Stats = get_memory(),
     Util = memory_util(Stats),
     Dirty = memory_dirty(Stats),
     Writeback = memory_writeback(Stats),
-    {H, [{memory_utilization, Util},
-     {memory_page_dirty, Dirty},
-     {memory_page_writeback, Writeback}]}.
+    {H, [
+        {memory_utilization, Util},
+        {memory_page_dirty, Dirty},
+        {memory_page_writeback, Writeback}
+    ]}.
 
 report_leveldb(H = #history{ lvlref = undefined }) ->
     {H, []};
 report_leveldb(H = #history{ lvlref = LRef }) ->
-    try case eleveldb:status(LRef, <<"leveldb.ThrottleGauge">>) of
-            {ok, Result} ->
-                Value = list_to_integer(Result),
-                {H, [{leveldb_write_throttle, Value}]};
-            _ ->
-                {H, []}
-        end
+    try eleveldb:status(LRef, <<"leveldb.ThrottleGauge">>) of
+        {ok, Result} ->
+            Value = list_to_integer(Result),
+            {H, [{leveldb_write_throttle, Value}]};
+        _ ->
+            {H, []}
     catch
         _:_ ->
             LRef2 = get_leveldb_ref(),
-        {H#history{lvlref=LRef2}, []}
+            {H#history{lvlref = LRef2}, []}
     end.
 
 net_rate(Bytes1, Bytes2) ->
@@ -375,12 +428,12 @@ filter(L, Pos, Val) ->
 
 message_queues([], _Threshold, _VNodeMap, Queues) ->
     lists:reverse(lists:keysort(1, Queues));
-message_queues([Pid|Pids], Threshold, VNodeMap, Queues) ->
+message_queues([Pid | Pids], Threshold, VNodeMap, Queues) ->
     case process_info(Pid, [message_queue_len, registered_name]) of
-        [{message_queue_len, Len},
-         {registered_name, RegName}] when Len > Threshold ->
+        [{message_queue_len, Len}, {registered_name, RegName}]
+                when Len > Threshold ->
             Entry = {Len, pid_name(Pid, RegName, VNodeMap)},
-            message_queues(Pids, Threshold, VNodeMap, [Entry|Queues]);
+            message_queues(Pids, Threshold, VNodeMap, [Entry | Queues]);
         _ ->
             message_queues(Pids, Threshold, VNodeMap, Queues)
     end.
@@ -408,8 +461,8 @@ get_disk2(Dev) ->
 
 memory_util(Mem) ->
     Stat = fun(Key) ->
-                   list_to_integer(element(2, lists:keyfind(Key, 1, Mem)))
-           end,
+        list_to_integer(element(2, lists:keyfind(Key, 1, Mem)))
+    end,
     Total = Stat("MemTotal:"),
     Free  = Stat("MemFree:"),
     Buffers = Stat("Buffers:"),
@@ -469,25 +522,26 @@ report_stats(Mod, Keys) ->
 %%%===================================================================
 %%% Utility functions
 %%%===================================================================
+
 pmap(F, L) ->
     Parent = self(),
     lists:mapfoldl(
-      fun(X, N) ->
-              Pid = spawn(fun() ->
-                                  Parent ! {pmap, N, F(X)}
-                          end),
-              {Pid, N+1}
-      end, 0, L),
-    L2 = [receive {pmap, N, R} -> {N,R} end || _ <- L],
+        fun(X, N) ->
+            Pid = spawn(fun() ->
+                Parent ! {pmap, N, F(X)}
+            end),
+            {Pid, N + 1}
+        end, 0, L),
+    L2 = [receive {pmap, N, R} -> {N, R} end || _ <- L],
     [R || {_, R} <- lists:keysort(1, L2)].
 
 load_modules_on_nodes(Modules, Nodes) ->
     [case code:get_object_code(Module) of
          {Module, Bin, File} ->
              %% rpc:multicall(Nodes, code, purge, [Module]),
-             {Ret, []} = rpc:multicall(Nodes, code,
-				       load_binary, [Module, File, Bin]),
-	     [{module, observer}] = lists:usort(Ret);
+             {Ret, []} = rpc:multicall(
+                 Nodes, code, load_binary, [Module, File, Bin]),
+             [{module, Module}] = lists:usort(Ret);
          error ->
              error({no_object_code, Module})
      end || Module <- Modules].
@@ -514,42 +568,42 @@ get_state(Pid) ->
     State.
 
 dump_stats(Stats, FD) ->
-    Out = io_lib:format("~p.~n ~p.~n",
-            [os:timestamp(), Stats]),
+    Out = io_lib:format("~p.~n ~p.~n", [os:timestamp(), Stats]),
     ok = file:write(FD, Out),
     %% not sure this is required.
     file:sync(FD).
 
--record(vmstat, {procs_r,
-                 procs_b,
-                 mem_swpd,
-                 mem_free,
-                 mem_buff,
-                 mem_cache,
-                 swap_si,
-                 swap_so,
-                 io_bi,
-                 io_bo,
-                 system_in,
-                 system_cs,
-                 cpu_us,
-                 cpu_sy,
-                 cpu_id,
-                 cpu_wa}).
+-record(vmstat, {
+    procs_r,
+    procs_b,
+    mem_swpd,
+    mem_free,
+    mem_buff,
+    mem_cache,
+    swap_si,
+    swap_so,
+    io_bi,
+    io_bo,
+    system_in,
+    system_cs,
+    cpu_us,
+    cpu_sy,
+    cpu_id,
+    cpu_wa
+}).
 
 report_vmstat(H) ->
     Result = os:cmd("vmstat 1 2"),
     Lines = string:tokens(Result, "\n"),
     Last = hd(lists:reverse(Lines)),
-    Report =
-    case parse_vmstat(Last) of
+    Report = case parse_vmstat(Last) of
         undefined ->
-        [];
-        VM = #vmstat{} ->
-        [{cpu_utilization, 100 - VM#vmstat.cpu_id},
-         {cpu_iowait, VM#vmstat.cpu_wa},
-         {memory_swap_in, VM#vmstat.swap_si},
-         {memory_swap_out, VM#vmstat.swap_so}]
+            [];
+        VM = #vmstat{} -> [
+            {cpu_utilization, 100 - VM#vmstat.cpu_id},
+            {cpu_iowait, VM#vmstat.cpu_wa},
+            {memory_swap_in, VM#vmstat.swap_si},
+            {memory_swap_out, VM#vmstat.swap_so}]
     end,
     {H, Report}.
 

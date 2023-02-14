@@ -1,22 +1,37 @@
-{application, riak_test,
- [
-  {description, "Testing Infrastructure for Riak"},
-  {vsn, git},
-  {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib,
-                  lager,
-                  mapred_verify
-                 ]},
-  {env, [
-    {platform, undefined},
-    {rt_scratch_dir, "/tmp/riak_test_scratch"},
-    {rt_max_wait_time, 180000},
-    {rt_retry_delay, 500},
-    {rt_harness, rtdev},
-    {java, [{fat_be_url, "http://riak-java-client.s3.amazonaws.com/riak-client-1.4.2-jar-with-dependencies-and-tests.jar"},
-            {tests_url, "http://riak-java-client.s3.amazonaws.com/riak-client-1.4.2-tests.jar"}
+%% ------------------------------------------------------------------
+%%
+%% Copyright (c) 2012-2013 Basho Technologies, Inc.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% ------------------------------------------------------------------
+{application, riak_test, [
+    {description, "Testing Infrastructure for Riak"},
+    {vsn, git},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib,
+        lager,
+        mapred_verify
+    ]},
+    {env, [
+        {platform, undefined},
+        {rt_scratch_dir, "/tmp/riak_test_scratch"},
+        {rt_max_wait_time, 180000},
+        {rt_retry_delay, 500},
+        {rt_harness, rtdev}
     ]}
-  ]}
- ]}.
+]}.

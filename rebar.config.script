@@ -1,0 +1,155 @@
+%% -*- mode: erlang; erlang-indent-level: 4; indent-tabs-mode: nil -*-
+%% ------------------------------------------------------------------
+%%
+%% Copyright (c) 2023 Workday, Inc.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% ------------------------------------------------------------------
+%%
+%% Adds ebin directories of apps listed in {riak_external_apps, [...]} that
+%% are found in the (built) riak repo pointed to by the 'riak' symlink in the
+%% current directory.
+%%
+%% Intended to provide dialyzer configuration, too, but that'll wait.
+%%
+
+%% Uncomment through the 'script(CONFIG) ->' line to:
+%%  - run as an escript for testing
+%%  - edit for editor code formatting to work
+
+%%-module(rebar_config_script).
+%%-export([main/1]).
+%%-mode(compile).
+%%-compile([
+%%    debug_info,
+%%    no_auto_import,
+%%    no_error_module_mismatch,
+%%    warnings_as_errors
+%%]).
+%%
+%%main([]) ->
+%%    try
+%%        {ok, Terms} = file:consult("rebar.config"),
+%%        script(Terms),
+%%        erlang:halt(0)
+%%    catch
+%%        C:R:S ->
+%%            io:format(standard_error, "~p:~p~n~0p~n", [C, R, S])
+%%    end,
+%%    erlang:halt(1).
+%%
+%%script(CONFIG) ->
+
+%%
+%% DON'T comment out below here
+%%
+    RiakRepo = "riak",
+    Checkouts = "_checkouts",   %% used in some comparisons
+
+    %% Look in _checkouts first to pick up active changes
+    LibPaths = [Checkouts, "_build/default/lib"],
+
+    GetAppPath = fun(AppName) ->
+        lists:foldl(fun
+            (Path, [] = Result) ->
+                AppDir = filename:join([RiakRepo, Path, AppName]),
+                Ebin = filename:join(AppDir, ebin),
+                case file:list_dir(Ebin) of
+                    {ok, [_ | _]} ->
+                        AppDir;
+                    _ ->
+                        Result
+                end;
+            (_Path, Result) ->
+                Result
+        end, [], LibPaths)
+    end,
+
+    GetAppPaths = fun(AppNames) ->
+        lists:foldl(
+            fun(AppName, Results) ->
+                case GetAppPath(AppName) of
+                    [] ->
+                        Results;
+                    AppDir ->
+                        [AppDir | Results]
+                end
+            end, [], AppNames)
+    end,
+
+    ConfigIn = case CONFIG of
+        #{} ->
+            CONFIG;
+        _ ->
+            maps:from_list(CONFIG)
+    end,
+    % io:format("ConfigIn:~n~p.~n", [ConfigIn]),
+
+    PrioritizePaths = fun
+        (Same, Same) ->
+            true;
+        (LPath, RPath) ->
+            [_RiakRepo, LTop | _] = filename:split(LPath),
+            if
+                LTop =:= Checkouts ->
+                    true;
+                true ->
+                    [_RiakRepo, RTop | _] = filename:split(RPath),
+                    if
+                        RTop =:= Checkouts ->
+                            false;
+                        true ->
+                            LPath =< RPath
+                    end
+            end
+    end,
+
+    PrioritizedPaths = fun(AppPaths) ->
+        Mapped = lists:foldl(
+            fun(AppPath, AppMap) ->
+                AppName = filename:basename(AppPath),
+                AppMap#{AppName => [AppPath | maps:get(AppName, AppMap, [])]}
+            end, #{}, AppPaths),
+        Preferred = maps:fold(
+            fun(_App, Paths, Results) ->
+                [Prioritized | _] = lists:usort(PrioritizePaths, Paths),
+                [Prioritized | Results]
+            end, [], Mapped),
+        Preferred
+    end,
+
+    ExistingDirs = fun(Dirs) ->
+        lists:filter(fun filelib:is_dir/1, Dirs)
+    end,
+
+    ConfigOut = case maps:get(riak_external_apps, ConfigIn, []) of
+        [_ | _] = AppNames ->
+            case GetAppPaths(AppNames) of
+                [_ | _] = AppDirs ->
+                    Prev = [filename:dirname(D) || D <- ExistingDirs(
+                        maps:get(xref_extra_paths, ConfigIn, []))],
+                    Prio = PrioritizedPaths(Prev ++ AppDirs),
+                    Ebins = [filename:join(D, ebin) || D <- lists:sort(Prio)],
+                    ConfigIn#{xref_extra_paths => Ebins};
+                _ ->
+                    ConfigIn
+            end;
+        _ ->
+            ConfigIn
+    end,
+    % io:format("ConfigOut:~n~p.~n", [ConfigOut]),
+
+    maps:to_list(ConfigOut).

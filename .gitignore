@@ -22,7 +22,6 @@ deps/
 ebin/
 log/
 logs/
-rebar.lock
 
 # ===== Common Development Tools =====
 *.bak
@@ -45,15 +44,20 @@ rebar.lock
 .vscode/
 /*.txt
 erln8.config
+tags
 tmp/
 
 # ===== Project-specific Elements =====
 
 *.jar
 *.png
-out
-riak-*
-riak_test
-search-corpus/spam.0
-smoke_test
-tags
+/doc/*
+/riak
+/riak-test-manifest.mf
+/riak_test
+/search-corpus/spam.0
+
+# ===== Order matters - exclusion overrides last =====
+
+!/doc/*.edoc
+!/doc/*.md

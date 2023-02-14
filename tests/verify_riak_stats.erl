@@ -1,7 +1,7 @@
 %% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2012-2016 Basho Technologies, Inc.
-%% Copyright (c) 2022 Workday, Inc.
+%% Copyright (c) 2022-2023 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -771,7 +771,6 @@ common_stats() ->
         <<"object_set_merge_time_mean">>,
         <<"object_set_merge_time_median">>,
         <<"object_set_merge_total">>,
-        <<"observer_version">>,
         <<"os_mon_version">>,
         <<"ownership_handoff_bytes_sent">>,
         <<"ownership_handoff_inbound_active_transfers">>,

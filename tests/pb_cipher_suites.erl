@@ -1,6 +1,26 @@
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2013-2014 Basho Technologies, Inc.
+%% Copyright (c) 2022-2023 Workday, Inc.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 -module(pb_cipher_suites).
-
 -behavior(riak_test).
+
 -export([confirm/0]).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -76,10 +96,10 @@ confirm() ->
 
     GoodCiphers = element(1, riak_core_ssl_util:parse_ciphers(CipherList)),
     lager:info("Good ciphers: ~p", [GoodCiphers]),
-    [AES256, AES128, _ECDSA] = 
-        ParsedCiphers = 
+    [AES256, AES128, _ECDSA] =
+        ParsedCiphers =
             lists:map(fun(PC) -> cipher_format(PC) end, GoodCiphers),
-    
+
     lager:info("Parsed Ciphers ~w", [ParsedCiphers]),
 
     lager:info("Check that the server's preference for ECDHE-RSA-AES256-SHA384"
@@ -107,9 +127,9 @@ confirm() ->
                                 [{ciphers,
                                     lists:reverse(ParsedCiphers)}]}
                             ]),
-    
+
     lager:info("Do we assume that cipher order is not honoured?"),
-    
+
     SingleCipherProps =
         [{credentials, "user", "password"},
             {cacertfile, filename:join([CertDir, "rootCA/cert.pem"])},
@@ -227,12 +247,11 @@ pb_connection_info(Port, Config) ->
 convert_suite_to_tuple(CS) when is_tuple(CS) ->
     CS;
 convert_suite_to_tuple(CS) when is_map(CS) ->
-    {maps:get(key_exchange, CS), 
+    {maps:get(key_exchange, CS),
         maps:get(cipher, CS),
         maps:get(mac, CS)}.
 
-
--ifdef(deprecated_22).
+%% Require OTP-22+
 
 cipher_format(Cipher) ->
     Cipher.
@@ -273,85 +292,3 @@ check_with_reenabled_protools(Port, CertDir) ->
                                                         "rootCA/cert.pem"])},
                                 {ssl_opts, [{versions, ['tlsv1']}]}
                             ])).
-
--else.
-
-
-    -ifdef(deprecated_21).
-
-        check_with_reenabled_protools(Port, CertDir) ->
-            lager:info("Cannot re-enable old protocols before OTP 22"),
-            ?assertMatch({error, {tcp, {tls_alert, {insufficient_security, _}}}},
-                pb_connection_info(Port,
-                                    [{credentials, "user", "password"},
-                                        {cacertfile,
-                                            filename:join([CertDir,
-                                                            "rootCA/cert.pem"])},
-                                    {ssl_opts, [{versions, ['tlsv1.1']}]}
-                                ])),
-
-            ?assertMatch({error, {tcp, {tls_alert, {insufficient_security, _}}}},
-                pb_connection_info(Port,
-                                    [{credentials, "user", "password"},
-                                            {cacertfile,
-                                                filename:join([CertDir,
-                                                                "rootCA/cert.pem"])},
-                                        {ssl_opts, [{versions, ['tlsv1']}]}
-                                    ])).
-
-        check_reasons({protocol_version,
-                        "received CLIENT ALERT: Fatal - Protocol Version"}) ->
-            ok;
-        check_reasons(ProtocolVersionError) ->
-            lager:info("Unexpected error ~s", [ProtocolVersionError]),
-            error.
-
-        insufficient_check(Port, SingleCipherProps) ->
-            {error,
-                {tcp,
-                    {tls_alert,
-                        {insufficient_security, _ErrorMsg}}}} =
-                pb_connection_info(Port, SingleCipherProps).
-        
-        cipher_format(Cipher) ->
-            ssl_cipher_format:suite_definition(Cipher).
-
-
-    -else.
-
-        check_reasons("protocol version") ->
-            ok;
-        check_reasons(ProtocolVersionError) ->
-            lager:info("Unexpected error ~s", [ProtocolVersionError]),
-            error.
-
-        check_with_reenabled_protools(Port, CertDir) ->
-            lager:info("Cannot re-enable old protocols before OTP 22"),
-            ?assertMatch({error, {tcp, {tls_alert,"insufficient security"}}},
-                pb_connection_info(Port,
-                                    [{credentials, "user", "password"},
-                                        {cacertfile,
-                                            filename:join([CertDir,
-                                                        "rootCA/cert.pem"])},
-                                    {ssl_opts, [{versions, ['tlsv1.1']}]}
-                                ])),
-
-            ?assertMatch({error, {tcp, {tls_alert,"insufficient security"}}},
-                pb_connection_info(Port,
-                                    [{credentials, "user", "password"},
-                                        {cacertfile,
-                                            filename:join([CertDir,
-                                                        "rootCA/cert.pem"])},
-                                        {ssl_opts, [{versions, ['tlsv1']}]}
-                                    ])).
-
-
-        insufficient_check(Port, SingleCipherProps) ->
-            {error, {tcp, {tls_alert,"insufficient security"}}} =
-                pb_connection_info(Port, SingleCipherProps).
-        
-        cipher_format(Cipher) ->
-            ssl_cipher:suite_definition(Cipher).
-
-    -endif.
--endif.

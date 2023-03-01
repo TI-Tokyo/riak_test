@@ -954,6 +954,7 @@ common_stats() ->
         <<"sys_threads_enabled">>,
         <<"sys_wordsize">>,
         <<"syslog_version">>,
+        <<"uncovered_preflists">>,
         <<"vnode_counter_update">>,
         <<"vnode_counter_update_time_100">>,
         <<"vnode_counter_update_time_95">>,

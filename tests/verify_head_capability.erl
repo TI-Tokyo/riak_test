@@ -1,7 +1,7 @@
 %% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2018 Russell Brown.
-%% Copyright (c) 2022 Workday, Inc.
+%% Copyright (c) 2022-2023 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -21,10 +21,11 @@
 %%% @doc
 %%% riak_test for vnode capability controlling HEAD request use in get fsm
 %%% @end
-
 -module(verify_head_capability).
 -behavior(riak_test).
+
 -export([confirm/0]).
+
 -include_lib("eunit/include/eunit.hrl").
 
 -define(BUCKET, <<"test-bucket">>).
@@ -35,7 +36,6 @@
 
 %% First version with get/put fsm Head capability
 -define(MIN_HEAD_VSN, [2, 9, 0]).
--define(VSN_STR(V), lists:join(".", [erlang:integer_to_list(N) || N <- V])).
 
 -define(TRACE_FUNC, "riak_kv_vnode:head/3").
 -define(TRACE_FILES, ["vhc_mixed.trace", "vhc_current.trace"]).
@@ -54,49 +54,35 @@ confirm() ->
     %% Do some GETS
     %% check that HEADs happen after cap is negotiated
 
-    %% Head capability was introduced in riak 2.9 - if we don't have a version
-    %% prior to that, there won't be any point in running a mixed cluster test.
-    [{current, CurVsn} | OldVsns] = lists:foldl(
-        fun(Key, Result) ->
-            try
-                Bin = rt:get_version(Key),
-                Str = erlang:binary_to_list(Bin),
-                Toks = string:lexemes(Str, ".- \n\r\t"),
-                Vsn = lists:reverse(lists:foldl(
-                    fun(Tok, Acc) ->
-                        case string:to_integer(Tok) of
-                            {error, _} ->
-                                Acc;
-                            {Seg, _} ->
-                                [Seg | Acc]
-                        end
-                    end, [], Toks)),
-                lager:info("~s version = ~s", [Key, ?VSN_STR(Vsn)]),
-                [{Key, Vsn} | Result]
-            catch
-                _:_:_ ->
-                    Result
-            end  % input list will be reversed
-        end, [], [legacy, previous, current]),
+    MinHeadVsn = rt_vsn:new_version(?MIN_HEAD_VSN),
+    [{_HdTag, HdVsn} | _] = CfgVersions = rt_vsn:configured_versions(),
+    %% Confirm that we have a version new enough for the test
+    ?assert(rt_vsn:compare_versions(HdVsn, MinHeadVsn) >= 0),
+    %% NewTag == 'current' if 'current' meets the criteria
+    {NewTag, NewVsn} = rt_vsn:find_version_at_least(MinHeadVsn, CfgVersions),
+    NewStr = rt_vsn:version_to_string(NewVsn),
 
-    %% 'current' will be at the head of the list - make sure it supports
-    %% Head requests - not much point in continuing if it doesn't
-    ?assert(CurVsn >= ?MIN_HEAD_VSN),
-
-    %% We'll only run the mixed cluster tests if we found an old enough version.
-    %% At the end of this case, return Nodes as a suitable cluster for the next
-    %% applicable test phase.
-    {OldEnough, Nodes} =
-        case lists:dropwhile(fun({_, Vsn}) -> Vsn >= ?MIN_HEAD_VSN end, OldVsns) of
-            [] ->
-                lager:info("No version found not supporting fsm Head requests"),
-                lager:info("Building cluster of 'current' nodes"),
-                {false, rt:build_cluster(4)};
-            [{Key, _Vsn} | _] ->
-                lager:info("'~s' version found not supporting fsm Head requests", [Key]),
-                lager:info("Building mixed cluster of '~s' and 'current' nodes", [Key]),
-                {true, rt:build_cluster([Key, Key, current, current])}
-        end,
+    %% We'll only run the mixed cluster tests if we found an old enough
+    %% version. At the end of this case, return Nodes as a suitable cluster
+    %% for the next applicable test phase.
+    {OldEnough, Nodes} = case
+            rt_vsn:find_version_before(MinHeadVsn, CfgVersions) of
+        {OldTag, OldVsn} ->
+            OldStr = rt_vsn:version_to_string(OldVsn),
+            lager:info(
+                "Version ~s (~s) found not supporting fsm Head requests",
+                [OldStr, OldTag]),
+            lager:info(
+                "Building mixed cluster of version ~s (~s) and ~s (~s) nodes",
+                [OldStr, OldTag, NewStr, NewTag]),
+            {true, rt:build_cluster([OldTag, OldTag, NewTag, NewTag])};
+        _ ->
+            lager:info("No version found not supporting fsm Head requests"),
+            lager:info(
+                "Building cluster of version ~s (~s) nodes",
+                [NewStr, NewTag]),
+            {false, rt:build_cluster(lists:duplicate(4, NewTag))}
+    end,
 
     %% Ensure redbug tracing is enabled regardless of r_t configuration
     rt_redbug:set_tracing_applied(true),
@@ -134,10 +120,11 @@ confirm() ->
             ?assertMatch(0, head_cnt(TraceFile1)),
             ?assertMatch([], ReadRes1),
 
-            lager:info("upgrade all to current"),
+            lager:info("upgrade all to ~s", [NewTag]),
+
             [OldNode1, OldNode2 | _] = Nodes,
-            rt:upgrade(OldNode1, current),
-            rt:upgrade(OldNode2, current);
+            rt:upgrade(OldNode1, NewTag),
+            rt:upgrade(OldNode2, NewTag);
         _ ->
             % not OldEnough
             ok

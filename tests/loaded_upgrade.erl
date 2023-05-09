@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2012 Basho Technologies, Inc.
+%% Copyright (c) 2012-2014 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -18,10 +18,11 @@
 %%
 %% -------------------------------------------------------------------
 -module(loaded_upgrade).
-
--include_lib("eunit/include/eunit.hrl").
+-behavior(riak_test).
 
 -export([confirm/0]).
+
+-include_lib("stdlib/include/assert.hrl").
 
 -export([kv_valgen/1, bucket/1, erlang_mr/0, int_to_key/1]).
 
@@ -208,6 +209,7 @@ node_monitor_loop(Node, Sup, TestProc) ->
             erlang:monitor_node(Node, false),
             ok;
         Other ->
-            lager:warn("Node monitor for ~p got unknown message ~p", [Node, Other]),
+            lager:warning(
+                "Node monitor for ~p got unknown message ~p", [Node, Other]),
             node_monitor_loop(Node, Sup, TestProc)
     end.

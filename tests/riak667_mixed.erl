@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2012 Basho Technologies, Inc.
+%% Copyright (c) 2015-2016 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -19,10 +19,11 @@
 %% -------------------------------------------------------------------
 -module(riak667_mixed).
 -behavior(riak_test).
--export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
 
--define(HARNESS, (rt_config:get(rt_harness))).
+-export([confirm/0]).
+
+-include_lib("stdlib/include/assert.hrl").
+
 -define(TYPE, <<"maps">>).
 -define(KEY, <<"cmeiklejohn">>).
 -define(KEY2, <<"cmeik">>).

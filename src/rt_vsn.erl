@@ -38,9 +38,6 @@
 -module(rt_vsn).
 
 -compile(inline).
--ifndef(TEST).
--compile(no_auto_import).
--endif. % TEST
 
 % Public API
 -export([
@@ -54,41 +51,33 @@
     version_to_string/1
 ]).
 
-% Public Types
--export_type([
-    anyvsn/0,
-    cfgvsn/0,
-    rt_vsn/0
-]).
-
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+%% Lager won't be running, EUnit throws away stdout from passing tests.
+-define(LOG_TO_STDIO, true).
 -endif. % TEST
+-include("logging.hrl").
 
+%% A comparable, strictly-ordered version representation.
+%% MUST be kept in sync with `rtt:vsn_rec()'
 -record(rtv, {
     vsn :: nonempty_list(non_neg_integer())
 }).
-
--type anyvsn() :: rt_vsn() | binstr() | vstruct().
--type binstr() :: binary() | string().
--type cfgvsn() :: {vsntag(), rt_vsn()}.
--type rt_vsn() :: #rtv{}.
--type vsnpath() :: {vsntag(), string()}.
--type vsntag() :: atom() | binstr().    % as found in rt.config `rtdev_path'
--type vstruct() :: {vsn, binstr()}.     % as found in `.app' files
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
--spec compare_versions(Left :: anyvsn(), Right :: anyvsn()) -> integer().
-%% @doc Compares two versions and returns an integer result indicator.
+-spec compare_versions(Left :: rtt:any_vsn(), Right :: rtt:any_vsn())
+        -> integer().
+%% @doc Compares two versions' semver representations and returns an integer
+%%      result indicator.
 %%
-%% @returns <ul>
-%%  <li><b>0</b> if the versions are strictly equal.</li>
-%%  <li><b>&lt;0</b> if Left &lt; Right.</li>
-%%  <li><b>&gt;0</b> if Left &gt; Right.</li>
-%% </ul>
+%% @returns <dl>
+%%  <dt>`= 0'</dt><dd>`semver(Left) =:= semver(Right)'.</dd>
+%%  <dt>`< 0'</dt><dd>`semver(Left) < semver(Right)'.</dd>
+%%  <dt>`> 0'</dt><dd>`semver(Left) > semver(Right)'.</dd>
+%% </dl>
 compare_versions(#rtv{vsn = Same}, #rtv{vsn = Same}) ->
     0;
 compare_versions(#rtv{vsn = Left}, #rtv{vsn = Right}) ->
@@ -98,23 +87,28 @@ compare_versions(Vsn, Vsn) ->
 compare_versions(Left, Right) ->
     compare_versions(parse_version(Left), parse_version(Right)).
 
--spec configured_versions() -> list(cfgvsn()).
-%% @doc Returns an ordered list of the versions configured in riak_test.config.
+-spec configured_versions() -> list(rtt:cfg_vsn()).
+%% @doc Returns an ordered list of the versions configured in
+%%      `riak_test.config'.
 %%
-%% The returned  list is ordered by descending version, and picks up <i>ALL</i>
-%% versions under `rtdev_path', not just `current/previous/legacy'.
+%% The returned  list is ordered by descending version, and picks up
+%% <i>ALL</i> versions returned by {@link rt:versions()} whose explicit
+%% version (semver) can be ascertained, not just `current/previous/legacy'.
 configured_versions() ->
-    configured_versions(rt_config:get(rtdev_path), []).
+    configured_tagged_versions(rt:versions(), []).
 
--spec find_version_at_least(TargetVsn :: anyvsn()) -> cfgvsn() | false.
-%% @doc Return the first version (by priority) in {@link configured_versions/0}
-%%      that is >= TargetVsn.
+-spec find_version_at_least(TargetVsn :: rtt:any_vsn())
+        -> rtt:cfg_vsn() | false.
+%% @doc Return the first version (by priority) in {@link configured_versions()}
+%%      that is `>= TargetVsn'.
 find_version_at_least(TargetVsn) ->
     find_version_at_least(TargetVsn, configured_versions()).
 
 -spec find_version_at_least(
-    TargetVsn :: anyvsn(), Versions :: list(cfgvsn())) -> cfgvsn() | false.
-%% @doc Return the first version (by priority) in Versions that is >= TargetVsn.
+    TargetVsn :: rtt:any_vsn(), Versions :: list(rtt:cfg_vsn()))
+        -> rtt:cfg_vsn() | false.
+%% @doc Return the first version (by priority) in `Versions'
+%%      that is `>= TargetVsn'.
 find_version_at_least(_TargetVsn, []) ->
     false;
 find_version_at_least(
@@ -155,15 +149,17 @@ find_version_at_least(#rtv{} = TargetVsn, Versions) ->
 find_version_at_least(TargetVsn, Versions) ->
     find_version_at_least(parse_version(TargetVsn), Versions).
 
--spec find_version_before(TargetVsn :: anyvsn()) -> cfgvsn() | false.
-%% @doc Return the first version in configured_versions/0 that is less
-%%      than TargetVsn.
+-spec find_version_before(TargetVsn :: rtt:any_vsn())
+        -> rtt:cfg_vsn() | false.
+%% @doc Return the first version in {@link configured_versions()} that is
+%%      `< TargetVsn'.
 find_version_before(TargetVsn) ->
     find_version_before(TargetVsn, configured_versions()).
 
 -spec find_version_before(
-    TargetVsn :: anyvsn(), Versions :: list(cfgvsn())) -> cfgvsn() | false.
-%% @doc Return the first version in Versions that is less than TargetVsn.
+    TargetVsn :: rtt:any_vsn(), Versions :: list(rtt:cfg_vsn()))
+        -> rtt:cfg_vsn() | false.
+%% @doc Return the first version in `Versions' that is `< TargetVsn'.
 find_version_before(_TargetVsn, []) ->
     false;
 find_version_before(
@@ -179,8 +175,8 @@ find_version_before(#rtv{} = TargetVsn, Versions) ->
 find_version_before(TargetVsn, Versions) ->
     find_version_before(parse_version(TargetVsn), Versions).
 
--spec new_version(nonempty_list(non_neg_integer())) -> rt_vsn().
-%% @doc Create a {@link rt_vsn()} from a list of integers.
+-spec new_version(nonempty_list(non_neg_integer())) -> rtt:vsn_rec().
+%% @doc Create a {@link rtt:vsn_rec()} from a list of integers.
 %%
 %% Note that this function will happily create a version from a string,
 %% because it's a list of integers, but that's probably not what you want
@@ -195,8 +191,8 @@ new_version(Ints) when erlang:is_list(Ints) andalso erlang:length(Ints) > 0 ->
 new_version(Arg) ->
     erlang:error(badarg, [Arg]).
 
--spec parse_version(VsnIn :: anyvsn()) -> rt_vsn() | no_return().
-%% @doc Parses [almost] anything into a {@link rt_vsn()}.
+-spec parse_version(VsnIn :: rtt:any_vsn()) -> rtt:vsn_rec() | no_return().
+%% @doc Parses [almost] anything into a {@link rtt:vsn_rec()}.
 %% @end
 %%  This is likely overkill within riak_test, but I already had the tested
 %%  code so just lifting it verbatim.
@@ -221,28 +217,31 @@ parse_version(VsnIn) when erlang:is_list(VsnIn) ->
 parse_version(VsnIn) ->
     erlang:error(badarg, [VsnIn]).
 
--spec version_to_string(Vsn :: rt_vsn()) -> string().
-%% @doc Returns the dotted decimal string representation of a {@link rt_vsn()}.
+-spec version_to_string(Vsn :: rtt:vsn_rec()) -> rtt:sem_vsn().
+%% @doc Returns the dotted decimal (semver) string representation of a
+%%      {@link rtt:vsn_rec()}.
 version_to_string(#rtv{vsn = Vsn}) ->
     lists:flatten(lists:join(".", [erlang:integer_to_list(Seg) || Seg <- Vsn]));
 version_to_string(Arg) ->
     erlang:error(badarg, [Arg]).
 
--spec tagged_version(Tag :: vsntag()) -> {vsntag(), rt_vsn()} | undefined | unknown.
-%% @doc Returns the version associated with Tag in a tuple, or an error indicator.
+-spec tagged_version(Tag :: rtt:vsn_tag())
+        -> {rtt:vsn_tag(), rtt:vsn_rec()} | undefined | unknown.
+%% @doc Returns the version associated with `Tag' in a tuple,
+%%      or a failure indicator.
 %%
 %% @returns <ul>
-%%  <li>`undefined' if Tag isn't found in `rtdev_path'.</li>
-%%  <li>`unknown' if Tag's Riak instance doesn't have a VERSION file.</li>
+%%  <li>`undefined' if `Tag' isn't found by `rt:get_vsn_rec(Tag)'.</li>
+%%  <li>`unknown' if `rt:get_vsn_rec(Tag)' can't determine the version.</li>
 %% </ul>
 tagged_version(Tag) ->
-    try rt:get_version(Tag) of
-        unknown = U ->
-            U;
-        Bin ->
-            {Tag, parse_version(Bin)}
+    try rt:get_vsn_rec(Tag) of
+        #rtv{} = Vsn ->
+            {Tag, Vsn};
+        Unknown ->
+            Unknown
     catch
-        _:_:_ ->
+        _:_ ->
             undefined
     end.
 
@@ -250,7 +249,8 @@ tagged_version(Tag) ->
 %% Internal
 %% ===================================================================
 
--spec compare_version_tags(Left :: vsntag(), Right :: vsntag()) -> integer().
+-spec compare_version_tags(Left :: rtt:vsn_tag(), Right :: rtt:vsn_tag())
+        -> integer().
 %% @hidden Version tag priority comparison
 compare_version_tags(Tag, Tag) -> 0;
 % Impose explicit order on the known tags
@@ -312,32 +312,24 @@ compare_version_vals([I | Left], [I | Right]) ->
 compare_version_vals([L | _], [R | _]) ->
     (L - R).
 
--spec configured_versions(
-    Elems :: list(vsnpath()), Result :: list(cfgvsn())) -> list(cfgvsn()).
-%% @hidden Convert `rtdev_path' into an ordered list of tagged versions.
-configured_versions([], Result) ->
-    configured_tagged_versions(Result, []);
-configured_versions([{root, _} | Elems], Result) ->
-    configured_versions(Elems, Result);
-configured_versions([{Tag, _} | Elems], Result) ->
-    configured_versions(Elems, [Tag | Result]).
-
 -spec configured_tagged_versions(
-    Tags :: list(vsntag()), Result :: list(cfgvsn())) -> list(cfgvsn()).
-%% @hidden Convert Tags into an ordered list of tagged versions.
+    Tags :: list(rtt:vsn_tag()), Result :: list(rtt:cfg_vsn()) )
+        -> list(rtt:cfg_vsn()).
+%% @hidden Convert Tags into an ordered list of tagged explicit versions.
 configured_tagged_versions([], Result) ->
     lists:reverse(lists:sort(fun compare_tagged_versions/2, Result));
 configured_tagged_versions([Tag | Tags], Result) ->
     case tagged_version(Tag) of
         {_Tag, #rtv{}} = TV ->
             configured_tagged_versions(Tags, [TV | Result]);
-        _ ->
+        NoVer ->
             % Drop anything without a version
+            ?LOG_WARN("Tag ~p has no explicit version: ~p", [Tag, NoVer]),
             configured_tagged_versions(Tags, Result)
     end.
 
 -spec compare_tagged_versions(
-    L :: {vsntag(), rt_vsn()}, R :: {vsntag(), rt_vsn()}) -> boolean().
+    L :: {rtt:vsn_tag(), #rtv{}}, R :: {rtt:vsn_tag(), #rtv{}}) -> boolean().
 %% @hidden lists:sort/2 comparator
 compare_tagged_versions({LT, #rtv{vsn = LV}}, {RT, #rtv{vsn = RV}}) ->
     case compare_version_vals(LV, RV) of
@@ -348,7 +340,7 @@ compare_tagged_versions({LT, #rtv{vsn = LV}}, {RT, #rtv{vsn = RV}}) ->
     end.
 
 -spec parse_version(
-    Segments :: list(string()), Result :: list(non_neg_integer())) -> rt_vsn().
+    Segments :: list(string()), Result :: list(non_neg_integer())) -> #rtv{}.
 %% @hidden The safe way to handle any number of segments.
 parse_version([], Result) ->
     #rtv{vsn = lists:reverse(Result)};

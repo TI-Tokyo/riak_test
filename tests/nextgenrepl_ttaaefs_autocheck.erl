@@ -1,12 +1,29 @@
+%% -------------------------------------------------------------------
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 %% @doc
 %% This module implements a riak_test to test the auto_check method
 %% in nextgenrepl ttaaefs
-
 -module(nextgenrepl_ttaaefs_autocheck).
 -behavior(riak_test).
+
 -export([confirm/0]).
--export([delete_from_cluster/3]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 
 -define(TEST_BUCKET, <<"repl-aae-fullsync-systest_a">>).
 -define(A_RING, 8).
@@ -67,21 +84,21 @@ setup_clusters(Now) ->
     rt:join_cluster(ClusterA),
     rt:join_cluster(ClusterB),
     rt:join_cluster(ClusterC),
-    
+
     wait_for_convergence(ClusterA, ClusterB, ClusterC),
-    
+
     lager:info("Ready for test."),
     [ClusterA, ClusterB, ClusterC].
 
 
 test_repl_between_clusters(ClusterA, ClusterB, ClusterC, Now) ->
-    
+
     NodeA = hd(ClusterA),
     NodeB = hd(ClusterB),
     NodeC = hd(ClusterC),
 
     AutoCheckFun = autosync_checkfun(Now),
-    
+
     ok = setup_replqueues(ClusterA ++ ClusterB ++ ClusterC),
 
     wait_for_convergence(ClusterA, ClusterB, ClusterC),
@@ -92,7 +109,7 @@ test_repl_between_clusters(ClusterA, ClusterB, ClusterC, Now) ->
     {http, {IPC, PortC}} = lists:keyfind(http, 1, rt:connection_info(NodeC)),
     lager:info("Cluster A ~s ~w Cluster B ~s ~w Cluster C ~s ~w",
                 [IPA, PortA, IPB, PortB, IPC, PortC]),
-    
+
     lager:info("Auto check should root compare"),
     {root_compare, 0}
         = AutoCheckFun({NodeA, IPA, PortA, ?A_NVAL},
@@ -103,7 +120,7 @@ test_repl_between_clusters(ClusterA, ClusterB, ClusterC, Now) ->
     {root_compare, 0}
         = AutoCheckFun({NodeC, IPC, PortC, ?C_NVAL},
                         {NodeA, IPA, PortA, ?A_NVAL}),
-    
+
     lists:foreach(fun(N) -> ?assertMatch(none, get_range(N)) end,
                     [NodeA, NodeB, NodeC]),
 
@@ -131,7 +148,7 @@ test_repl_between_clusters(ClusterA, ClusterB, ClusterC, Now) ->
         = AutoCheckFun({NodeA, IPA, PortA, ?A_NVAL},
                             {NodeB, IPB, PortB, ?B_NVAL}),
     ?assertMatch(none, get_range(NodeA)),
-    
+
     {clock_compare, 100}
         = AutoCheckFun({NodeB, IPB, PortB, ?B_NVAL},
                             {NodeC, IPC, PortC, ?C_NVAL}),
@@ -210,10 +227,10 @@ write_to_cluster(Node, Start, End, Bucket, NewObj, CVB) ->
     lager:info("Writing ~p keys to node ~p.", [End - Start + 1, Node]),
     lager:warning("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
-    F = 
+    F =
         fun(N, Acc) ->
             Key = key(N),
-            Obj = 
+            Obj =
                 case NewObj of
                     true ->
                         riak_object:new(Bucket,
@@ -238,29 +255,6 @@ write_to_cluster(Node, Start, End, Bucket, NewObj, CVB) ->
     lager:warning("~p errors while writing: ~p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
-delete_from_cluster(Node, Start, End) ->
-    delete_from_cluster(Node, Start, End, ?TEST_BUCKET).
-
-delete_from_cluster(Node, Start, End, Bucket) ->
-    lager:info("Deleting ~p keys from node ~p.", [End - Start + 1, Node]),
-    {ok, C} = riak:client_connect(Node),
-    F = 
-        fun(N, Acc) ->
-            Key = key(N),
-            try riak_client:delete(Bucket, Key, C) of
-                ok ->
-                    Acc;
-                Other ->
-                    [{N, Other} | Acc]
-            catch
-                What:Why ->
-                    [{N, {What, Why}} | Acc]
-            end
-        end,
-    Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    lager:warning("~p errors while deleting: ~p", [length(Errors), Errors]),
-    ?assertEqual([], Errors).
-
 
 %% @doc Read from cluster a series of keys, asserting a certain number
 %%      of errors.
@@ -271,7 +265,7 @@ read_from_cluster(Node, Start, End, Errors) ->
 read_from_cluster(Node, Start, End, Errors, Bucket, CommonValBin) ->
     lager:info("Reading ~p keys from node ~p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
-    F = 
+    F =
         fun(N, Acc) ->
             Key = key(N),
             case  riak_client:get(Bucket, Key, C) of
@@ -302,7 +296,7 @@ key(N) ->
 
 get_stats(Node) ->
     lager:info("Fetching stats from ~w", [Node]),
-    S = verify_riak_stats:get_stats(Node, ?STATS_WAIT),
+    S = rt:get_stats(Node, ?STATS_WAIT),
     {_, ACT} = lists:keyfind(<<"ttaaefs_allcheck_total">>, 1, S),
     {_, DCT} = lists:keyfind(<<"ttaaefs_daycheck_total">>, 1, S),
     {_, HCT} = lists:keyfind(<<"ttaaefs_hourcheck_total">>, 1, S),

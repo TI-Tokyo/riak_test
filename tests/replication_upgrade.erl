@@ -1,7 +1,28 @@
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2012-2016 Basho Technologies, Inc.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 -module(replication_upgrade).
 -behavior(riak_test).
+
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+
+% -include_lib("stdlib/include/assert.hrl").
 
 confirm() ->
     TestMetaData = riak_test_runner:metadata(),
@@ -41,7 +62,7 @@ confirm() ->
             lists:sort(fun(_, _) -> rand:uniform(100) < 50 end, Nodes);
         Other ->
             lager:error("Invalid upgrade ordering ~p", [Other]),
-            erlang:exit()
+            erlang:error(case_clause, [Other])
     end,
 
     ClusterASize = rt_config:get(cluster_a_size, 3),
@@ -66,7 +87,7 @@ confirm() ->
     ok = lists:foreach(fun(Node) ->
                                lager:info("Upgrade node: ~p", [Node]),
                                rt:log_to_nodes(Nodes, "Upgrade node: ~p", [Node]),
-                               rt:upgrade(Node, current, fun replication2_upgrade:remove_jmx_from_conf/1),
+                               rt:upgrade(Node, current),
                                rt:wait_until_pingable(Node),
                                rt:wait_for_service(Node, [riak_kv, riak_pipe, riak_repl]),
                                [rt:wait_until_ring_converged(N) || N <- [ANodes, BNodes]],

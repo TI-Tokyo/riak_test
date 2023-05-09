@@ -1,4 +1,24 @@
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2013-2016 Basho Technologies, Inc.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 -module(repl_util).
+
 -export([make_cluster/1,
          name_cluster/2,
          node_has_version/2,
@@ -52,7 +72,8 @@
          validate_completed_fullsync/6,
          validate_intercepted_fullsync/5
         ]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 
 make_cluster(Nodes) ->
     [First|Rest] = Nodes,
@@ -479,7 +500,7 @@ do_write(Node, Start, End, Bucket, W) ->
 
 %% does the node meet the version requirement?
 node_has_version(Node, Version) ->
-    NodeVersion =  rtdev:node_version(rtdev:node_id(Node)),
+    NodeVersion =  rt:get_node_version(Node),
     case NodeVersion of
         current ->
             %% current always satisfies any version check

@@ -1,6 +1,7 @@
 %% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2018 Martin Sumner.
+%% Copyright (c) 2023 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -35,11 +36,15 @@
 %%
 %% Also, a sanity check is done to make sure AAE repairs go away eventually
 %% if there is no activity.  That was an actual early AAE bug.
-
 -module(verify_tictac_aae).
--export([confirm/0, verify_aae_norebuild/1, verify_aae_rebuild/1, test_single_partition_loss/3]).
+-behavior(riak_test).
+
+-export([confirm/0]).
+
+%% Shared to tests
 -export([verify_data/2]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 
 % I would hope this would come from the testing framework some day
 % to use the test in small and large scenarios.
@@ -94,7 +99,6 @@
        ).
 -define(NUM_NODES, 4).
 -define(NUM_KEYS, 2000).
--define(FUZZ_REPAIRS, 2).
 -define(BUCKET, <<"test_bucket">>).
 -define(ALT_BUCKET1, <<"alt_bucket1">>).
 -define(ALT_BUCKET2, <<"alt_bucket2">>).
@@ -102,6 +106,11 @@
 -define(ALT_BUCKET4, <<"alt_bucket4">>).
 -define(N_VAL, 3).
 -define(STATS_DELAY, 1000).
+
+%% Some keys may be repaired more than once.
+%% The original fuzz factor of 0.1% wasn't always enough, leaving the
+%% test flappy. About a third of a percent *seems* to cover all cases ...
+-define(FUZZ_REPAIRS(Num), erlang:round(Num * 1.003333)).
 
 confirm() ->
 
@@ -153,7 +162,7 @@ confirm() ->
             CheckFun =
                 fun(StatName) ->
                     proplists:get_value(StatName,
-                        verify_riak_stats:get_stats(NodeToUpgrade, ?STATS_DELAY))
+                        rt:get_stats(NodeToUpgrade, ?STATS_DELAY))
                 end,
             ?assertEqual(0, CheckFun(<<"tictacaae_bucket_total">>)),
             ?assertEqual(0, CheckFun(<<"tictacaae_modtime_total">>)),
@@ -169,8 +178,8 @@ check_capability(Node) ->
         get,
         [{riak_kv, tictacaae_prompted_repairs}, false]).
 
-verify_aae_norebuild(Nodes) ->
-    verify_aae_norebuild(Nodes, false).
+% verify_aae_norebuild(Nodes) ->
+%     verify_aae_norebuild(Nodes, false).
 
 verify_aae_norebuild(Nodes, CheckTypeStats) ->
     lager:info("Tictac AAE tests without rebuilding trees"),
@@ -188,14 +197,12 @@ verify_aae_norebuild(Nodes, CheckTypeStats) ->
             lists:map(
                 fun(N) ->
                     proplists:get_value(RepSN,
-                        verify_riak_stats:get_stats(N, ?STATS_DELAY))
+                        rt:get_stats(N, ?STATS_DELAY))
                 end,
                 Nodes)),
     lager:info("Repairs ~w approx expected ~w", [Repairs, ?NUM_KEYS]),
     ?assert(Repairs >= ?NUM_KEYS),
-    ?assert(Repairs =< ?NUM_KEYS + ?FUZZ_REPAIRS),
-        % Allow a fuzz of 0.1%
-        % Some keys may have repair triggered twice.
+    ?assert(Repairs =< ?FUZZ_REPAIRS(?NUM_KEYS)),
 
     KV2 = [{K, <<V/binary, "a">>} || {K, V} <- KV1],
     lager:info("Writing additional n=1 data to require more repairs"),
@@ -220,7 +227,7 @@ verify_aae_norebuild(Nodes, CheckTypeStats) ->
                 fun(StatName) ->
                     fun(Node) ->
                         V = proplists:get_value(StatName,
-                                verify_riak_stats:get_stats(Node, ?STATS_DELAY)),
+                                rt:get_stats(Node, ?STATS_DELAY)),
                         ?assertNotEqual(0, V)
                     end
                 end,

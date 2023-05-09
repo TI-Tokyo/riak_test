@@ -1,12 +1,33 @@
+%% -*- mode: erlang; erlang-indent-level: 4; indent-tabs-mode: nil -*-
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2013-2016 Basho Technologies, Inc.
+%% Copyright (c) 2018-2023 Workday, Inc.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 -module(pb_security).
-
 -behavior(riak_test).
+
 -export([confirm/0]).
 
 -export([map_object_value/3, reduce_set_union/2, mapred_modfun_input/3]).
 -export([setup_pb_certificates/1]).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/assert.hrl").
 -include_lib("riakc/include/riakc.hrl").
 
 -define(assertDenied(Op), ?assertMatch({error, <<"Permission",_/binary>>}, Op)).
@@ -501,21 +522,17 @@ confirm() ->
             %% 2i permission test
             lager:info("Checking 2i is disallowed"),
             ?assertMatch({error, <<"Permission", _/binary>>},
-                         riakc_pb_socket:get_index(PB, <<"hello">>,
-                                                   {binary_index,
-                                                    "name"},
-                                                   <<"John">>)),
+                riakc_pb_socket:get_index_eq(PB,
+                    <<"hello">>, {binary_index, "name"}, <<"John">>)),
 
             lager:info("Granting 2i permissions, checking that results come back"),
-            ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.index", "on",
-                                                            "default", "to", Username]]),
+            ok = rpc:call(Node, riak_core_console, grant,
+                [["riak_kv.index", "on", "default", "to", Username]]),
 
             %% don't actually have any indexes
             ?assertMatch({ok, ?INDEX_RESULTS{keys=[]}},
-                         riakc_pb_socket:get_index(PB, <<"hello">>,
-                                                   {binary_index,
-                                                    "name"},
-                                                   <<"John">>)),
+                riakc_pb_socket:get_index_eq(PB,
+                    <<"hello">>, {binary_index, "name"}, <<"John">>)),
             ok
     end,
 

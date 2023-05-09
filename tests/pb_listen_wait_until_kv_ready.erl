@@ -48,7 +48,7 @@
     agent_proc/1        %% spawned agent process
 ]).
 
--include_lib("eunit/include/eunit.hrl").
+% -include_lib("stdlib/include/assert.hrl").
 -include("logging.hrl").
 
 %% First version with riak_api_pb_listener:wait_for_listener_ready.
@@ -114,7 +114,7 @@ confirm() ->
                 ++ term_fmt(OldTag) ++ " (~s)",
                 [OldTag, rt_vsn:version_to_string(OldVsn)]),
             OldNode = deploy_node(OldTag),
-            {ok, [{OldIP, OldPort}]} = rt:get_pb_conn_info(OldNode),
+            {ok, {OldIP, OldPort}} = rt:get_pb_conn_info(OldNode),
             connect_write_read(Agent, OldNode, OldIP, OldPort, ?LINE, fail),
             stop_node(OldNode, ?LINE);
         _ ->
@@ -127,7 +127,7 @@ confirm() ->
         "Testing for success with version " ++ term_fmt(CurTag) ++ " (~s)",
         [CurTag, rt_vsn:version_to_string(CurVsn)]),
     Node = deploy_node(CurTag),
-    {ok, [{IP, PbPort}]} = rt:get_pb_conn_info(Node),
+    {ok, {IP, PbPort}} = rt:get_pb_conn_info(Node),
     connect_write_read(Agent, Node, IP, PbPort, ?LINE, pass),
     stop_node(Node, ?LINE),
 

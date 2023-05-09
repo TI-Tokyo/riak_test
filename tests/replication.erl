@@ -1,11 +1,40 @@
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2012-2014 Basho Technologies, Inc.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 -module(replication).
 -behavior(riak_test).
+
 -export([confirm/0]).
--compile([export_all, nowarn_export_all]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 
 %% export functions shared with other replication tests...
--export([make_bucket/3]).
+-export([
+    add_listeners/1,
+    add_site/2,
+    do_write/5,
+    make_bucket/3,
+    replication/3,
+    verify_listeners/1,
+    wait_for_site_ips/3,
+    wait_until_connection/1
+]).
 
 confirm() ->
     Conf = [
@@ -465,15 +494,6 @@ add_listener(N, Node, IP, Port) ->
     Res = rpc:call(N, riak_repl_console, add_listener, Args),
     ?assertEqual(ok, Res).
 
-del_listeners(Node) ->
-    Listeners = get_listeners(Node),
-    lists:foreach(fun(Listener={IP, Port, N}) ->
-                lager:info("deleting listener ~p on ~p", [Listener, Node]),
-                Res = rpc:call(Node, riak_repl_console, del_listener,
-                    [[atom_to_list(N), IP, integer_to_list(Port)]]),
-                ?assertEqual(ok, Res)
-        end, Listeners).
-
 get_listeners(Node) ->
     Status = rpc:call(Node, riak_repl_console, status, [quiet]),
     %% *sigh*
@@ -518,8 +538,8 @@ start_and_wait_until_fullsync_complete(Node, Retries) ->
     Count = proplists:get_value(server_fullsyncs, Status0) + 1,
     lager:info("waiting for fullsync count to be ~p", [Count]),
 
-    lager:info("Starting fullsync on ~p (~p)", [Node,
-            rtdev:node_version(rtdev:node_id(Node))]),
+    lager:info("Starting fullsync on ~p (~p)",
+        [Node, rt:get_node_version(Node)]),
     rpc:call(Node, riak_repl_console, start_fullsync, [[]]),
 
     %% sleep because of the old bug where stats will crash if you call it too
@@ -550,35 +570,6 @@ make_fullsync_wait_fun(Node, Count) ->
                             false
                     end
             end
-    end.
-
-wait_until_is_leader(Node) ->
-    lager:info("wait_until_is_leader(~p)", [Node]),
-    rt:wait_until(Node, fun is_leader/1).
-
-is_leader(Node) ->
-    case rpc:call(Node, riak_repl_leader, leader_node, []) of
-        {badrpc, _} ->
-            lager:info("Badrpc"),
-            false;
-        Leader ->
-            lager:info("Checking: ~p =:= ~p", [Leader, Node]),
-            Leader =:= Node
-    end.
-
-
-wait_until_is_not_leader(Node) ->
-    lager:info("wait_until_is_not_leader(~p)", [Node]),
-    rt:wait_until(Node, fun is_not_leader/1).
-
-is_not_leader(Node) ->
-    case rpc:call(Node, riak_repl_leader, leader_node, []) of
-        {badrpc, _} ->
-            lager:info("Badrpc"),
-            false;
-        Leader ->
-            lager:info("Checking: ~p =/= ~p", [Leader, Node]),
-            Leader =/= Node
     end.
 
 wait_until_leader(Node) ->

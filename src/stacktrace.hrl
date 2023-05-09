@@ -15,6 +15,7 @@
 %%                 _             -> {'EXIT', Reason, ?_get_stacktrace_(StackToken)}
 %%             end
 %%     end,
+-error("stacktrace macros are deprecated, use Class:Reason:StackTrace code").
 
 -ifdef(OTP_RELEASE). %% This implies 21 or higher
 -define(_exception_(Class, Reason, StackToken), Class:Reason:StackToken).

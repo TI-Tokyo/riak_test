@@ -1,6 +1,7 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2013-2014 Basho Technologies, Inc.
+%% Copyright (c) 2014-2015 Basho Technologies, Inc.
+%% Copyright (c) 2022-2023 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -17,12 +18,12 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
-
 -module(ensemble_byzantine).
--export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+-behavior(riak_test).
 
--define(HARNESS, (rt_config:get(rt_harness))).
+-export([confirm/0]).
+
+-include_lib("stdlib/include/assert.hrl").
 
 -define(NUM_NODES, 8).
 -define(NVAL, 5).
@@ -205,7 +206,7 @@ start_nodes(PL) ->
     [rt:start_and_wait(Node) || {{_, Node}, _} <- PL].
 
 data_path(Node) ->
-    ?HARNESS:node_path(Node) ++ "/data/"++backend_dir().
+    rt:get_node_path(Node) ++ "/data/" ++ backend_dir().
 
 backup_path(Node, N) ->
     data_path(Node) ++ integer_to_list(N) ++ ".bak".
@@ -216,8 +217,7 @@ backup_data(N, PL) ->
 backup_node(Node, N) ->
     Path = data_path(Node),
     BackupPath = backup_path(Node, N),
-    Cmd = "cp -R "++Path++" "++BackupPath,
-    lager:info("~p", [os:cmd(Cmd)]).
+    ?assertMatch({0, []}, rt:cmd("/bin/cp", ["-pPR", Path, BackupPath])).
 
 restore_data(N, PL) ->
     [restore_node(Node, N) || {{_, Node}, _} <- PL].
@@ -226,8 +226,7 @@ restore_node(Node, N) ->
     Path = data_path(Node),
     BackupPath = backup_path(Node, N),
     rm_backend_dir(Node),
-    Cmd = "mv "++BackupPath++" "++Path,
-    ?assertEqual([], os:cmd(Cmd)).
+    ?assertMatch({0, []}, rt:cmd("/bin/mv", [BackupPath, Path])).
 
 assert_lose_synctrees_and_recover(PBC, Bucket, Key, Val, PL, ToLose) ->
     {{Idx0, Node0}, primary} = hd(PL),

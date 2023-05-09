@@ -1,7 +1,7 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2013 Basho Technologies, Inc.
-%% Copyright (c) 2018-2022 Workday, Inc.
+%% Copyright (c) 2013-2014 Basho Technologies, Inc.
+%% Copyright (c) 2018-2023 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -20,8 +20,10 @@
 %% -------------------------------------------------------------------
 -module(verify_handoff).
 -behavior(riak_test).
+
 -export([confirm/0, run_test/4]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 
 %%
 %% TODO Portions of this test are commented out pending removal of elevedb backend stats, which
@@ -213,8 +215,6 @@ test_hinted_handoff([RootNode | OtherNodes] = Nodes, NTestItems) ->
 
     ok.
 
-
-
 test_repair_handoff([RootNode | _OtherNodes] = Nodes) ->
 
     lager:info("Testing repair handoff by stopping ~p, deleting some data, and issuing a repair ...", [RootNode]),
@@ -262,14 +262,13 @@ delete_bitcask_dir(Node, Partition) ->
 issue_repair(Node, Partition) ->
     rpc:call(Node, riak_kv_vnode, repair, Partition).
 
-
 % get_handoff_stats(Type, Node) when is_atom(Node) ->
-%     Stats = get_stats(Node),
+%     Stats = rt:get_stats(Node),
 %     BytesSentStatName   = stat_name(Type, bytes_sent),
 %     ObjectsSentStatName = stat_name(Type, objects_sent),
 %     [
-%         {BytesSentStatName,   get_stat(Stats, BytesSentStatName)},
-%         {ObjectsSentStatName, get_stat(Stats, ObjectsSentStatName)}
+%         {BytesSentStatName,   rt:get_stat(Stats, BytesSentStatName)},
+%         {ObjectsSentStatName, rt:get_stat(Stats, ObjectsSentStatName)}
 %     ];
 % get_handoff_stats(Type, Nodes) ->
 %     [{Node, get_handoff_stats(Type, Node)} || Node <- Nodes].
@@ -287,6 +286,7 @@ issue_repair(Node, Partition) ->
 %         end,
 %         lists:zip(BeforeHandoffStats, AfterHandoffStats)
 %     )).
+
 assert_using(Node, {CapabilityCategory, CapabilityName}, ExpectedCapabilityName) ->
     lager:info("assert_using ~p =:= ~p", [ExpectedCapabilityName, CapabilityName]),
     ExpectedCapabilityName =:= rt:capability(Node, {CapabilityCategory, CapabilityName}).
@@ -354,7 +354,7 @@ deploy_test_nodes(true,  N) ->
 % wait_until_stat_at_least(Node, StatName, ExpectedValue) ->
 %     rt:wait_until(
 %         fun() ->
-%             Stat = get_stat(Node, StatName),
+%             Stat = rt:get_stat(Node, StatName),
 %             case Stat of
 %                 Value when ExpectedValue =< Value ->
 %                     true;
@@ -364,26 +364,3 @@ deploy_test_nodes(true,  N) ->
 %             end
 %         end
 %     ).
-
-
-% get_stats(Node) ->
-%     StatsCommand = io_lib:format("curl -s -S ~s/stats", [rt:http_url(Node)]),
-%     lager:debug("Retrieving stats from ~p using command ~s", [Node, StatsCommand]),
-%     StatString = os:cmd(StatsCommand),
-%     {struct, Stats} = mochijson2:decode(StatString),
-%     Stats.
-%     % case rt:cmd(StatsCommand) of
-%     %     {0, StatString} ->
-%     %         {struct, Stats} = mochijson2:decode(StatString),
-%     %         Stats;
-%     %     {NonZero, Error} ->
-%     %         lager:error("Non-zero exit code returned when fetching stats: ~p.  Error=~p", [NonZero, Error]),
-%     %         throw(get_stats_error)
-%     % end.
-
-
-% get_stat(Node, Key) when is_atom(Node) ->
-%     Stats = get_stats(Node),
-%     get_stat(Stats, Key);
-% get_stat(Stats, Key) ->
-%     proplists:get_value(list_to_binary(atom_to_list(Key)), Stats).

@@ -17,8 +17,10 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+
+%% @deprecated Unused anywhere
 -module(rt_local).
--include_lib("eunit/include/eunit.hrl").
+-deprecated(module).
 
 -export([
          assert_which/1,
@@ -30,6 +32,8 @@
          url_to_filename/1,
          which/1
 ]).
+
+-include_lib("eunit/include/eunit.hrl").
 
 %% @doc Return the home directory of the riak_test script.
 -spec home_dir() -> file:filename().

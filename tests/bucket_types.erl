@@ -1,9 +1,28 @@
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2013-2015 Basho Technologies, Inc.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 -module(bucket_types).
-
 -behavior(riak_test).
+
 -export([confirm/0, mapred_modfun/3, mapred_modfun_type/3]).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(SUMVALUE_MAPRED,
             [{map,
@@ -328,29 +347,23 @@ confirm() ->
             riakc_pb_socket:put(PB, Obj1),
             riakc_pb_socket:put(PB, Obj2),
 
-            ?assertMatch({ok, {index_results_v1, [<<"JRD">>], _, _}}, riakc_pb_socket:get_index(PB, <<"test">>,
-                                                                                                {binary_index,
-                                                                                                 "name"},
-                                                                                                <<"John">>)),
+            ?assertMatch({ok, {index_results_v1, [<<"JRD">>], _, _}},
+                riakc_pb_socket:get_index_eq(PB,
+                    <<"test">>, {binary_index, "name"}, <<"John">>)),
 
-            ?assertMatch({ok, {index_results_v1, [], _, _}}, riakc_pb_socket:get_index(PB, <<"test">>,
-                                                                                       {binary_index,
-                                                                                        "name"},
-                                                                                       <<"Jane">>)),
+            ?assertMatch({ok, {index_results_v1, [], _, _}},
+                riakc_pb_socket:get_index_eq(PB,
+                    <<"test">>, {binary_index, "name"}, <<"Jane">>)),
 
-            ?assertMatch({ok, {index_results_v1, [<<"JRD">>], _, _}}, riakc_pb_socket:get_index(PB,
-                                                                                                {Type,
-                                                                                                 <<"test">>},
-                                                                                                {binary_index,
-                                                                                                 "name"},
-                                                                                                <<"Jane">>)),
+            ?assertMatch({ok, {index_results_v1, [<<"JRD">>], _, _}},
+                riakc_pb_socket:get_index_eq(PB,
+                    {Type, <<"test">>}, {binary_index, "name"}, <<"Jane">>)),
 
             %% wild stab at the undocumented cs_bucket_fold
             {ok, ReqID} = riakc_pb_socket:cs_bucket_fold(PB, <<"test">>, []),
             accumulate(ReqID),
 
-            {ok, ReqID2} = riakc_pb_socket:cs_bucket_fold(PB, {Type,
-                                                               <<"test">>}, []),
+            {ok, ReqID2} = riakc_pb_socket:cs_bucket_fold(PB, {Type, <<"test">>}, []),
             accumulate(ReqID2),
             ok
     end,

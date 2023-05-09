@@ -17,10 +17,11 @@
 %% -------------------------------------------------------------------
 %% @doc Verification of AAE fold's find_keys and object stats
 %% operational fold features
-
 -module(verify_tictacrebuild_via_statsfold).
+
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 
 -define(DEFAULT_RING_SIZE, 64).
 -define(CFG_TICTACAAE(ExchangeTick, RebuildTick, PoolStrategy),
@@ -34,7 +35,7 @@
                 % store
            {tictacaae_rebuildwait, 4},
            {tictacaae_rebuilddelay, 60},
-           {tictacaae_exchangetick, ExchangeTick}, 
+           {tictacaae_exchangetick, ExchangeTick},
            {tictacaae_rebuildtick, RebuildTick},
            {worker_pool_strategy, PoolStrategy}
           ]},
@@ -44,7 +45,7 @@
            {default_bucket_props, [{allow_mult, true}]}
           ]}]
        ).
--define(CFG_NOAAE(PoolStrategy), 
+-define(CFG_NOAAE(PoolStrategy),
         [{riak_kv,
           [
            % Speedy AAE configuration
@@ -101,7 +102,7 @@ confirm() ->
 
     TotalKeys = lists:foldl(KeyLoadFun(?NUM_KEYS_PERNODE), 0, Cluster),
     lager:info("Loaded ~w objects", [?NUM_KEYS_PERNODE * length(Cluster)]),
-    
+
     lager:info("get stats"),
     {ok, {stats, Stats}} = rhc:aae_object_stats(HttpCH, ?BUCKET, all, all),
     FoldKeyCount = proplists:get_value(<<"total_count">>, Stats),
@@ -124,7 +125,7 @@ confirm() ->
     lager:info("Wait until rebuild has caused correct result"),
     lager:info("This should be immediate for native backend"),
 
-    RebuildCompleteFun = 
+    RebuildCompleteFun =
         fun() ->
             {ok, {stats, RebuildStats}} =
                 rhc:aae_object_stats(HttpCH, ?BUCKET, all, all),
@@ -153,7 +154,7 @@ confirm() ->
     N1_AF4 = fetch_stats(af4pool_stats(), Node1),
     N2_AF4 = fetch_stats(af4pool_stats(), Node2),
     N3_AF4 = fetch_stats(af4pool_stats(), Node3),
-    
+
     ?assertNotEqual(0, lists:min(N1_AF4)),
     ?assertEqual(0, lists:max(N2_AF4)),
     ?assertEqual(0, lists:max(N3_AF4)),
@@ -178,7 +179,7 @@ confirm() ->
 
 
 fetch_stats(StatList, Node) ->
-    Stats = verify_riak_stats:get_stats(Node, 1000),
+    Stats = rt:get_stats(Node, 1000),
     SL = lists:map(fun(S) -> proplists:get_value(S, Stats) end, StatList),
     lager:info("Stats pulled for ~p ~w - ~p", [StatList, Node, SL]),
     SL.

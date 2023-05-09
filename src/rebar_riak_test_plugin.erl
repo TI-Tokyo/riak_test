@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2012 Basho Technologies, Inc.
+%% Copyright (c) 2012-2014 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -18,13 +18,15 @@
 %%
 %% -------------------------------------------------------------------
 
+%% @deprecated No replacement!
+%% This is a Rebar2 plugin, not compatible with Rebar3+.
+-module(rebar_riak_test_plugin).
+-deprecated(module).
 
 %%
 %{riak_test, [
 %    {src_dirs, ["test/src", "deps/riak_test_"]}
 %]}.
-
--module(rebar_riak_test_plugin).
 
 -export([
     clean/2,
@@ -32,9 +34,19 @@
     rt_run/2
 ]).
 
+-ignore_xref([
+    {eqc, version, 0},
+    {rebar_config, get_global, 3},
+    {rebar_config, set, 3},
+    {rebar_erlc_compiler, compile, 2},
+    {rebar_file_utils, rm_rf, 1},
+    {rebar_utils, ebin_dir, 0}
+]).
+
 %% ===================================================================
 %% Public API
 %% ===================================================================
+
 clean(Config, AppFile) ->
     case should_i_run(Config) of
         false -> ok;
@@ -46,7 +58,7 @@ compile(Config, AppFile) ->
         false -> ok;
         _ -> riak_test_compile(Config, AppFile)
     end.
-    
+
 rt_run(Config, AppFile) ->
     case should_i_run(Config) of
         false -> ok;
@@ -56,9 +68,11 @@ rt_run(Config, AppFile) ->
 %% ===================================================================
 %% Private Functions - pronounced Funk-tee-owns, not funk-ee-towns
 %% ===================================================================
+
 should_i_run(Config) ->
     %% Only run on the base dir
-    hd(lists:reverse(element(3, Config))) =:= local andalso proplists:is_defined(riak_test, element(3, Config)).
+    hd(lists:reverse(element(3, Config))) =:= local
+        andalso proplists:is_defined(riak_test, element(3, Config)).
 
 option(Key, Config) ->
     case proplists:get_value(riak_test, element(3, Config), not_configured) of
@@ -69,7 +83,7 @@ option(Key, Config) ->
 
 riak_test_clean(Config, _AppFile) ->
     case option(test_output, Config) of
-        {error, not_set} -> 
+        {error, not_set} ->
             io:format("No test_output directory set, check your rebar.config");
         TestOutputDir ->
             io:format("Removing test_output dir ~s~n", [TestOutputDir]),
@@ -77,24 +91,28 @@ riak_test_clean(Config, _AppFile) ->
     end,
     ok.
 
-riak_test_compile(Config, AppFile) ->    
+riak_test_compile(Config, AppFile) ->
     CompilationConfig = compilation_config(Config),
     rebar_erlc_compiler:compile(CompilationConfig, AppFile),
     ok.
-    
+
 riak_test_run(Config, _AppFile) ->
     RiakTestConfig = rebar_config:get_global(Config, config, "rtdev"),
     Test = rebar_config:get_global(Config, test, ""),
     code:add_pathsz([rebar_utils:ebin_dir(), option(test_output, Config)]),
-    riak_test:main(["-c", RiakTestConfig, "-t", Test]),
-    ok.
-    
+    %% no return - halts the VM on completion
+    riak_test_escript:main(["-c", RiakTestConfig, "-t", Test]).
+
 compilation_config(Conf) ->
     C1 = rebar_config:set(Conf, riak_test, undefined),
     C2 = rebar_config:set(C1, plugins, undefined),
     ErlOpts = proplists:get_value(erl_opts, element(3, Conf)),
     ErlOpts1 = proplists:delete(src_dirs, ErlOpts),
-    ErlOpts2 = [{parse_transform,lager_transform},{outdir, option(test_output, Conf)}, {src_dirs, option(test_paths, Conf)} | ErlOpts1],
+    ErlOpts2 = [
+        {parse_transform,lager_transform},
+        {outdir, option(test_output, Conf)},
+        {src_dirs, option(test_paths, Conf)}
+        | ErlOpts1],
     case eqc_present() of
        true ->
            ErlOpts3 = [{d, 'EQC'},{d, 'TEST'} | ErlOpts2];

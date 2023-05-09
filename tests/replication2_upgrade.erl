@@ -22,8 +22,10 @@
 %% Test cluster version migration with BNW replication as "new" version
 -module(replication2_upgrade).
 -behavior(riak_test).
--export([confirm/0, remove_jmx_from_conf/1]).
--include_lib("eunit/include/eunit.hrl").
+
+-export([confirm/0]).
+
+% -include_lib("stdlib/include/assert.hrl").
 
 confirm() ->
     TestMetaData = riak_test_runner:metadata(),
@@ -51,11 +53,11 @@ confirm() ->
              ]}
     ],
 
-    NodeConfig = [{FromVersion, Conf} || _ <- lists:seq(1, NumNodes)],
+    NodeConfig = lists:duplicate(NumNodes, {FromVersion, Conf}),
 
     Nodes = rt:deploy_nodes(NodeConfig, [riak_kv, riak_repl]),
 
-    ClusterASize = rt_config:get(cluster_a_size, 3),
+    ClusterASize = rt_config:get(cluster_a_size, (NumNodes div 2)),
     {ANodes, BNodes} = lists:split(ClusterASize, Nodes),
     lager:info("ANodes: ~p", [ANodes]),
     lager:info("BNodes: ~p", [BNodes]),
@@ -78,7 +80,7 @@ confirm() ->
             [[Node] || Node <- lists:sort(fun(_, _) -> rand:uniform(100) < 50 end, Nodes)];
         Other ->
             lager:error("Invalid upgrade ordering ~p", [Other]),
-            erlang:exit()
+            erlang:error(case_clause, [Other])
     end,
 
     lager:info("Build cluster A"),
@@ -109,7 +111,7 @@ confirm() ->
 upgrade_node(Node, Nodes, ANodes, BNodes) ->
     lager:info("Upgrade node: ~p", [Node]),
     rt:log_to_nodes(Nodes, "Upgrade node: ~p", [Node]),
-    rt:upgrade(Node, current, fun ?MODULE:remove_jmx_from_conf/1),
+    rt:upgrade(Node, current),
     %% The upgrade did a wait for pingable
     rt:wait_for_service(Node, [riak_kv, riak_pipe, riak_repl]),
     [rt:wait_until_ring_converged(N) || N <- [ANodes, BNodes]],
@@ -135,16 +137,3 @@ upgrade_node(Node, Nodes, ANodes, BNodes) ->
     end,
     lager:info("Replication with upgraded node: ~p", [Node]),
     rt:log_to_nodes(Nodes, "Replication with upgraded node: ~p", [Node]).
-
-%% @doc when going from riak_ee to OS riak + repl (>=2.2.5) there are
-%% riak.conf elements that must be removed, as the applications no
-%% longer exist. This is a cfish issue really, see
-%% https://github.com/basho/cuttlefish/issues/176
-remove_jmx_from_conf(Params) ->
-    NewConfPath = proplists:get_value(new_conf_dir, Params),
-    SedCmd = "sed -i.bak '/^jmx/d'",
-    File = filename:join(NewConfPath, "riak.conf"),
-    Cmd = io_lib:format("~s ~s", [SedCmd, File]),
-    lager:info("Removing jmx with cmd ~p", [Cmd]),
-    Res = os:cmd(Cmd),
-    lager:info("jmx cmd res = ~p", [Res]).

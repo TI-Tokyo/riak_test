@@ -1,5 +1,35 @@
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2013-2016 Basho Technologies, Inc.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
+
+%% @private
 -module(rtssh).
--compile([export_all, nowarn_export_all]).
+
+%% Right now, this module doesn't define the required callbacks for a harness.
+%% It'll have to be fixed if it's ever to be used.
+% -behavior(rt_harness).
+
+-compile([
+    export_all,
+    nowarn_export_all
+]).
+
 -include_lib("eunit/include/eunit.hrl").
 
 get_version() ->
@@ -235,11 +265,11 @@ deploy_clusters(ClusterConfigs) ->
     end.
 
 create_dirs(Nodes) ->
-    [ssh_cmd(Node, "mkdir -p " ++ node_path(Node) ++ "/data/snmp/agent/db")
+    [ssh_cmd(Node, "mkdir -p " ++ get_node_path(Node) ++ "/data/snmp/agent/db")
      || Node <- Nodes].
 
 clean_data_dir(Nodes, SubDir) when is_list(Nodes) ->
-    [ssh_cmd(Node, "rm -rf " ++ node_path(Node) ++ "/data/" ++ SubDir)
+    [ssh_cmd(Node, "rm -rf " ++ get_node_path(Node) ++ "/data/" ++ SubDir)
      || Node <- Nodes].
 
 start(Node) ->
@@ -256,7 +286,7 @@ upgrade(Node, NewVersion, UpgradeCallback) when is_function(UpgradeCallback) ->
 %% upgrade callback unsupported for this driver until there is a need.
 %% c.f., rtdev:upgrade/4
 upgrade(Node, NewVersion, Config, _UpgradeCallback) ->
-    Version = node_version(Node),
+    Version = get_node_version(Node),
     lager:info("Upgrading ~p : ~p -> ~p", [Node, Version, NewVersion]),
     stop(Node),
     rt:wait_until_unpingable(Node),
@@ -334,7 +364,7 @@ riak(Node, Args) ->
     {ok, Result}.
 
 riakcmd(Node, Cmd) ->
-    node_path(Node) ++ "/bin/riak " ++ Cmd.
+    get_node_path(Node) ++ "/bin/riak " ++ Cmd.
 
 gitcmd(Path, Cmd) ->
     io_lib:format("git --git-dir=\"~s/.git\" --work-tree=\"~s/\" ~s",
@@ -348,7 +378,7 @@ riak_admin_cmd(Node, Args) ->
                           erlang:error(badarg)
                   end, Args),
     ArgStr = string:join(Quoted, " "),
-    node_path(Node) ++ "/bin/riak admin " ++ ArgStr.
+    get_node_path(Node) ++ "/bin/riak admin " ++ ArgStr.
 
 load_hosts() ->
     {HostsIn, Aliases} = read_hosts_file("hosts"),
@@ -474,7 +504,7 @@ format(Msg, Args) ->
     lists:flatten(io_lib:format(Msg, Args)).
 
 update_nodename(Node) ->
-    Etc = node_path(Node) ++ "/etc/",
+    Etc = get_node_path(Node) ++ "/etc/",
     Files = [filename:basename(File) || File <- wildcard(Node, Etc ++ "*")],
     RiakConfExists = lists:member("riak.conf", Files),
     VMArgsExists = lists:member("vm.args", Files),
@@ -489,7 +519,7 @@ update_nodename(Node) ->
 update_vm_args(_Node, []) ->
     ok;
 update_vm_args(Node, Props) ->
-    Etc = node_path(Node) ++ "/etc/",
+    Etc = get_node_path(Node) ++ "/etc/",
     Files = [filename:basename(File) || File <- wildcard(Node, Etc ++ "*")],
     VMArgsExists = lists:member("vm.args", Files),
     AdvExists = lists:member("advanced.config", Files),
@@ -505,7 +535,7 @@ update_vm_args(Node, Props) ->
 
 do_update_vm_args(Node, Props) ->
     %% TODO: Make non-matched options be appended to file
-    VMArgs = node_path(Node) ++ "/etc/vm.args",
+    VMArgs = get_node_path(Node) ++ "/etc/vm.args",
     Bin = remote_read_file(Node, VMArgs),
     Output =
         lists:foldl(fun({Config, Value}, Acc) ->
@@ -529,7 +559,7 @@ update_app_config(all, Config) ->
         [ update_app_config(host_to_node(Host), Path, Config) || Path <- Paths ]
     end|| Host <- rt_config:get(rtssh_hosts)];
 update_app_config(Node, Config) ->
-    update_app_config(Node, node_path(Node), Config).
+    update_app_config(Node, get_node_path(Node), Config).
 
 update_app_config(Node, Path, Config) ->
     Etc = Path ++ "/etc/",
@@ -620,10 +650,10 @@ set_advanced_conf(Node, NameValuePairs) when is_atom(Node) ->
     ok.
 
 get_riak_conf(Node) ->
-    node_path(Node) ++ "/etc/riak.conf".
+    get_node_path(Node) ++ "/etc/riak.conf".
 
 get_advanced_riak_conf(Node) ->
-    node_path(Node) ++ "/etc/advanced.config".
+    get_node_path(Node) ++ "/etc/advanced.config".
 
 append_to_conf_file(Node, File, NameValuePairs) ->
     Current = remote_read_file(Node, File),
@@ -684,21 +714,26 @@ relpath(root, Path) ->
 relpath(_, _) ->
     throw("Version requested but only one path provided").
 
-node_path(Node) when is_atom(Node) ->
-    node_path(Node, node_version(Node)).
+-spec get_node_path(Node :: node()) -> Result :: rt:fs_path().
+get_node_path(Node) when is_atom(Node) ->
+    node_path(Node, get_node_version(Node)).
 
 node_path(Node, Version) ->
-    N = node_id(Node),
+    N = get_node_id(Node),
     Path = relpath(Version),
     lists:flatten(io_lib:format("~s/dev/dev~b", [Path, N])).
 
-node_id(_Node) ->
+-spec get_node_id(Node :: node()) -> Result :: rt:node_id().
+get_node_id(_Node) ->
     %% NodeMap = rt_config:get(rt_nodes),
     %% orddict:fetch(Node, NodeMap).
     1.
 
-node_version(Node) ->
-    orddict:fetch(Node, rt_config:get(rt_versions)).
+-spec get_node_version(Node :: rt:node_id() | node()) -> Result :: rt:vsn_str().
+get_node_version(NodeNum) when erlang:is_integer(NodeNum) ->
+    orddict:fetch(NodeNum, rt_config:get(rt_versions));
+get_node_version(Node) ->
+    get_node_version(get_node_id(Node)).
 
 %%%===================================================================
 %%% Local command spawning

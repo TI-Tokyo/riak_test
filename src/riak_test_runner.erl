@@ -1,7 +1,8 @@
+%% -*- mode: erlang; erlang-indent-level: 4; indent-tabs-mode: nil -*-
 %% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2012-2016 Basho Technologies, Inc.
-%% Copyright (c) 2018 Workday, Inc.
+%% Copyright (c) 2018-2023 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -112,7 +113,7 @@ execute(TestModule, {Mod, Fun}, TestMetaData) ->
     NewGroupLeader = riak_test_group_leader:new_group_leader(self()),
     group_leader(NewGroupLeader, self()),
 
-    {0, UName} = rt:cmd("uname -a"),
+    {0, UName} = rt:cmd("uname", ["-a"]),
     lager:info("Test Runner `uname -a` : ~s", [UName]),
 
     Pid = spawn_link(?MODULE, return_to_exit, [Mod, Fun, []]),

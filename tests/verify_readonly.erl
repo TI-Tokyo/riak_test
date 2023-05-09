@@ -19,9 +19,10 @@
 %% -------------------------------------------------------------------
 -module(verify_readonly).
 -behavior(riak_test).
+
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
--include("../src/stacktrace.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 
 -define(BUCKET, <<"B0">>).
 -define(POST_MULT, 100).
@@ -50,37 +51,29 @@ confirm() ->
                 {bitcask, [{max_file_size, 1000000},
                 {leveled, [{journal_objectcount, 2000},
                             {max_pencillercachesize, 4000}]}]}],
-    
+
     [RootNode | TestNodes] = rt:build_cluster(NTestNodes, Config),
     [FailNode | _RestNodes] = TestNodes,
     rt:wait_for_service(RootNode, riak_kv),
     rt:wait_for_service(FailNode, riak_kv),
-    Path = filename:join([rtdev:relpath(current),
-                          "dev",
-                          "dev"++ integer_to_list(rtdev:node_id(FailNode)),
-                          "riak",
-                          "data"]),
+    Path = filename:join(rt:get_node_path(FailNode), "data"),
 
     % When running the test we cannot let it crash on failure - as then the
     % write permissions will not be restored (and any subsequent test in a test
     % run will fail)
-    R = 
+    R =
         try run_test(NTestItems, RootNode, FailNode) of
             pass -> pass
         catch
-            ?_exception_(_, Error, StackToken) -> 
-                lager:error("Test failure as caught error ~w", [Error]),
-                lager:error("Failure has trace ~p",
-                                [?_get_stacktrace_(StackToken)]),
+            Class:Reason:StackTrace ->
+                lager:error("Test failure caught ~p: ~p~n~0p",
+                    [Class, Reason, StackTrace]),
                 error
         end,
-    
-    S = io_lib:format("chmod -R u+w ~p",[Path]),
-    lager:info("Restoring write permission to path via ~s", [S]),
-    os:cmd(S),
-    
-    R.
 
+    set_write_perm(Path, true),
+
+    R.
 
 run_test(NTestItems, RootNode, FailNode) ->
     lager:info("Populating cluster with writes."),
@@ -88,14 +81,9 @@ run_test(NTestItems, RootNode, FailNode) ->
     lager:info("Write complete - removing write permisions on data path"),
     %% write one object with a bucket type
 
-    Path = filename:join([rtdev:relpath(current),
-                          "dev",
-                          "dev"++ integer_to_list(rtdev:node_id(FailNode)),
-                          "riak",
-                          "data"]),
-    S = io_lib:format("chmod -R u-w ~p",[Path]),
-    lager:info("Running command ~s with output ~w", [S, os:cmd(S)]),
-    
+    Path = filename:join(rt:get_node_path(FailNode), "data"),
+    set_write_perm(Path, false),
+
     pong = net_adm:ping(FailNode),
 
     WriteAttempts = NTestItems * (?POST_MULT - 1),
@@ -105,13 +93,26 @@ run_test(NTestItems, RootNode, FailNode) ->
                             NTestItems, NTestItems * ?POST_MULT, ?BUCKET,
                             2),
     lager:info("Write complete - validating"),
-    
+
     lager:info("Errors on write count of ~w out of ~w",
                 [length(PostErrors), WriteAttempts]),
     true = length(PostErrors) < (WriteAttempts div 10000),
     lager:info("Less than 0.01% of writes errored due to failure"),
-    
+
     lager:info("Confirm the node did crash as it couldn't write"),
     pang = net_adm:ping(FailNode),
 
     pass.
+
+set_write_perm(Path, Writeable) when erlang:is_boolean(Writeable) ->
+    {OnOff, Opt} = if
+        Writeable ->
+            {"ON", "u+w"};
+        true ->
+            {"OFF", "u-w"}
+    end,
+    [Exe | Args] = CmdList = ["/bin/chmod", "-R", Opt, Path],
+    lager:info(
+        "Setting write permission ~s with ~s",
+        [OnOff, rt_exec:cmd_line(CmdList)]),
+    ?assertMatch({0, _}, rt:cmd(Exe, Args)).

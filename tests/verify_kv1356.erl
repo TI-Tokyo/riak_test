@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2012 Basho Technologies, Inc.
+%% Copyright (c) 2016 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -17,7 +17,6 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
-
 %%% @doc This test was written after
 %%% https://github.com/basho/riak_kv/issues/1356 was opened. The user
 %%% reported, under certain config, that riak simply "forgets"
@@ -26,19 +25,16 @@
 %%% the node we can read it. If we kill and start the node we can read
 %%% it.
 %%% @end
-
-
 -module(verify_kv1356).
 -behavior(riak_test).
+
 -export([confirm/0]).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(BUCKET, <<"b">>).
 -define(KEY, <<"k">>).
 -define(VALUE, <<"v">>).
-
--define(HARNESS, (rt_config:get(rt_harness))).
 
 -define(ELEVELDB_CONF(Path),
         [{eleveldb, [{data_root, "leveldb"},
@@ -78,4 +74,4 @@ assertObjectValueEqual(Val, Obj) ->
     ?assertEqual(Val, riakc_obj:get_value(Obj)).
 
 data_path(Node) ->
-    ?HARNESS:node_path(Node) ++ "tiered_path".
+    filename:join(rt:get_node_path(Node), "tiered_path").

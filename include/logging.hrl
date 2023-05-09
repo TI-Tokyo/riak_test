@@ -120,14 +120,14 @@
 -define(_LOG_HEADER_ARGS(L, M), ?_LOG_HEADER_ARGS(L), M).
 
 -define(LOG(L, T),
-    ?_LOG_(?_LOG_HEADER_FMT("~p"),  [?_LOG_HEADER_ARGS(L), T])).
+    ?_LOG_(?_LOG_HEADER_FMT("~0p"), [?_LOG_HEADER_ARGS(L), T])).
 -define(LOG(L, F, A),
     ?_LOG_(?_LOG_HEADER_FMT(F),     [?_LOG_HEADER_ARGS(L) | A])).
 -define(LOG(L, F, A, M),
     ?_LOG_(?_LOG_HEADER_FMT(F, M),  [?_LOG_HEADER_ARGS(L, M) | A])).
 
 -else.  % LOG_TO_LAGER
--define(LOG(L, T),          lager:L("~p", [T])).
+-define(LOG(L, T),          lager:L("~0p", [T])).
 -define(LOG(L, F, A),       lager:L(F, A)).
 -define(LOG(L, F, A, M),    lager:L(maps:to_list(M), F, A)).
 -endif. % ! LOG_TO_LOGGER

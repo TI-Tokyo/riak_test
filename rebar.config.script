@@ -19,14 +19,13 @@
 %%
 %% ------------------------------------------------------------------
 %%
-%% Adds ebin directories of apps listed in {riak_external_apps, [...]} that
-%% are found in the (built) riak repo pointed to by the 'riak' symlink in the
-%% current directory.
+%% Uses apps listed in {riak_external_apps, [...]} to add application and/or
+%% ebin directories to the dialyzer and xref configurations.
+%% The previously-compiled riak repo pointed to by the 'riak' symlink in the
+%% current directory is searched for the listed applications.
 %%
-%% Intended to provide dialyzer configuration, too, but that'll wait.
 %%
-
-%% Uncomment through the 'script(CONFIG) ->' line to:
+%% Uncomment through the 'do_script(CONFIG) ->' line to:
 %%  - run as an escript for testing
 %%  - edit for editor code formatting to work
 
@@ -43,113 +42,207 @@
 %%main([]) ->
 %%    try
 %%        {ok, Terms} = file:consult("rebar.config"),
-%%        script(Terms),
+%%        _ = do_script(Terms),
 %%        erlang:halt(0)
 %%    catch
 %%        C:R:S ->
-%%            io:format(standard_error, "~p:~p~n~0p~n", [C, R, S])
+%%            io:format(standard_error, "~p:~p~n~p~n", [C, R, S])
 %%    end,
 %%    erlang:halt(1).
 %%
-%%script(CONFIG) ->
+%%do_script(CONFIG) ->
 
 %%
 %% DON'T comment out below here
 %%
-    RiakRepo = "riak",
-    Checkouts = "_checkouts",   %% used in some comparisons
+    Debug = false,
 
-    %% Look in _checkouts first to pick up active changes
-    LibPaths = [Checkouts, "_build/default/lib"],
-
-    GetAppPath = fun(AppName) ->
-        lists:foldl(fun
-            (Path, [] = Result) ->
-                AppDir = filename:join([RiakRepo, Path, AppName]),
-                Ebin = filename:join(AppDir, ebin),
-                case file:list_dir(Ebin) of
-                    {ok, [_ | _]} ->
-                        AppDir;
-                    _ ->
-                        Result
-                end;
-            (_Path, Result) ->
-                Result
-        end, [], LibPaths)
-    end,
-
-    GetAppPaths = fun(AppNames) ->
-        lists:foldl(
-            fun(AppName, Results) ->
-                case GetAppPath(AppName) of
-                    [] ->
-                        Results;
-                    AppDir ->
-                        [AppDir | Results]
-                end
-            end, [], AppNames)
+    DebugMsg = fun(Format, Args) ->
+        case Debug of
+            true ->
+                io:format(Format, Args);
+            _ ->
+                ok
+        end
     end,
 
     ConfigIn = case CONFIG of
-        #{} ->
-            CONFIG;
+        Map when erlang:is_map(Map) ->
+            Map;
         _ ->
             maps:from_list(CONFIG)
     end,
-    % io:format("ConfigIn:~n~p.~n", [ConfigIn]),
+    DebugMsg("ConfigIn:~n~p.~n", [ConfigIn]),
 
-    PrioritizePaths = fun
-        (Same, Same) ->
-            true;
-        (LPath, RPath) ->
-            [_RiakRepo, LTop | _] = filename:split(LPath),
-            if
-                LTop =:= Checkouts ->
-                    true;
-                true ->
-                    [_RiakRepo, RTop | _] = filename:split(RPath),
-                    if
-                        RTop =:= Checkouts ->
-                            false;
-                        true ->
-                            LPath =< RPath
-                    end
-            end
-    end,
+    RiakRepo = "riak",
+    Checkouts = "_checkouts",   %% used in some comparisons
 
-    PrioritizedPaths = fun(AppPaths) ->
-        Mapped = lists:foldl(
-            fun(AppPath, AppMap) ->
-                AppName = filename:basename(AppPath),
-                AppMap#{AppName => [AppPath | maps:get(AppName, AppMap, [])]}
-            end, #{}, AppPaths),
-        Preferred = maps:fold(
-            fun(_App, Paths, Results) ->
-                [Prioritized | _] = lists:usort(PrioritizePaths, Paths),
-                [Prioritized | Results]
-            end, [], Mapped),
-        Preferred
-    end,
+    %% Look in _checkouts first to pick up active changes, then under "_build".
+    LibPaths = [Checkouts, "_build/default/lib"],
+
+    %% Names and Types ...
+    %% It's a script, so no macros, no type specs, no function specs. In their
+    %% stead, the following name [component] patterns denote types:
+    %%
+    %%  AppName     :: atom()
+    %%  AppDir      :: nonempty_string()    % basename(AppDir) == AppName
+    %%  AppEbin     :: nonempty_string()    % AppDir/ebin
+    %%  AppFile     :: nonempty_string()    % AppEbin/<AppName>.app
+    %%  AppRec      :: {AppName, AppDir, AppEbin}
+    %%  PltXtra     :: list(AppName)
+    %%  XrefXtra    :: list(AppEbin)
+    %%
 
     ExistingDirs = fun(Dirs) ->
         lists:filter(fun filelib:is_dir/1, Dirs)
     end,
 
-    ConfigOut = case maps:get(riak_external_apps, ConfigIn, []) of
-        [_ | _] = AppNames ->
-            case GetAppPaths(AppNames) of
-                [_ | _] = AppDirs ->
-                    Prev = [filename:dirname(D) || D <- ExistingDirs(
-                        maps:get(xref_extra_paths, ConfigIn, []))],
-                    Prio = PrioritizedPaths(Prev ++ AppDirs),
-                    Ebins = [filename:join(D, ebin) || D <- lists:sort(Prio)],
-                    ConfigIn#{xref_extra_paths => Ebins};
+    IsAppRecInCheckouts = fun(AppRec) ->
+        case AppRec of
+            {_AppName, [RiakRepo, Checkouts | _], _AppEbin} ->
+                true;
+            _ ->
+                false
+        end
+    end,
+
+    AppNameFromFile = fun(AppFile) ->
+        case file:consult(AppFile) of
+            {ok, [{application, AppName, [_|_]}]} ->
+                AppName;
+            Other ->
+                io:format(standard_error,
+                    "Unexpected .app file result from ~s~n~p.~n",
+                    [AppFile, Other]),
+                erlang:error(einval, [AppFile, Other])
+        end
+    end,
+
+    %% GetAppRec(AppRec | AppName | AppDir | AppEbin) -> false | AppRec.
+    %% The main heavy lifter. Take most anything and turn it into an AppRec.
+    GetAppRec = fun
+        ({AppName, [_|_] = _AppDir, [_|_] = _AppEbin} = AppRec)
+                when erlang:is_atom(AppName) ->
+            AppRec;
+        (AppName) when erlang:is_atom(AppName) ->
+            lists:foldl(fun
+                (Path, false) ->
+                    AppDir = filename:join([RiakRepo, Path, AppName]),
+                    AppEbin = filename:join(AppDir, "ebin"),
+                    case file:list_dir(AppEbin) of
+                        {ok, [_|_]} ->
+                            {AppName, AppDir, AppEbin};
+                        _ ->
+                            false
+                    end;
+                (_Path, Result) ->
+                    Result
+            end, false, LibPaths);
+        ([_|_] = AppOrEbinDir) ->
+            SplitRev = lists:reverse(filename:split(AppOrEbinDir)),
+            {AppNameStr, AppDir, AppEbin} = case SplitRev of
+                ["ebin" | [AppNameDir | _] = AppDirRev] ->
+                    {AppNameDir, filename:join(lists:reverse(AppDirRev)), AppOrEbinDir};
+                [AppNameDir | _] ->
+                    {AppNameDir, AppOrEbinDir, filename:join(AppOrEbinDir, "ebin")}
+            end,
+            AppName = case filelib:wildcard(filename:join(AppEbin, "*.app")) of
+                [AppFile] ->
+                    DebugMsg("Reading app file ~s~n", [AppFile]),
+                    AppNameFromFile(AppFile);
                 _ ->
-                    ConfigIn
-            end;
+                    DebugMsg("Parsing app dir ~s~n", [AppDir]),
+                    erlang:list_to_atom(AppNameStr)
+            end,
+            {AppName, AppDir, AppEbin};
+        (Oops) ->
+            %% Got some debugging to do ...
+            io:format(standard_error, "GetAppRec: invalid parameter: ~0p~n", [Oops]),
+            erlang:error(einval, [Oops])
+    end,
+
+
+    GetAppRecs = fun(AppNameOrDirs) ->
+        lists:foldl(
+            fun(AppNameOrDir, Results) ->
+                case GetAppRec(AppNameOrDir) of
+                    false ->
+                        Results;
+                    AppRec ->
+                        [AppRec | Results]
+                end
+            end, [], AppNameOrDirs)
+    end,
+
+    %% lists:sort/2 comparator, prefer paths in _checkouts
+    PrioritizeAppRecs = fun
+        (Same, Same) ->
+            true;
+        (LAppRec, RAppRec) ->
+            case IsAppRecInCheckouts(LAppRec) of
+                true ->
+                    true;
+                _ ->
+                    case IsAppRecInCheckouts(RAppRec) of
+                        true ->
+                            false;
+                        _ ->
+                            {_, LPath, _} = LAppRec,
+                            {_, RPath, _} = RAppRec,
+                            LPath =< RPath
+                    end
+            end
+    end,
+
+    PrioritizedAppRecs = fun(AppRecs) ->
+        Mapped = lists:foldl(
+            fun({AppName, _AppDir, _AppEbin} = AppRec, AppMap) ->
+                maps:update_with(AppName,
+                    fun(PrevAppRecs) ->
+                        [AppRec | PrevAppRecs]
+                    end, [AppRec], AppMap)
+            end, #{}, AppRecs),
+        Preferred = maps:fold(
+            fun(_App, AppRecsVal, Results) ->
+                [Prio | _] = lists:usort(PrioritizeAppRecs, AppRecsVal),
+                [Prio | Results]
+            end, [], Mapped),
+        lists:sort(Preferred)
+    end,
+
+    ConfigOut = case GetAppRecs(maps:get(riak_external_apps, ConfigIn, [])) of
+        [_|_] = ExtAppRecs ->
+            %% Dialyzer itself will happily accept AppDirs/AppEbins in its
+            %% applications list, but Rebar only accepts AppName atoms in
+            %% plt_extra_apps, so we have to add the directories to the code
+            %% path. Doing so actually obviates the need for adding them to
+            %% xref_extra_paths, but we do it anyway so that if someone dumps
+            %% the active configuration they'll show up where they're expected.
+            ok = code:add_pathsz([E || {_A, _D, E} <- ExtAppRecs]),
+
+            XrefExtra = case maps:get(xref_extra_paths, ConfigIn, []) of
+                [_|_] = PrevXrPaths ->
+                    PrevXrRecs = GetAppRecs(ExistingDirs(PrevXrPaths)),
+                    PrioritizedAppRecs(PrevXrRecs ++ ExtAppRecs);
+                _ ->
+                    ExtAppRecs
+            end,
+            ConfigXr = ConfigIn#{xref_extra_paths => [E || {_A, _D, E} <- XrefExtra]},
+
+            DzConf = maps:get(dialyzer, ConfigXr, []),
+            DzExtra = case lists:keyfind(plt_extra_apps, 1, DzConf) of
+                {_Key, [_ | _] = PrevDzApps} ->
+                    PrevDzRecs = GetAppRecs(PrevDzApps),
+                    PrioritizedAppRecs(PrevDzRecs ++ ExtAppRecs);
+                _ ->
+                    ExtAppRecs
+            end,
+            ConfigDz = ConfigXr#{dialyzer => lists:keystore(plt_extra_apps, 1,
+                DzConf, {plt_extra_apps, [A || {A, _D, _E} <- DzExtra]}) },
+            ConfigDz;
         _ ->
             ConfigIn
     end,
-    % io:format("ConfigOut:~n~p.~n", [ConfigOut]),
+    DebugMsg("ConfigOut:~n~p.~n", [ConfigOut]),
 
     maps:to_list(ConfigOut).

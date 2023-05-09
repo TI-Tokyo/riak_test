@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2012 Basho Technologies, Inc.
+%% Copyright (c) 2012-2014 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -18,11 +18,11 @@
 %%
 %% -------------------------------------------------------------------
 -module(partition_repair).
--compile([export_all, nowarn_export_all]).
--include_lib("eunit/include/eunit.hrl").
-
 -behavior(riak_test).
+
 -export([confirm/0]).
+
+-include_lib("stdlib/include/assert.hrl").
 
 -define(FMT(S, L), lists:flatten(io_lib:format(S, L))).
 
@@ -47,25 +47,25 @@ confirm() ->
     lager:info("riak_core handoff_concurrency: ~p", [HOConcurrency]),
     lager:info("riak_core vnode_management_timer 1000"),
     Conf = [
-            {riak_core,
-             [
-              {ring_creation_size, RingSize},
-              {handoff_manager_timeout, 1000},
-              {vnode_management_timer, 1000},
-              {handoff_concurrency, HOConcurrency}
-             ]},
-            %% @TODO This is only to test whether the test failure happens
-            %% without AAE. The AAE errors found in the logs could be unrelated
-            {riak_kv,
-             [
-              {anti_entropy, {off, []}}
-             ]
-            }
-            %% {lager,
-            %%  [{handlers,
-            %%    [{lager_file_backend,
-            %%      [{"./log/console.log",debug,10485760,"$D0",5}]}]}]}
-           ],
+        {riak_core, [
+            {ring_creation_size, RingSize},
+            {handoff_manager_timeout, 1000},
+            {vnode_management_timer, 1000},
+            {handoff_concurrency, HOConcurrency}
+        ]},
+        %% @TODO This is only to test whether the test failure happens
+        %% without AAE. The AAE errors found in the logs could be unrelated
+        {riak_kv, [
+            {anti_entropy, {off, []}}
+        ]}
+        %% {lager, [
+        %%     {handlers, [
+        %%         {lager_file_backend, [
+        %%             {"./log/console.log", debug, 10485760, "$D0", 5}
+        %%         ]}
+        %%     ]}
+        %% ]}
+    ],
 
     Nodes = rt:build_cluster(NumNodes, Conf),
 
@@ -82,7 +82,7 @@ confirm() ->
 
     lager:info("Stash ITFs for each partition"),
     %% @todo Should riak_test guarantee that the scratch pad is clean instead?
-    ?assertCmd("rm -rf " ++ base_stash_path()),
+    ?assertMatch({0, _}, rt:cmd("/bin/rm", ["-rf", base_stash_path()])),
     %% need to load the module so riak can see the fold fun
     rt:load_modules_on_nodes([?MODULE], Nodes),
     Ring = rt:get_ring(hd(Nodes)),
@@ -232,9 +232,6 @@ gte(Node, Value, StashedData, {B, K}) ->
     Merged = rpc:call(Node, riak_object, syntactic_merge, [VnodeObject, StashedObject]),
     riak_object:equal(VnodeObject, Merged).
 
-is_true(X) ->
-    X == true.
-
 count_data({Partition, Node}) ->
     dict:size(get_data({Partition, Node})).
 
@@ -266,9 +263,6 @@ base_stash_path() ->
 stash_path(Service, Partition) ->
     base_stash_path() ++ atom_to_list(Service) ++ "/" ++ integer_to_list(Partition) ++ ".stash".
 
-file_list(Dir) ->
-    filelib:wildcard(Dir ++ "/*").
-
 wait_for_repair(_, 0) ->
     throw(wait_for_repair_max_tries);
 wait_for_repair({Partition, Node}, Tries) ->
@@ -279,11 +273,6 @@ wait_for_repair({Partition, Node}, Tries) ->
             timer:sleep(timer:seconds(1)),
             wait_for_repair({Partition, Node}, Tries - 1)
     end.
-
-data_path(Node, Suffix, Partition) ->
-    [Name, _] = string:tokens(atom_to_list(Node), "@"),
-    Base = rt_config:get('rtdev_path.current') ++ "/dev/" ++ Name ++ "/data",
-    Base ++ "/" ++ Suffix ++ "/" ++ integer_to_list(Partition).
 
 backend_mod_dir(undefined) ->
     %% riak_test defaults to bitcask when undefined

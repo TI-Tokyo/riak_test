@@ -20,7 +20,7 @@
 -module(verify_vclock).
 -behavior(riak_test).
 -export([confirm/0, run_test/3]).
--include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 %% We've got a separate test for capability negotiation and other mechanisms, so the test here is fairly
 %% straightforward: get a list of different versions of nodes and join them into a cluster, making sure that
@@ -28,34 +28,26 @@
 confirm() ->
     NTestItems    = 10,                                     %% How many test items to write/verify?
     TestMode      = false,                                  %% Set to false for "production tests", true if too slow.
-   
-    run_test(TestMode, NTestItems, default),
 
-    lager:info("Test verify_vclock passed."),
-    pass.
+    run_test(TestMode, NTestItems, default).
 
 run_test(TestMode, NTestItems, VClockEncoding) ->
 
     lager:info("Testing vclock (encoding: ~p)", [VClockEncoding]),
 
-    %% This resets nodes, cleans up stale directories, etc.:
-    lager:info("Cleaning up..."),
-    rt:setup_harness(dummy, dummy),
-
     %% In reality, we could probably do this with a single node, but now the plumbing's already here:
     lager:info("Spinning up test nodes"),
-    [RootNode, TestNode0, TestNode1] = Nodes = deploy_test_nodes(TestMode, 3),
+    [RootNode, TestNode0, TestNode1] = deploy_test_nodes(TestMode, 3),
 
-    %% First, exercise the default setting, then force known encodings and see if we get our data back. 
+    %% First, exercise the default setting, then force known encodings and see if we get our data back.
     try_encoding(RootNode,  default,     NTestItems),
     try_encoding(TestNode0, encode_raw,  NTestItems),
     try_encoding(TestNode1, encode_zlib, NTestItems),
 
-    stopall(Nodes),
     lager:info("Test verify_vclock passed."),
     pass.
 
-try_encoding(TestNode, Encoding, NTestItems) -> 
+try_encoding(TestNode, Encoding, NTestItems) ->
 
     rt:wait_for_service(TestNode, riak_kv),
     force_encoding(TestNode, Encoding),
@@ -73,7 +65,7 @@ try_encoding(TestNode, Encoding, NTestItems) ->
     ?assertEqual(NTestItems, length(Results0)),
     lager:info("Ok, data not found (as expected)."),
 
-    %%  Do an initial write and see if we can get our data back (indirectly test vclock creation and 
+    %%  Do an initial write and see if we can get our data back (indirectly test vclock creation and
     %% encoding):
     lager:info("Testing write-and-read..."),
     our_pbc_write(TestNode, NTestItems),
@@ -91,21 +83,21 @@ try_encoding(TestNode, Encoding, NTestItems) ->
 
 force_encoding(Node, EncodingMethod) ->
     case EncodingMethod of
-        default -> lager:info("Using default encoding type."), true;   
+        default -> lager:info("Using default encoding type."), true;
 
         _       -> lager:info("Forcing encoding type to ~p.", [EncodingMethod]),
-                   OverrideData = 
+                   OverrideData =
                     [
-                      { riak_kv, 
-                            [ 
+                      { riak_kv,
+                            [
                                 { override_capability,
-                                        [ 
+                                        [
                                           { vclock_data_encoding,
-                                               [ 
+                                               [
                                                   {    use, EncodingMethod},
-                                                  { prefer, EncodingMethod} 
+                                                  { prefer, EncodingMethod}
                                                 ]
-                                          } 
+                                          }
                                         ]
                                 }
                             ]
@@ -116,10 +108,7 @@ force_encoding(Node, EncodingMethod) ->
 
     end.
 
-stopall(Nodes) ->
-    lists:foreach(fun(N) -> rt:brutal_kill(N) end, Nodes).
-
-make_kv(N, VSuffix) -> 
+make_kv(N, VSuffix) ->
     K = <<N:32/integer>>,
     V = <<K/binary, VSuffix/binary>>,
     { K, V }.
@@ -148,10 +137,10 @@ our_pbc_write(Node, Start, End, Bucket, VSuffix) ->
         end,
     lists:foldl(F, [], lists:seq(Start, End)).
 
-our_pbc_read(Node, Size) -> 
+our_pbc_read(Node, Size) ->
     our_pbc_read(Node, 1, Size, <<"systest">>, <<>>).
 
-our_pbc_read(Node, Size, Suffix) -> 
+our_pbc_read(Node, Size, Suffix) ->
     our_pbc_read(Node, 1, Size, <<"systest">>, Suffix).
 
 our_pbc_read(Node, Start, End, Bucket, VSuffix) ->
@@ -170,14 +159,14 @@ our_pbc_read(Node, Start, End, Bucket, VSuffix) ->
                    {ok, Obj} ->
                                    ObjectValue = riakc_obj:get_value(Obj),
                                    case ObjectValue of
-                                    V -> 
+                                    V ->
                                             Acc;
-                                    WrongVal -> 
+                                    WrongVal ->
                                             [{N, {wrong_val, WrongVal}} | Acc]
                                    end;
 
                    {error, timeout} ->
-                                   lager:error("timeout"), 
+                                   lager:error("timeout"),
                                    AddFailure({error, timeout}, N, Acc);
                    {error, disconnected} ->
                                    lager:error("disconnected"),
@@ -191,7 +180,7 @@ our_pbc_read(Node, Start, End, Bucket, VSuffix) ->
 .
 
 %% For some testing purposes, making these limits smaller is helpful:
-deploy_test_nodes(false, N) -> 
+deploy_test_nodes(false, N) ->
     rt:deploy_nodes(N);
 deploy_test_nodes(true,  N) ->
     lager:info("NOTICE: Using turbo settings for testing."),

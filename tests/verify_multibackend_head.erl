@@ -20,7 +20,7 @@
 -module(verify_multibackend_head).
 -behavior(riak_test).
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/assert.hrl").
 -define(DEFAULT_RING_SIZE, 16).
 
 -define(CONF,
@@ -42,9 +42,9 @@ confirm() ->
 
     rt:set_backend(riak_kv_multi_backend),
     [Node1] = rt:deploy_nodes(1, ?CONF),
-    
+
     Stats1 = get_stats(Node1),
-    
+
     C = rt:httpc(Node1),
     PBC = rt:pbc(Node1),
 
@@ -68,18 +68,18 @@ confirm() ->
         || X <- lists:seq(4, 5)],
     [rt:httpc_read(C, UnTypedBucket, <<X>>)
         || X <- lists:seq(4, 5)],
-    
+
 
     Stats2 = get_stats(Node1),
 
-    ExpectedNodeStats = 
+    ExpectedNodeStats =
         case HeadSupport of
             true ->
                 [{<<"node_gets">>, 10},
                     {<<"node_puts">>, 5},
                     {<<"node_gets_total">>, 10},
                     {<<"node_puts_total">>, 5},
-                    {<<"vnode_gets">>, 5}, 
+                    {<<"vnode_gets">>, 5},
                         % The five PUTS will require only HEADs
                     {<<"vnode_heads">>, 30},
                         % There is no reduction in the count of HEADs
@@ -131,11 +131,4 @@ verify_inc(Prev, Props, Keys) ->
      end || {Key, Inc} <- Keys].
 
 get_stats(Node) ->
-    timer:sleep(2000),
-    lager:info("Retrieving stats from node ~s", [Node]),
-    StatsCommand = io_lib:format("curl -s -S ~s/stats", [rt:http_url(Node)]),
-    lager:debug("Retrieving stats using command ~s", [StatsCommand]),
-    StatString = os:cmd(StatsCommand),
-    {struct, Stats} = mochijson2:decode(StatString),
-    %%lager:debug(StatString),
-    Stats.
+    rt:get_stats(Node, 2000).

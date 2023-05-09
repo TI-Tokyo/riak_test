@@ -1,16 +1,70 @@
--module(replication2_pg).
--export([confirm/0]).
--compile([export_all, nowarn_export_all]).
--include_lib("eunit/include/eunit.hrl").
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2013-2014 Basho Technologies, Inc.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 
+%% @deprecated Needs replacement!
+%% This module is pretty unusable due to it's unworkable structure.
+-module(replication2_pg).
+-deprecated(module).
+-behavior(riak_test).
+
+-export([confirm/0]).
+%% Individual tests
+-export([
+    test_12_pg_mode_repl12/0,
+    test_12_pg_mode_repl12_ssl/0,
+    test_12_pg_mode_repl_mixed/0,
+    test_12_pg_mode_repl_mixed_ssl/0,
+    test_basic_pg_mode_mixed/0,
+    test_basic_pg_mode_mixed_ssl/0,
+    test_basic_pg_mode_repl13/0,
+    test_basic_pg_mode_repl13_ssl/0,
+    test_bidirectional_pg/0,
+    test_bidirectional_pg_ssl/0,
+    test_cluster_mapping/0,
+    test_mixed_pg/0,
+    test_mixed_pg_ssl/0,
+    test_multiple_sink_pg/0,
+    test_multiple_sink_pg_ssl/0,
+    test_pg_proxy/0,
+    test_pg_proxy_ssl/0
+]).
+
+-include_lib("stdlib/include/assert.hrl").
+
+-ignore_xref([
+    %% This exists, but including intercepts in xref coverage isn't fun.
+    {riak_repl2_leader_intercepts, set_leader_node, 1},
+
+    %% Shut up the xref warnings about stuff that's not in Riak v3.
+    {riak_repl_pb_api, get, 4},
+    {riak_repl_pb_api, get, 5},
+    {riak_repl_pb_api, get_clusterid, 1}
+]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Test proxy_get in Default and Advanced mode of 1.3+ repl
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-setup_repl_clusters(Conf) ->
-    setup_repl_clusters(Conf, false).
+% setup_repl_clusters(Conf) ->
+%     setup_repl_clusters(Conf, false).
 
 setup_repl_clusters(Conf, SSL) ->
     NumNodes = 6,
@@ -885,8 +939,8 @@ confirm() ->
     %% of riak_test's setup/teardown per test.
     [?assertEqual(pass, erlang:apply(?MODULE, Test, [])) || Test <- AllTests].
 
-banner(T) ->
-    banner(T, false).
+% banner(T) ->
+%     banner(T, false).
 
 banner(T, SSL) ->
     lager:info("----------------------------------------------"),

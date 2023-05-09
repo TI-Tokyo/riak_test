@@ -1,7 +1,7 @@
 %% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2012-2016 Basho Technologies, Inc.
-%% Copyright (c) 2022-2023 Workday, Inc.
+%% Copyright (c) 2018-2023 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -20,19 +20,21 @@
 %% -------------------------------------------------------------------
 -module(verify_riak_stats).
 -behavior(riak_test).
--export([confirm/0, get_stats/1, get_stats/2]).
--include_lib("eunit/include/eunit.hrl").
--include("../src/stacktrace.hrl").
+
+-export([confirm/0]).
+
+-include_lib("stdlib/include/assert.hrl").
 
 -define(CTYPE, <<"counters">>).
 -define(STYPE, <<"sets">>).
 -define(MTYPE, <<"maps">>).
--define(TYPES, [{?CTYPE, counter},
-                {?STYPE, set},
-                {?MTYPE, map}]).
+-define(TYPES, [
+    {?CTYPE, counter},
+    {?STYPE, set},
+    {?MTYPE, map}
+]).
 -define(CONF, []).
 
-%% You should have curl installed locally to do this.
 confirm() ->
     Nodes = rt:deploy_nodes(1, ?CONF),
     [Node1] = Nodes,
@@ -52,25 +54,26 @@ confirm() ->
 
     %% make sure a set of stats have valid values
     lager:info("Verifying that the system and ring stats have valid values"),
-    verify_nz(Stats1,[<<"cpu_nprocs">>,
-                      <<"mem_total">>,
-                      <<"mem_allocated">>,
-                      <<"sys_logical_processors">>,
-                      <<"sys_process_count">>,
-                      <<"sys_thread_pool_size">>,
-                      <<"sys_wordsize">>,
-                      <<"ring_num_partitions">>,
-                      <<"ring_creation_size">>,
-                      <<"memory_total">>,
-                      <<"memory_processes">>,
-                      <<"memory_processes_used">>,
-                      <<"memory_system">>,
-                      <<"memory_atom">>,
-                      <<"memory_atom_used">>,
-                      <<"memory_binary">>,
-                      <<"memory_code">>,
-                      <<"memory_ets">>]),
-
+    verify_nz(Stats1, [
+        <<"cpu_nprocs">>,
+        <<"mem_total">>,
+        <<"mem_allocated">>,
+        <<"sys_logical_processors">>,
+        <<"sys_process_count">>,
+        <<"sys_thread_pool_size">>,
+        <<"sys_wordsize">>,
+        <<"ring_num_partitions">>,
+        <<"ring_creation_size">>,
+        <<"memory_total">>,
+        <<"memory_processes">>,
+        <<"memory_processes_used">>,
+        <<"memory_system">>,
+        <<"memory_atom">>,
+        <<"memory_atom_used">>,
+        <<"memory_binary">>,
+        <<"memory_code">>,
+        <<"memory_ets">>
+    ]),
 
     lager:info("perform 5 x  PUT and a GET to increment the stats"),
     lager:info("as the stat system only does calcs for > 5 readings"),
@@ -84,21 +87,24 @@ confirm() ->
     ExpectedNodeStats =
         case HeadSupport of
             true ->
-                [{<<"node_gets">>, 10},
+                [
+                    {<<"node_gets">>, 10},
                     {<<"node_puts">>, 5},
                     {<<"node_gets_total">>, 10},
                     {<<"node_puts_total">>, 5},
                     {<<"vnode_gets">>, 5},
-                        % The five PUTS will require only HEADs
+                    % The five PUTS will require only HEADs
                     {<<"vnode_heads">>, 30},
-                        % There is no reduction in the count of HEADs
-                        % as HEADS before GETs
+                    % There is no reduction in the count of HEADs
+                    % as HEADS before GETs
                     {<<"vnode_puts">>, 15},
                     {<<"vnode_gets_total">>, 5},
                     {<<"vnode_heads_total">>, 30},
-                    {<<"vnode_puts_total">>, 15}];
+                    {<<"vnode_puts_total">>, 15}
+                ];
             false ->
-                [{<<"node_gets">>, 10},
+                [
+                    {<<"node_gets">>, 10},
                     {<<"node_puts">>, 5},
                     {<<"node_gets_total">>, 10},
                     {<<"node_puts_total">>, 5},
@@ -107,23 +113,26 @@ confirm() ->
                     {<<"vnode_puts">>, 15},
                     {<<"vnode_gets_total">>, 30},
                     {<<"vnode_heads_total">>, 0},
-                    {<<"vnode_puts_total">>, 15}]
+                    {<<"vnode_puts_total">>, 15}
+                ]
         end,
 
     %% make sure the stats that were supposed to increment did
     verify_inc(Stats1, Stats2, ExpectedNodeStats),
 
     %% verify that fsm times were tallied
-    verify_nz(Stats2, [<<"node_get_fsm_time_mean">>,
-                       <<"node_get_fsm_time_median">>,
-                       <<"node_get_fsm_time_95">>,
-                       <<"node_get_fsm_time_99">>,
-                       <<"node_get_fsm_time_100">>,
-                       <<"node_put_fsm_time_mean">>,
-                       <<"node_put_fsm_time_median">>,
-                       <<"node_put_fsm_time_95">>,
-                       <<"node_put_fsm_time_99">>,
-                       <<"node_put_fsm_time_100">>]),
+    verify_nz(Stats2, [
+        <<"node_get_fsm_time_mean">>,
+        <<"node_get_fsm_time_median">>,
+        <<"node_get_fsm_time_95">>,
+        <<"node_get_fsm_time_99">>,
+        <<"node_get_fsm_time_100">>,
+        <<"node_put_fsm_time_mean">>,
+        <<"node_put_fsm_time_median">>,
+        <<"node_put_fsm_time_95">>,
+        <<"node_put_fsm_time_99">>,
+        <<"node_put_fsm_time_100">>
+    ]),
 
     lager:info("Make PBC Connection"),
     Pid = rt:pbc(Node1),
@@ -132,11 +141,11 @@ confirm() ->
 
     rt:systest_write(Node1, 1),
     %% make sure the stats that were supposed to increment did
-    verify_inc(Stats2, Stats3, [{<<"pbc_connects_total">>, 1},
-                                {<<"pbc_connects">>, 1},
-                                {<<"pbc_active">>, 1}]),
-
-
+    verify_inc(Stats2, Stats3, [
+        {<<"pbc_connects_total">>, 1},
+        {<<"pbc_connects">>, 1},
+        {<<"pbc_active">>, 1}
+    ]),
 
     lager:info("Force Read Repair"),
     rt:pbc_write(Pid, <<"testbucket">>, <<"1">>, <<"blah!">>),
@@ -144,14 +153,14 @@ confirm() ->
 
     Stats4 = get_stats(Node1),
     verify_inc(Stats3, Stats4, [{<<"read_repairs_total">>, 0},
-                                {<<"read_repairs">>, 0}]),
+        {<<"read_repairs">>, 0}]),
 
     _Value = rt:pbc_read(Pid, <<"testbucket">>, <<"1">>),
 
     Stats5 = get_stats(Node1),
 
     verify_inc(Stats3, Stats5, [{<<"read_repairs_total">>, 1},
-                                {<<"read_repairs">>, 1}]),
+        {<<"read_repairs">>, 1}]),
 
     _ = do_datatypes(Pid),
 
@@ -159,10 +168,10 @@ confirm() ->
 
     Stats6 = get_stats(Node1),
     [
-     begin
-         lager:info("~s: ~p (expected non-zero)", [S, proplists:get_value(S, Stats6)]),
-         verify_nz(Stats6, [S])
-     end || S <- datatype_stats() ],
+        begin
+            lager:info("~s: ~p (expected non-zero)", [S, proplists:get_value(S, Stats6)]),
+            verify_nz(Stats6, [S])
+        end || S <- datatype_stats()],
 
     _ = do_pools(Node1),
 
@@ -175,14 +184,14 @@ confirm() ->
 
 verify_inc(Prev, Props, Keys) ->
     [begin
-         Old = proplists:get_value(Key, Prev, 0),
-         New = proplists:get_value(Key, Props, 0),
-         lager:info("~s: ~p -> ~p (expected ~p)", [Key, Old, New, Old + Inc]),
-         ?assertEqual(New, (Old + Inc))
-     end || {Key, Inc} <- Keys].
+        Old = proplists:get_value(Key, Prev, 0),
+        New = proplists:get_value(Key, Props, 0),
+        lager:info("~s: ~p -> ~p (expected ~p)", [Key, Old, New, Old + Inc]),
+        ?assertEqual(New, (Old + Inc))
+    end || {Key, Inc} <- Keys].
 
 verify_nz(Props, Keys) ->
-    [?assertNotEqual(proplists:get_value(Key,Props,0), 0) || Key <- Keys].
+    [?assertNotEqual(proplists:get_value(Key, Props, 0), 0) || Key <- Keys].
 
 has_head_support(leveled) ->
     true;
@@ -190,252 +199,238 @@ has_head_support(_Backend) ->
     false.
 
 get_stats(Node) ->
-    get_stats(Node, 10000).
-
-get_stats(Node, Wait) ->
-    timer:sleep(Wait),
-    lager:info("Retrieving stats from node ~s", [Node]),
-    StatsCommand = io_lib:format("curl -s -S ~s/stats", [rt:http_url(Node)]),
-    lager:debug("Retrieving stats using command ~s", [StatsCommand]),
-    StatString = os:cmd(StatsCommand),
-    {struct, Stats} = mochijson2:decode(StatString),
-    %%lager:debug(StatString),
-    Stats.
+    rt:get_stats(Node, 10000).
 
 get_console_stats(Node) ->
-    %% Problem: rt:admin(Node, Cmd) seems to drop parts of the output when
-    %% used for "riak admin status" in 'rtdev'.
-    %% Temporary workaround: use os:cmd/1 when in 'rtdev' (needs some cheats
-    %% in order to find the right path etc.)
-    try
-	Stats =
-	    case rt_config:get(rt_harness) of
-		rtdev ->
-		    N = rtdev:node_id(Node),
-		    Path = rtdev:relpath(rtdev:node_version(N)),
-		    Cmd = rtdev:riak_admin_cmd(Path, N, ["status"]),
-		    lager:info("Cmd = ~p~n", [Cmd]),
-		    os:cmd(Cmd);
-		_ ->
-		    rt:admin(Node, "status")
-	    end,
-	[S || {_,_} = S <-
-		  [list_to_tuple(re:split(L, " : ", []))
-		   || L <- tl(tl(string:tokens(Stats, "\n")))]]
-    catch
-	    ?_exception_(Error, Reason, StackToken) ->
-	    lager:info("riak admin status ~p: ~p~n~p~n",
-		       [Error, Reason, ?_get_stacktrace_(StackToken)]),
-	    []
-    end.
+    OkStats = rt:admin_stats(Node),
+    ?assertMatch({ok, _}, OkStats),
+    {ok, Stats} = OkStats,
+    % lager:info("Stats: ~p", [Stats]),
+    Stats.
 
-compare_http_and_console_stats(Stats1, Stats2) ->
-    OnlyInHttp = [S || {K,_} = S <- Stats1,
-		       not lists:keymember(K, 1, Stats2)],
-    OnlyInAdmin = [S || {K,_} = S <- Stats2,
-			not lists:keymember(K, 1, Stats1)],
-    maybe_log_stats_keys(OnlyInHttp, "Keys missing from riak admin"),
-    maybe_log_stats_keys(OnlyInAdmin, "Keys missing from HTTP"),
-    ?assertEqual([], OnlyInHttp),
-    ?assertEqual([], OnlyInAdmin),
-    ok.
+compare_http_and_console_stats(HttpStats, AdminStats) ->
+    HttpKeys = stats_keys(HttpStats),
+    AdminKeys = stats_keys(AdminStats),
+    OnlyInHttp = find_and_log_extra_keys(
+        HttpKeys, AdminKeys, "Keys missing from riak admin stats"),
+    OnlyInAdmin = find_and_log_extra_keys(
+        AdminKeys, HttpKeys, "Keys missing from HTTP stats"),
+    ?assertMatch({[], []}, {OnlyInHttp, OnlyInAdmin}).
 
 verify_stats_keys_complete(Node, Stats) ->
-    ActualKeys = proplists:get_keys(Stats),
+    ActualKeys = stats_keys(Stats),
     ExpectedKeys = all_stats(Node),
-    MissingStatsKeys = diff_lists(ActualKeys, ExpectedKeys),
-    AdditionalStatsKeys = diff_lists(ExpectedKeys, ActualKeys),
-    maybe_log_stats_keys(MissingStatsKeys, "missing stats keys"),
-    maybe_log_stats_keys(AdditionalStatsKeys, "additional stats"),
-    ?assertEqual({[],[]}, {MissingStatsKeys, AdditionalStatsKeys}),
-    ok.
+    MissingStatsKeys = find_and_log_extra_keys(
+        ExpectedKeys, ActualKeys, "Missing stats keys"),
+    AdditionalStatsKeys = find_and_log_extra_keys(
+        ActualKeys, ExpectedKeys, "Additional stats keys"),
+    ?assertMatch({[], []}, {MissingStatsKeys, AdditionalStatsKeys}).
 
-diff_lists(List, ThatList) ->
-    lists:filter(fun(Element) -> not lists:member(Element, List) end, ThatList).
+%% Will be inlined away
+stats_keys(Stats) ->
+    proplists:get_keys(Stats).
 
--spec maybe_log_stats_keys([binary()], string()) -> ok.
-maybe_log_stats_keys(StatsKeys, _Description) when length(StatsKeys) == 0 ->
-    ok;
-maybe_log_stats_keys(StatsKeys, Description) ->
-    lager:info("~s: ~s", [Description, pretty_print_stats_keys(StatsKeys)]).
+%% Returns elements in SubjectList that are not present in ReferenceList.
+%% Will be inlined away
+extra_elems(SubjectList, ReferenceList) ->
+    lists:subtract(SubjectList, ReferenceList).
 
--spec pretty_print_stats_keys([binary()]) -> string().
-pretty_print_stats_keys(StatsKeys) ->
-    ConvertedStatsKeys = lists:map(fun(StatsKey) -> binary_to_list(StatsKey) end, StatsKeys),
-    string:join(ConvertedStatsKeys, ", ").
+%% Returns keys in SubjectKeys that are not present in ReferenceKeys.
+%% If Result is not an empty list, logs it with ExtraKeysDescription.
+-spec find_and_log_extra_keys(
+    SubjectKeys :: rtt:stat_keys(),
+    ReferenceKeys :: rtt:stat_keys(),
+    ExtraKeysDescription :: nonempty_string() )
+        -> Result :: rtt:stat_keys().
+find_and_log_extra_keys(SubjectKeys, ReferenceKeys, ExtraKeysDescription) ->
+    case extra_elems(SubjectKeys, ReferenceKeys) of
+        [] = None ->
+            None;
+        Keys ->
+            Extra = lists:usort(Keys),
+            ExtraStr = string:join([
+                stats_key_to_string(K) || K <- Extra], ", "),
+            lager:warning("~s: ~s", [ExtraKeysDescription, ExtraStr]),
+            %% Allow time for the log to be written, as we're probably about
+            %% to exit on an assertion failure.
+            timer:sleep(555),
+            Extra
+    end.
+
+-spec stats_key_to_string(StatsKey :: rtt:stat_key()) -> nonempty_string().
+stats_key_to_string(StatsKey) when erlang:is_binary(StatsKey) ->
+    erlang:binary_to_list(StatsKey);
+stats_key_to_string([_|_] = StatsKey) ->
+    StatsKey;
+stats_key_to_string(StatsKey) ->
+    io_lib:format("~p", [StatsKey]).
 
 datatype_stats() ->
     %% Merge stats are excluded because we likely never merge disjoint
     %% copies on a single node after a single write each.
-    [ list_to_binary(Stat) ||
+    [list_to_binary(Stat) ||
         Stat <- [
-                 %%  "object_counter_merge"
-                 %% ,"object_counter_merge_total"
-                 %% ,"object_counter_merge_time_mean"
-                 %% ,"object_counter_merge_time_median"
-                 %% ,"object_counter_merge_time_95"
-                 %% ,"object_counter_merge_time_99"
-                 %% ,"object_counter_merge_time_100"
-                 %% ,
-                 "vnode_counter_update"
-                ,"vnode_counter_update_total"
-                ,"vnode_counter_update_time_mean"
-                ,"vnode_counter_update_time_median"
-                ,"vnode_counter_update_time_95"
-                ,"vnode_counter_update_time_99"
-                ,"vnode_counter_update_time_100"
-                 %% ,"object_set_merge"
-                 %% ,"object_set_merge_total"
-                 %% ,"object_set_merge_time_mean"
-                 %% ,"object_set_merge_time_median"
-                 %% ,"object_set_merge_time_95"
-                 %% ,"object_set_merge_time_99"
-                 %% ,"object_set_merge_time_100"
-                ,"vnode_set_update"
-                ,"vnode_set_update_total"
-                ,"vnode_set_update_time_mean"
-                ,"vnode_set_update_time_median"
-                ,"vnode_set_update_time_95"
-                ,"vnode_set_update_time_99"
-                ,"vnode_set_update_time_100"
-                 %% ,"object_map_merge"
-                 %% ,"object_map_merge_total"
-                 %% ,"object_map_merge_time_mean"
-                 %% ,"object_map_merge_time_median"
-                 %% ,"object_map_merge_time_95"
-                 %% ,"object_map_merge_time_99"
-                 %% ,"object_map_merge_time_100"
-                ,"vnode_map_update"
-                ,"vnode_map_update_total"
-                ,"vnode_map_update_time_mean"
-                ,"vnode_map_update_time_median"
-                ,"vnode_map_update_time_95"
-                ,"vnode_map_update_time_99"
-                ,"vnode_map_update_time_100"
-                ,"node_gets_counter"
-                ,"node_gets_counter_total"
-                ,"node_get_fsm_counter_siblings_mean"
-                ,"node_get_fsm_counter_siblings_median"
-                ,"node_get_fsm_counter_siblings_95"
-                ,"node_get_fsm_counter_siblings_99"
-                ,"node_get_fsm_counter_siblings_100"
-                ,"node_get_fsm_counter_objsize_mean"
-                ,"node_get_fsm_counter_objsize_median"
-                ,"node_get_fsm_counter_objsize_95"
-                ,"node_get_fsm_counter_objsize_99"
-                ,"node_get_fsm_counter_objsize_100"
-                ,"node_get_fsm_counter_time_mean"
-                ,"node_get_fsm_counter_time_median"
-                ,"node_get_fsm_counter_time_95"
-                ,"node_get_fsm_counter_time_99"
-                ,"node_get_fsm_counter_time_100"
-                ,"node_gets_set"
-                ,"node_gets_set_total"
-                ,"node_get_fsm_set_siblings_mean"
-                ,"node_get_fsm_set_siblings_median"
-                ,"node_get_fsm_set_siblings_95"
-                ,"node_get_fsm_set_siblings_99"
-                ,"node_get_fsm_set_siblings_100"
-                ,"node_get_fsm_set_objsize_mean"
-                ,"node_get_fsm_set_objsize_median"
-                ,"node_get_fsm_set_objsize_95"
-                ,"node_get_fsm_set_objsize_99"
-                ,"node_get_fsm_set_objsize_100"
-                ,"node_get_fsm_set_time_mean"
-                ,"node_get_fsm_set_time_median"
-                ,"node_get_fsm_set_time_95"
-                ,"node_get_fsm_set_time_99"
-                ,"node_get_fsm_set_time_100"
-                ,"node_gets_map"
-                ,"node_gets_map_total"
-                ,"node_get_fsm_map_siblings_mean"
-                ,"node_get_fsm_map_siblings_median"
-                ,"node_get_fsm_map_siblings_95"
-                ,"node_get_fsm_map_siblings_99"
-                ,"node_get_fsm_map_siblings_100"
-                ,"node_get_fsm_map_objsize_mean"
-                ,"node_get_fsm_map_objsize_median"
-                ,"node_get_fsm_map_objsize_95"
-                ,"node_get_fsm_map_objsize_99"
-                ,"node_get_fsm_map_objsize_100"
-                ,"node_get_fsm_map_time_mean"
-                ,"node_get_fsm_map_time_median"
-                ,"node_get_fsm_map_time_95"
-                ,"node_get_fsm_map_time_99"
-                ,"node_get_fsm_map_time_100"
-                ,"node_puts_counter"
-                ,"node_puts_counter_total"
-                ,"node_put_fsm_counter_time_mean"
-                ,"node_put_fsm_counter_time_median"
-                ,"node_put_fsm_counter_time_95"
-                ,"node_put_fsm_counter_time_99"
-                ,"node_put_fsm_counter_time_100"
-                ,"node_puts_set"
-                ,"node_puts_set_total"
-                ,"node_put_fsm_set_time_mean"
-                ,"node_put_fsm_set_time_median"
-                ,"node_put_fsm_set_time_95"
-                ,"node_put_fsm_set_time_99"
-                ,"node_put_fsm_set_time_100"
-                ,"node_puts_map"
-                ,"node_puts_map_total"
-                ,"node_put_fsm_map_time_mean"
-                ,"node_put_fsm_map_time_median"
-                ,"node_put_fsm_map_time_95"
-                ,"node_put_fsm_map_time_99"
-                ,"node_put_fsm_map_time_100"
-                ,"counter_actor_counts_mean"
-                ,"counter_actor_counts_median"
-                ,"counter_actor_counts_95"
-                ,"counter_actor_counts_99"
-                ,"counter_actor_counts_100"
-                ,"set_actor_counts_mean"
-                ,"set_actor_counts_median"
-                ,"set_actor_counts_95"
-                ,"set_actor_counts_99"
-                ,"set_actor_counts_100"
-                ,"map_actor_counts_mean"
-                ,"map_actor_counts_median"
-                ,"map_actor_counts_95"
-                ,"map_actor_counts_99"
-                ,"map_actor_counts_100"
-                ]
+            %%  "object_counter_merge"
+            %% ,"object_counter_merge_total"
+            %% ,"object_counter_merge_time_mean"
+            %% ,"object_counter_merge_time_median"
+            %% ,"object_counter_merge_time_95"
+            %% ,"object_counter_merge_time_99"
+            %% ,"object_counter_merge_time_100"
+            %% ,
+              "vnode_counter_update"
+            , "vnode_counter_update_total"
+            , "vnode_counter_update_time_mean"
+            , "vnode_counter_update_time_median"
+            , "vnode_counter_update_time_95"
+            , "vnode_counter_update_time_99"
+            , "vnode_counter_update_time_100"
+            %% ,"object_set_merge"
+            %% ,"object_set_merge_total"
+            %% ,"object_set_merge_time_mean"
+            %% ,"object_set_merge_time_median"
+            %% ,"object_set_merge_time_95"
+            %% ,"object_set_merge_time_99"
+            %% ,"object_set_merge_time_100"
+            , "vnode_set_update"
+            , "vnode_set_update_total"
+            , "vnode_set_update_time_mean"
+            , "vnode_set_update_time_median"
+            , "vnode_set_update_time_95"
+            , "vnode_set_update_time_99"
+            , "vnode_set_update_time_100"
+            %% ,"object_map_merge"
+            %% ,"object_map_merge_total"
+            %% ,"object_map_merge_time_mean"
+            %% ,"object_map_merge_time_median"
+            %% ,"object_map_merge_time_95"
+            %% ,"object_map_merge_time_99"
+            %% ,"object_map_merge_time_100"
+            , "vnode_map_update"
+            , "vnode_map_update_total"
+            , "vnode_map_update_time_mean"
+            , "vnode_map_update_time_median"
+            , "vnode_map_update_time_95"
+            , "vnode_map_update_time_99"
+            , "vnode_map_update_time_100"
+            , "node_gets_counter"
+            , "node_gets_counter_total"
+            , "node_get_fsm_counter_siblings_mean"
+            , "node_get_fsm_counter_siblings_median"
+            , "node_get_fsm_counter_siblings_95"
+            , "node_get_fsm_counter_siblings_99"
+            , "node_get_fsm_counter_siblings_100"
+            , "node_get_fsm_counter_objsize_mean"
+            , "node_get_fsm_counter_objsize_median"
+            , "node_get_fsm_counter_objsize_95"
+            , "node_get_fsm_counter_objsize_99"
+            , "node_get_fsm_counter_objsize_100"
+            , "node_get_fsm_counter_time_mean"
+            , "node_get_fsm_counter_time_median"
+            , "node_get_fsm_counter_time_95"
+            , "node_get_fsm_counter_time_99"
+            , "node_get_fsm_counter_time_100"
+            , "node_gets_set"
+            , "node_gets_set_total"
+            , "node_get_fsm_set_siblings_mean"
+            , "node_get_fsm_set_siblings_median"
+            , "node_get_fsm_set_siblings_95"
+            , "node_get_fsm_set_siblings_99"
+            , "node_get_fsm_set_siblings_100"
+            , "node_get_fsm_set_objsize_mean"
+            , "node_get_fsm_set_objsize_median"
+            , "node_get_fsm_set_objsize_95"
+            , "node_get_fsm_set_objsize_99"
+            , "node_get_fsm_set_objsize_100"
+            , "node_get_fsm_set_time_mean"
+            , "node_get_fsm_set_time_median"
+            , "node_get_fsm_set_time_95"
+            , "node_get_fsm_set_time_99"
+            , "node_get_fsm_set_time_100"
+            , "node_gets_map"
+            , "node_gets_map_total"
+            , "node_get_fsm_map_siblings_mean"
+            , "node_get_fsm_map_siblings_median"
+            , "node_get_fsm_map_siblings_95"
+            , "node_get_fsm_map_siblings_99"
+            , "node_get_fsm_map_siblings_100"
+            , "node_get_fsm_map_objsize_mean"
+            , "node_get_fsm_map_objsize_median"
+            , "node_get_fsm_map_objsize_95"
+            , "node_get_fsm_map_objsize_99"
+            , "node_get_fsm_map_objsize_100"
+            , "node_get_fsm_map_time_mean"
+            , "node_get_fsm_map_time_median"
+            , "node_get_fsm_map_time_95"
+            , "node_get_fsm_map_time_99"
+            , "node_get_fsm_map_time_100"
+            , "node_puts_counter"
+            , "node_puts_counter_total"
+            , "node_put_fsm_counter_time_mean"
+            , "node_put_fsm_counter_time_median"
+            , "node_put_fsm_counter_time_95"
+            , "node_put_fsm_counter_time_99"
+            , "node_put_fsm_counter_time_100"
+            , "node_puts_set"
+            , "node_puts_set_total"
+            , "node_put_fsm_set_time_mean"
+            , "node_put_fsm_set_time_median"
+            , "node_put_fsm_set_time_95"
+            , "node_put_fsm_set_time_99"
+            , "node_put_fsm_set_time_100"
+            , "node_puts_map"
+            , "node_puts_map_total"
+            , "node_put_fsm_map_time_mean"
+            , "node_put_fsm_map_time_median"
+            , "node_put_fsm_map_time_95"
+            , "node_put_fsm_map_time_99"
+            , "node_put_fsm_map_time_100"
+            , "counter_actor_counts_mean"
+            , "counter_actor_counts_median"
+            , "counter_actor_counts_95"
+            , "counter_actor_counts_99"
+            , "counter_actor_counts_100"
+            , "set_actor_counts_mean"
+            , "set_actor_counts_median"
+            , "set_actor_counts_95"
+            , "set_actor_counts_99"
+            , "set_actor_counts_100"
+            , "map_actor_counts_mean"
+            , "map_actor_counts_median"
+            , "map_actor_counts_95"
+            , "map_actor_counts_99"
+            , "map_actor_counts_100"
+        ]
     ].
 
 do_datatypes(Pid) ->
-    _ = [ get_and_update(Pid, Type) || Type <- [counter, set, map]].
+    _ = [get_and_update(Pid, Type) || Type <- [counter, set, map]].
 
 get_and_update(Pid, counter) ->
-
-    _ = [ riakc_pb_socket:update_type(Pid, {?CTYPE, <<"pb">>}, <<I>>,
-                                      {counter, {increment, 5},
-                                       undefined})
-          || I <- lists:seq(1, 10) ],
-
-    _ = [ riakc_pb_socket:fetch_type(Pid, {?CTYPE, <<"pb">>}, <<I>>)
-          || I <- lists:seq(1, 10) ];
+    _ = [riakc_pb_socket:update_type(Pid, {?CTYPE, <<"pb">>}, <<I>>,
+        {counter, {increment, 5},
+            undefined})
+        || I <- lists:seq(1, 10)],
+    _ = [riakc_pb_socket:fetch_type(Pid, {?CTYPE, <<"pb">>}, <<I>>)
+        || I <- lists:seq(1, 10)];
 
 get_and_update(Pid, set) ->
-
-    _ = [ riakc_pb_socket:update_type(Pid, {?STYPE, <<"pb">>}, <<I>>,
-                                      {set, {add_all, [<<"a">>, <<"b">>]}, undefined})
-          || I <- lists:seq(1, 10) ],
-
-    _ = [ riakc_pb_socket:fetch_type(Pid, {?STYPE, <<"pb">>}, <<I>>)
-          || I <- lists:seq(1, 10) ];
+    _ = [riakc_pb_socket:update_type(Pid, {?STYPE, <<"pb">>}, <<I>>,
+        {set, {add_all, [<<"a">>, <<"b">>]}, undefined})
+        || I <- lists:seq(1, 10)],
+    _ = [riakc_pb_socket:fetch_type(Pid, {?STYPE, <<"pb">>}, <<I>>)
+        || I <- lists:seq(1, 10)];
 
 get_and_update(Pid, map) ->
-
-    _ = [ riakc_pb_socket:update_type(Pid, {?MTYPE, <<"pb">>}, <<I>>,
-                                      {map,
-                                       {update,[
-                                                {update, {<<"a">>, counter}, {increment, 5}}
-                                               ]},
-                                       undefined})
-          || I <- lists:seq(1, 10) ],
-
-    _ = [ riakc_pb_socket:fetch_type(Pid, {?MTYPE, <<"pb">>}, <<I>>)
-          || I <- lists:seq(1, 10) ].
+    _ = [riakc_pb_socket:update_type(Pid, {?MTYPE, <<"pb">>}, <<I>>,
+        {map,
+            {update, [
+                {update, {<<"a">>, counter}, {increment, 5}}
+            ]},
+            undefined})
+        || I <- lists:seq(1, 10)],
+    _ = [riakc_pb_socket:fetch_type(Pid, {?MTYPE, <<"pb">>}, <<I>>)
+        || I <- lists:seq(1, 10)].
 
 all_stats(Node) ->
     common_stats() ++ product_stats(rt:product(Node)).
@@ -1033,8 +1028,8 @@ common_stats() ->
         <<"xmerl_version">>
     ]
     ++ pool_stats()
-    ++ tictacaae_stats()
-    ++ ttaaefs_stats().
+        ++ tictacaae_stats()
+        ++ ttaaefs_stats().
 
 product_stats(riak_ee) ->
     [
@@ -1050,60 +1045,65 @@ product_stats(riak) ->
     [].
 
 pool_stats() ->
-    dscp_stats() ++
-        [<<"worker_node_worker_pool_total">>,
-            <<"worker_node_worker_pool_queuetime_mean">>,
-            <<"worker_node_worker_pool_queuetime_100">>,
-            <<"worker_node_worker_pool_worktime_mean">>,
-            <<"worker_node_worker_pool_worktime_100">>,
+    dscp_stats() ++ [
+        <<"worker_node_worker_pool_total">>,
+        <<"worker_node_worker_pool_queuetime_mean">>,
+        <<"worker_node_worker_pool_queuetime_100">>,
+        <<"worker_node_worker_pool_worktime_mean">>,
+        <<"worker_node_worker_pool_worktime_100">>,
         <<"worker_unregistered_total">>,
-            <<"worker_unregistered_queuetime_mean">>,
-            <<"worker_unregistered_queuetime_100">>,
-            <<"worker_unregistered_worktime_mean">>,
-            <<"worker_unregistered_worktime_100">>,
+        <<"worker_unregistered_queuetime_mean">>,
+        <<"worker_unregistered_queuetime_100">>,
+        <<"worker_unregistered_worktime_mean">>,
+        <<"worker_unregistered_worktime_100">>,
         <<"worker_vnode_pool_total">>,
-            <<"worker_vnode_pool_queuetime_mean">>,
-            <<"worker_vnode_pool_queuetime_100">>,
-            <<"worker_vnode_pool_worktime_mean">>,
-            <<"worker_vnode_pool_worktime_100">>].
+        <<"worker_vnode_pool_queuetime_mean">>,
+        <<"worker_vnode_pool_queuetime_100">>,
+        <<"worker_vnode_pool_worktime_mean">>,
+        <<"worker_vnode_pool_worktime_100">>
+    ].
 
 dscp_stats() ->
-    [<<"worker_af1_pool_total">>,
-            <<"worker_af1_pool_queuetime_mean">>,
-            <<"worker_af1_pool_queuetime_100">>,
-            <<"worker_af1_pool_worktime_mean">>,
-            <<"worker_af1_pool_worktime_100">>,
+    [
+        <<"worker_af1_pool_total">>,
+        <<"worker_af1_pool_queuetime_mean">>,
+        <<"worker_af1_pool_queuetime_100">>,
+        <<"worker_af1_pool_worktime_mean">>,
+        <<"worker_af1_pool_worktime_100">>,
         <<"worker_af2_pool_total">>,
-            <<"worker_af2_pool_queuetime_mean">>,
-            <<"worker_af2_pool_queuetime_100">>,
-            <<"worker_af2_pool_worktime_mean">>,
-            <<"worker_af2_pool_worktime_100">>,
+        <<"worker_af2_pool_queuetime_mean">>,
+        <<"worker_af2_pool_queuetime_100">>,
+        <<"worker_af2_pool_worktime_mean">>,
+        <<"worker_af2_pool_worktime_100">>,
         <<"worker_af3_pool_total">>,
-            <<"worker_af3_pool_queuetime_mean">>,
-            <<"worker_af3_pool_queuetime_100">>,
-            <<"worker_af3_pool_worktime_mean">>,
-            <<"worker_af3_pool_worktime_100">>,
+        <<"worker_af3_pool_queuetime_mean">>,
+        <<"worker_af3_pool_queuetime_100">>,
+        <<"worker_af3_pool_worktime_mean">>,
+        <<"worker_af3_pool_worktime_100">>,
         <<"worker_af4_pool_total">>,
-            <<"worker_af4_pool_queuetime_mean">>,
-            <<"worker_af4_pool_queuetime_100">>,
-            <<"worker_af4_pool_worktime_mean">>,
-            <<"worker_af4_pool_worktime_100">>,
+        <<"worker_af4_pool_queuetime_mean">>,
+        <<"worker_af4_pool_queuetime_100">>,
+        <<"worker_af4_pool_worktime_mean">>,
+        <<"worker_af4_pool_worktime_100">>,
         <<"worker_be_pool_total">>,
-            <<"worker_be_pool_queuetime_mean">>,
-            <<"worker_be_pool_queuetime_100">>,
-            <<"worker_be_pool_worktime_mean">>,
-            <<"worker_be_pool_worktime_100">>
-        ].
+        <<"worker_be_pool_queuetime_mean">>,
+        <<"worker_be_pool_queuetime_100">>,
+        <<"worker_be_pool_worktime_mean">>,
+        <<"worker_be_pool_worktime_100">>
+    ].
 
 dscp_totals() ->
-    [<<"worker_af1_pool_total">>,
+    [
+        <<"worker_af1_pool_total">>,
         <<"worker_af2_pool_total">>,
         <<"worker_af3_pool_total">>,
         <<"worker_af4_pool_total">>,
-        <<"worker_be_pool_total">>].
+        <<"worker_be_pool_total">>
+    ].
 
 tictacaae_stats() ->
-    [<<"tictacaae_queue_microsec__max">>,
+    [
+        <<"tictacaae_queue_microsec__max">>,
         <<"tictacaae_queue_microsec_mean">>,
         <<"tictacaae_root_compare">>,
         <<"tictacaae_root_compare_total">>,
@@ -1122,10 +1122,12 @@ tictacaae_stats() ->
         <<"tictacaae_not_supported">>,
         <<"tictacaae_not_supported_total">>,
         <<"tictacaae_modtime">>,
-        <<"tictacaae_modtime_total">>].
+        <<"tictacaae_modtime_total">>
+    ].
 
 ttaaefs_stats() ->
-    [<<"ttaaefs_src_ahead_total">>,
+    [
+        <<"ttaaefs_src_ahead_total">>,
         <<"ttaaefs_snk_ahead_total">>,
         <<"ttaaefs_nosync_total">>,
         <<"ttaaefs_sync_total">>,
@@ -1136,7 +1138,8 @@ ttaaefs_stats() ->
         <<"ttaaefs_rangecheck_total">>,
         <<"ttaaefs_allcheck_total">>,
         <<"ttaaefs_daycheck_total">>,
-        <<"ttaaefs_hourcheck_total">>].
+        <<"ttaaefs_hourcheck_total">>
+    ].
 
 
 do_pools(Node) ->

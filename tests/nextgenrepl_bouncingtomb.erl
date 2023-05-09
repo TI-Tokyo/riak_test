@@ -1,11 +1,29 @@
+%% -------------------------------------------------------------------
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 %% @doc
 %% This module implements a riak_test to prove real-time repl
 %% works as expected with automated discovery of peers
-
 -module(nextgenrepl_bouncingtomb).
 -behavior(riak_test).
+
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 
 -define(TEST_BUCKET, <<"repl-aae-fullsync-systest_a">>).
 -define(A_RING, 16).
@@ -55,7 +73,7 @@
             {tictacaae_rebuildtick, 3600000} % don't tick for an hour!
         ]).
 
--define(CONFIG(RingSize, NVal, Q, DeleteMode), 
+-define(CONFIG(RingSize, NVal, Q, DeleteMode),
         ?CORE_CONFIG(RingSize, NVal) ++
         [{riak_kv,
             ?AAE_CONFIG ++
@@ -68,7 +86,7 @@
             ]
         }]).
 
--define(SNK_CONFIG(RingSize, Nval, Q, ClusterName, IP, P, DeleteMode), 
+-define(SNK_CONFIG(RingSize, Nval, Q, ClusterName, IP, P, DeleteMode),
         ?CORE_CONFIG(RingSize, Nval) ++
         [{riak_kv,
             ?AAE_CONFIG ++
@@ -99,14 +117,14 @@ confirm() ->
     lager:info("***************"),
     lager:info("Testing rotating tombs with key insomnia"),
     lager:info("***************"),
-    
+
     [ClusterA1, ClusterB1] =
         rt:deploy_clusters([
             {3, ?CONFIG(?A_RING, ?A_NVAL, cluster_b, 1000)},
             {3, ?CONFIG(?B_RING, ?B_NVAL, cluster_a, keep)}]),
 
     pass = with_insomnia_test(ClusterA1, ClusterB1),
-    
+
     rt:clean_cluster(ClusterA1),
     rt:clean_cluster(ClusterB1),
 
@@ -119,7 +137,7 @@ confirm() ->
             {2, ?CONFIG(?A_RING, ?A_NVAL, cluster_b, keep)},
             {2, ?CONFIG(?B_RING, ?B_NVAL, cluster_a, 1000)},
             {1, ?CONFIG(?C_RING, ?C_NVAL, q1_ttaaefs, keep)}]),
-    
+
     no_insomnia_test(ClusterA2, ClusterB2, ClusterC2).
 
 no_insomnia_test(ClusterA, ClusterB, ClusterC) ->
@@ -143,7 +161,7 @@ no_insomnia_test(ClusterA, ClusterB, ClusterC) ->
                 lists:keyfind(pb, 1, rt:connection_info(Node)),
             {IP, Port}
         end,
-    
+
     reset_peer_config(NodeA1, cluster_a, ?A_RING, ?A_NVAL, cluster_b, PeerConfigFun(NodeB1), 1000),
     reset_peer_config(NodeA2, cluster_a, ?A_RING, ?A_NVAL, cluster_b, PeerConfigFun(NodeB2), 1000),
     reset_peer_config(NodeB1, cluster_b, ?B_RING, ?B_NVAL, cluster_a,  PeerConfigFun(NodeA1), keep),
@@ -155,7 +173,7 @@ no_insomnia_test(ClusterA, ClusterB, ClusterC) ->
     lager:info("Confirm riak_kv is up on all nodes."),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end,
                     ClusterA ++ ClusterB),
-    
+
     lager:info("Wait for peer discovery"),
     timer:sleep((?INIT_MAX_DELAY + 1) * 1000),
 
@@ -208,10 +226,10 @@ no_insomnia_test(ClusterA, ClusterB, ClusterC) ->
 
             {A1C, B1C}
         end,
-    
+
     lager:info("Cluster B has tombstones, but Cluster A has objects"),
     {_InitACount, _InitBCount} = LogFun(NodeA1, NodeB1),
-    
+
     GetStatsFun(),
 
     rotating_full_sync(NodeA1, NodeB1, GetStatsFun, LogFun, ?LOOP_COUNT),
@@ -239,7 +257,7 @@ with_insomnia_test(ClusterA, ClusterB) ->
                 lists:keyfind(pb, 1, rt:connection_info(Node)),
             {IP, Port}
         end,
-    
+
     reset_peer_config(NodeA1, cluster_a, ?A_RING, ?A_NVAL, cluster_b, PeerConfigFun(NodeB1), 1000),
     reset_peer_config(NodeA2, cluster_a, ?A_RING, ?A_NVAL, cluster_b, PeerConfigFun(NodeB2), 1000),
     reset_peer_config(NodeA3, cluster_a, ?A_RING, ?A_NVAL, cluster_b, PeerConfigFun(NodeB3), 1000),
@@ -304,7 +322,7 @@ with_insomnia_test(ClusterA, ClusterB) ->
 
     lager:info("Cluster B has tombstones, but Cluster A should have reaped"),
     {_InitACount, _InitBCount} = LogFun(NodeA1, NodeB1),
-    
+
     GetStatsFun(),
 
     rotating_full_sync(NodeA1, NodeB1, GetStatsFun, LogFun, ?LOOP_COUNT),
@@ -314,7 +332,7 @@ with_insomnia_test(ClusterA, ClusterB) ->
     pass.
 
 rotating_full_sync(NodeA, NodeB, GetStatsFun, LogFun, 0) ->
-    LoopLogFun = 
+    LoopLogFun =
         fun(X) ->
             lager:info("Closing count loop ~w", [X]),
             _ = LogFun(NodeA, NodeB)
@@ -355,10 +373,10 @@ write_to_cluster(Node, Start, End, CommonValBin) ->
     lager:info("Writing ~p keys to node ~p.", [End - Start + 1, Node]),
     lager:warning("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
-    F = 
+    F =
         fun(N, Acc) ->
             Key = list_to_binary(io_lib:format("~8..0B~n", [N])),
-            Obj = 
+            Obj =
                 case CommonValBin of
                     new_obj ->
                         CVB = ?COMMMON_VAL_INIT,
@@ -388,7 +406,7 @@ delete_from_cluster(Node, Start, End) ->
     lager:info("Deleting ~p keys from node ~p.", [End - Start + 1, Node]),
     lager:warning("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
-    F = 
+    F =
         fun(N, Acc) ->
             Key = list_to_binary(io_lib:format("~8..0B~n", [N])),
             try riak_client:delete(?TEST_BUCKET, Key, C) of
@@ -422,7 +440,7 @@ drain_queue(SrcC, SnkA, N) ->
     end.
 
 get_stats(Node) ->
-    S = verify_riak_stats:get_stats(Node, ?STATS_WAIT),
+    S = rt:get_stats(Node, ?STATS_WAIT),
     {<<"ngrfetch_prefetch_total">>, PFT} =
         lists:keyfind(<<"ngrfetch_prefetch_total">>, 1, S),
     {<<"ngrfetch_tofetch_total">>, TFT} =

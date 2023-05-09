@@ -17,14 +17,33 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
-
 %% Verify functionality of async job enable/disable flags in advanced.config.
 -module(verify_job_enable_ac).
-
 -behavior(riak_test).
--compile([export_all, nowarn_export_all]).
+
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+
+%% Called indirectly by name
+-export([
+    verify_list_buckets_disabled_http/1,
+    verify_list_buckets_disabled_pb/1,
+    verify_list_buckets_enabled_http/1,
+    verify_list_buckets_enabled_pb/1,
+    verify_list_keys_disabled_http/1,
+    verify_list_keys_disabled_pb/1,
+    verify_list_keys_enabled_http/1,
+    verify_list_keys_enabled_pb/1,
+    verify_mapred_disabled_http/1,
+    verify_mapred_disabled_pb/1,
+    verify_mapred_enabled_http/1,
+    verify_mapred_enabled_pb/1,
+    verify_secondary_index_disabled_http/1,
+    verify_secondary_index_disabled_pb/1,
+    verify_secondary_index_enabled_http/1,
+    verify_secondary_index_enabled_pb/1
+]).
+
+-include_lib("stdlib/include/assert.hrl").
 -include("job_enable_common.hrl").
 
 %% Start with all job classes disabled - we'll slowly enable
@@ -104,8 +123,8 @@ verify_list_keys_disabled_pb(Client) ->
 
 verify_secondary_index_disabled_pb(Client) ->
     Expected = {error, ?ERRMSG_BIN(?TOKEN_SEC_INDEX)},
-    ?assertEqual(Expected, riakc_pb_socket:get_index(Client, <<"2i_test">>,
-                                                     {integer_index, "test_idx"}, 42)).
+    ?assertEqual(Expected, riakc_pb_socket:get_index_eq(
+        Client, <<"2i_test">>, {integer_index, "test_idx"}, 42)).
 
 verify_mapred_disabled_pb(Client) ->
     Expected = {error, ?ERRMSG_BIN(?TOKEN_MAP_REDUCE)},
@@ -122,7 +141,8 @@ verify_list_keys_enabled_pb(Client) ->
     ?assertEqual(SortedKeys, ?BASIC_TEST_KEYS).
 
 verify_secondary_index_enabled_pb(Client) ->
-    Result = riakc_pb_socket:get_index_eq(Client, <<"2i_test">>, {integer_index, "test_idx"}, 42),
+    Result = riakc_pb_socket:get_index_eq(
+        Client, <<"2i_test">>, {integer_index, "test_idx"}, 42),
     ?assertMatch({ok, {index_results_v1, [<<"2">>], _, _}}, Result).
 
 verify_mapred_enabled_pb(Client) ->

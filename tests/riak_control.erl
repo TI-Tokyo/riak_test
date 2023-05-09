@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2013 Basho Technologies, Inc.
+%% Copyright (c) 2013-2016 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -28,16 +28,16 @@
 
 -export([confirm/0]).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(RC_ENABLE_CFG, [{riak_control, [{enabled, true}, {auth, none}]}]).
 
 %% @doc Verify that Riak Control operates predictably during an upgrade.
 confirm() ->
     verify_upgrade(legacy),
-    rt:setup_harness(ignored, ignored),
+    rt:setup_harness(?MODULE, []),
     verify_upgrade(previous),
-    rt:setup_harness(ignored, ignored),
+    rt:setup_harness(?MODULE, []),
     pass.
 
 %% @doc Verify an upgrade succeeds with all nodes running control from

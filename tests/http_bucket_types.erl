@@ -1,9 +1,32 @@
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2013-2016 Basho Technologies, Inc.
+%% Copyright (c) 2023 Workday, Inc.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 -module(http_bucket_types).
 
 -behavior(riak_test).
--export([confirm/0, mapred_modfun/3, mapred_modfun_type/3]).
+-export([confirm/0]).
 
--include_lib("eunit/include/eunit.hrl").
+%% MFA callbacks
+-export([mapred_modfun/3, mapred_modfun_type/3]).
+
+-include_lib("stdlib/include/assert.hrl").
 -include_lib("riakc/include/riakc.hrl").
 
 -define(SUMVALUE_MAPRED,
@@ -417,10 +440,10 @@ confirm() ->
     rt_redbug:set_tracing_applied(true),
     lager:info("Deploy a single node cluster"),
     lager:info("Can only monitor one node with redbug"),
-    [SingleNode] 
-        = rt:build_cluster(1, 
-                            [], 
-                            [{riak_core, 
+    [SingleNode]
+        = rt:build_cluster(1,
+                            [],
+                            [{riak_core,
                                 [{default_bucket_props,
                                     [{n_val, 3},
                                         {allow_mult, true},
@@ -438,16 +461,12 @@ confirm() ->
         rt:create_activate_and_wait_for_bucket_type(
             [SingleNode], <<"sync_all">>, [{sync_on_write,all}, {n_val,3}]),
 
-    lager:info("Setup redbug tracing for selective sync test"),
-    {ok, CWD} = file:get_cwd(),
-    FnameBase = "rt_vhc",
-    FileBase = filename:join([CWD, FnameBase]),
-    OneTrcFile = FileBase ++ "One",
-    AllTrcFile = FileBase ++ "All",
-    BackendTrcFile = FileBase ++ "Backend",
-    file:delete(OneTrcFile),
-    file:delete(AllTrcFile),
-    file:delete(BackendTrcFile),
+    ScratchDir = rt_config:get(rt_scratch_dir),
+    [OneTrcFile, AllTrcFile, BackendTrcFile] = TraceFiles =
+        [filename:join(ScratchDir, FN) || FN <-
+            ["hbt_one.trace", "hbt_all.trace", "hbt_backend.trace"]],
+    %% Make sure the trace files don't exist from some previous run!
+    delete_files(TraceFiles),
 
     lager:info("STARTING TRACE"),
     Backend = proplists:get_value(backend, riak_test_runner:metadata()),
@@ -459,8 +478,8 @@ confirm() ->
         riakc_obj:new({<<"sync_one">>, <<"b_sync_one">>}, <<"key">>, <<"newestvalue">>)),
     lager:info("doing get"),
     {ok, _} = rhc:get(RHC, {<<"sync_one">>, <<"b_sync_one">>}, <<"key">>),
-    
-    stopped = redbug:stop(),
+
+    redbug_stop(),
     ?assertMatch(1, flushput_cnt(TraceFun, OneTrcFile)),
 
 
@@ -471,7 +490,7 @@ confirm() ->
     lager:info("doing get"),
     {ok, _} = rhc:get(RHC, {<<"sync_backend">>, <<"b_sync_backend">>}, <<"key">>),
 
-    stopped = redbug:stop(),
+    redbug_stop(),
     ?assertMatch(0, flushput_cnt(TraceFun, BackendTrcFile)),
 
     redbug_start(TraceFun, AllTrcFile, SingleNode),
@@ -481,24 +500,20 @@ confirm() ->
     lager:info("doing get"),
     {ok, _} = rhc:get(RHC, {<<"sync_all">>, <<"b_sync_all">>}, <<"key">>),
 
-    stopped = redbug:stop(),
+    redbug_stop(),
     ?assertMatch(3, flushput_cnt(TraceFun, AllTrcFile)),
 
-    file:delete(OneTrcFile),
-    file:delete(AllTrcFile),
-    file:delete(BackendTrcFile),
-    
+    %% Only delete trace files on success
+    delete_files(TraceFiles),
     pass.
 
 redbug_start(TraceFun, TrcFile, Node) ->
-    timer:sleep(1000), % redbug doesn't always appear to immediately stop
-    lager:info("TracingFun ~s on ~w", [TraceFun, Node]),
-    Start = redbug:start(TraceFun,
-                        rt_redbug:default_trace_options() ++
-                            [{target, Node},
-                            {arity, true},
-                            {print_file, TrcFile}]),
-    lager:info("Redbug start message ~w", [Start]).
+    lager:info("TracingFun ~s on ~s", [TraceFun, Node]),
+    ?assertMatch(ok, rt_redbug:trace(Node, TraceFun,
+        #{arity => true, print_file => TrcFile})).
+
+redbug_stop() ->
+    ?assertMatch(ok, rt_redbug:stop()).
 
 mapred_modfun(Pipe, Args, _Timeout) ->
     lager:info("Args for mapred modfun are ~p", [Args]),
@@ -515,14 +530,27 @@ flushputfun(leveled) ->
 flushputfun(eleveldb) ->
     "riak_kv_eleveldb_backend:flush_put/5";
 flushputfun(bitcask) ->
-    "riak_kv_bitcask_backend:flush_put/5".
+    "riak_kv_bitcask_backend:flush_put/5";
+flushputfun(undefined) ->
+    flushputfun(bitcask).
 
 flushput_cnt(TraceFun, File) ->
     lager:info("checking ~p", [File]),
-    {ok, FileData} = file:read_file(File),
-    count_matches(re:run(FileData, TraceFun, [global])).
+    %% redbug doesn't create the file until it has something to write to it,
+    %% so accommodate non-existence
+    case file:read_file(File) of
+        {ok, FileData} ->
+            Pattern = "\\b" ++ TraceFun ++ "\\b",
+            count_matches(re:run(FileData, Pattern, [global]));
+        Error ->
+            ?assertMatch({error, enoent}, Error),
+            0
+    end.
 
 count_matches(nomatch) ->
     0;
 count_matches({match, Matches}) ->
     length(Matches).
+
+delete_files(Files) ->
+    lists:foreach(fun file:delete/1, Files).

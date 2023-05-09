@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2013 Basho Technologies, Inc.
+%% Copyright (c) 2013-2014 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -36,7 +36,7 @@
 -module(verify_handoff_mixed).
 -behavior(riak_test).
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/assert.hrl").
 -include("rt_pipe.hrl").
 
 -define(KV_BUCKET, <<"vhm_kv">>).
@@ -51,8 +51,7 @@ confirm() ->
     UpgradeVsn = proplists:get_value(upgrade_version,
                                      riak_test_runner:metadata(),
                                      previous),
-    Versions = [{current, []},
-                {UpgradeVsn, []}],
+    Versions = [current, UpgradeVsn],
     Services = [riak_kv, riak_pipe],
     [Current, Old] = Nodes = rt:deploy_nodes(Versions, Services),
 
@@ -134,33 +133,52 @@ check_logs() ->
     ?assertEqual([], ZeroHandoff),
     ok.
 
+-type app_counts() :: orddict:orddict(atom(), non_neg_integer()).
+
+-spec sum_app_handoff() -> app_counts().
 sum_app_handoff() ->
     lager:info("Combing logs for handoff notes"),
-    lists:foldl(
-      fun({App, Count}, Acc) ->
-              orddict:update_counter(App, Count, Acc)
-      end,
-      [],
-      lists:append([ find_app_handoff(Log) || Log <- rt:get_node_logs() ])).
+    lists:foldl(fun sum_app_handoff/2, [],
+        rt:process_node_logs(all, fun process_node_log_file/3, ?MODULE)).
 
-find_app_handoff({Path, Port}) ->
-    case re:run(Path, "console\.log$") of
-        {match, _} ->
-            find_line(Port, file:read_line(Port));
-        nomatch ->
-            %% save time not looking through other logs
-            []
+-spec sum_app_handoff(
+    Captured :: {ok, app_counts()} | rtt:std_error(),
+    AccData :: app_counts()) -> app_counts().
+sum_app_handoff({ok, []}, AccData) ->
+    AccData;
+sum_app_handoff({ok, FileData}, AccData) ->
+    orddict:fold(fun orddict:update_counter/3, AccData, FileData);
+%% Anything else is fatal
+sum_app_handoff({error, {Reason, Info}}, _AccData) ->
+    erlang:error(Reason, [Info]);
+sum_app_handoff({error, What}, _AccData) ->
+    erlang:error(What).
+
+-spec process_node_log_file(
+    Node :: node(), LogFile :: rtt:fs_path(), Param :: term() )
+        -> {ok, app_counts()} | rtt:std_error().
+process_node_log_file(_Node, LogFile, _Param) ->
+    case filename:basename(LogFile) of
+        "console.log" ->
+            SedFilt = "s/^.*ownership transfer of ([a-z_]+)"
+                ".*completed.*([0-9]+) objects.*$/\\1 \\2/p",
+            case rt:cmd("/usr/bin/sed", ["-En", SedFilt, LogFile], rlines) of
+                {0, rlines, Lines} ->
+                    {ok, lists:foldl(fun process_log_capture/2, [], Lines)};
+                %% Anything else is an error
+                {error, _} = Error ->
+                    Error;
+                Other ->
+                    {error, {sed, Other}}
+            end;
+        _ ->
+            {ok, []}
     end.
 
-find_line(Port, {ok, Data}) ->
-    Re = "ownership transfer of ([a-z_]+).*"
-        "completed.*([0-9]+) objects",
-    case re:run(Data, Re, [{capture, all_but_first, list}]) of
-        {match, [App, Count]} ->
-            [{list_to_atom(App), list_to_integer(Count)}
-             |find_line(Port, file:read_line(Port))];
-        nomatch ->
-            find_line(Port, file:read_line(Port))
-    end;
-find_line(_, _) ->
-    [].
+-spec process_log_capture(Line :: nonempty_string(), Acc :: app_counts() )
+        -> app_counts().
+process_log_capture(Line, Acc) ->
+    [AppStr, CntStr] = string:tokens(Line, " "),
+    App = erlang:list_to_atom(AppStr),
+    Cnt = erlang:list_to_integer(CntStr),
+    orddict:update_counter(App, Cnt, Acc).

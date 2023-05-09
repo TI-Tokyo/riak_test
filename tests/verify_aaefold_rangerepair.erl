@@ -20,30 +20,32 @@
 %% @doc Verification of AAE fold based on n_val (with cached trees)
 %%
 %% Confirm that read repair can be accelerated by an aae_fold
-
 -module(verify_aaefold_rangerepair).
+-behavior(riak_test).
+
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 
 -define(DEFAULT_RING_SIZE, 16).
 -define(CFG_NOREBUILD,
         [{riak_kv,
           [
-           {anti_entropy, {off, []}},
-           {tictacaae_active, active},
-           {tictacaae_parallelstore, leveled_ko},
-                % if backend not leveled will use parallel key-ordered
-                % store
-           {tictacaae_rebuildwait, 4},
-           {tictacaae_rebuilddelay, 3600},
-           {tictacaae_exchangetick, 3600000}, 
-                % don't tick for an hour!
-                % don't want to repair via AAE
-           {tictacaae_rebuildtick, 3600000} % don't tick for an hour!
-          ]},
+        {anti_entropy, {off, []}},
+        {tictacaae_active, active},
+        {tictacaae_parallelstore, leveled_ko},
+        % if backend not leveled will use parallel key-ordered
+        % store
+        {tictacaae_rebuildwait, 4},
+        {tictacaae_rebuilddelay, 3600},
+        {tictacaae_exchangetick, 3600000},
+        % don't tick for an hour!
+        % don't want to repair via AAE
+        {tictacaae_rebuildtick, 3600000} % don't tick for an hour!
+    ]},
          {riak_core,
           [
-           {ring_creation_size, ?DEFAULT_RING_SIZE}
+        {ring_creation_size, ?DEFAULT_RING_SIZE}
           ]}]
        ).
 -define(NUM_NODES, 4).
@@ -114,7 +116,7 @@ verify_aae_repair(Nodes, ClientMod, ClientHead, Nodes) ->
     rt:start_and_wait(TailNode),
 
     rt:wait_until_transfers_complete(Nodes),
-    
+
     object_count(ClientMod, ClientHead, "after restart - participating"),
     object_count(ClientMod, ClientHead, "after restart - participating"),
     object_count(ClientMod, ClientHead, "after restart - participating"),
@@ -133,8 +135,8 @@ verify_aae_repair(Nodes, ClientMod, ClientHead, Nodes) ->
     lager:info("Forcing read repair - first set"),
     %% Initially two sets were to be used, to similate reverting to backup, but
     %% as only leveled has a testable hot_backup, we have to repair the first
-    %% set to get back to the "recovered from backup point" 
-    {ok, NumKeys0} = 
+    %% set to get back to the "recovered from backup point"
+    {ok, NumKeys0} =
         ClientMod:aae_range_repairkeys(ClientHead,
                                         ?BUCKET,
                                         all,
@@ -146,7 +148,7 @@ verify_aae_repair(Nodes, ClientMod, ClientHead, Nodes) ->
     get_read_repair_total(Nodes),
 
     lager:info("Forcing read repair - second set"),
-    {ok, NumKeys1} = 
+    {ok, NumKeys1} =
         ClientMod:aae_range_repairkeys(ClientHead,
                                         ?BUCKET,
                                         all,
@@ -157,7 +159,7 @@ verify_aae_repair(Nodes, ClientMod, ClientHead, Nodes) ->
 
     rpc:call(TailNode, riak_client, reset_node_for_coverage, []),
     rt:wait_until_ring_converged(Nodes),
-    
+
     TC2 = object_count(ClientMod, ClientHead, "after repair - participating"),
     ?assertMatch(TC2, 3 * ?NUM_KEYS),
 
@@ -166,7 +168,7 @@ verify_aae_repair(Nodes, ClientMod, ClientHead, Nodes) ->
 
     lager:info("Read repair total should be about ~w/~w of ~w",
                 [?N_VAL, ?NUM_NODES, 2 * ?NUM_KEYS]),
-    
+
     true = (RR1 - RR0) > ?NUM_KEYS,
     true = (RR1 - RR0) < 2 * ?NUM_KEYS,
 
@@ -234,11 +236,10 @@ object_count(ClientMod, ClientHead, LogInfo) ->
     {<<"total_count">>, TC} = lists:keyfind(<<"total_count">>, 1, StatList),
     TC.
 
-
 get_read_repair_total(Nodes) ->
     FoldFun =
         fun(Node, Acc) ->
-            Stats = get_stats(Node),
+            Stats = rt:get_stats(Node),
             {<<"read_repairs_total">>, RR} =
                 lists:keyfind(<<"read_repairs_total">>, 1, Stats),
             lager:info("Repairs on ~p ~w", [Node, RR]),
@@ -247,10 +248,3 @@ get_read_repair_total(Nodes) ->
     RRT = lists:foldl(FoldFun, 0, Nodes),
     lager:info("Read repair total ~w", [RRT]),
     RRT.
-
-get_stats(Node) ->
-    lager:info("Retrieving stats from node ~s", [Node]),
-    StatsCommand = io_lib:format("curl -s -S ~s/stats", [rt:http_url(Node)]),
-    StatString = os:cmd(StatsCommand),
-    {struct, Stats} = mochijson2:decode(StatString),
-    Stats.

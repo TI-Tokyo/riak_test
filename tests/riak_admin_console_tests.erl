@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 -module(riak_admin_console_tests).
--include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -export([confirm/0]).
 
@@ -59,8 +59,10 @@ cluster_tests(Node) ->
 bucket_tests(Node) ->
     check_admin_cmd(Node, "bucket-type status foo"),
     check_admin_cmd(Node, "bucket-type activate foo"),
-    check_admin_cmd(Node, "bucket-type create foo {\"props\":{[]}}"),
-    check_admin_cmd(Node, "bucket-type update foo {\"props\":{[]}}"),
+    %% Note that the 'props' json would need to be quoted on a real command
+    %% line - not quoted here because of how check_admin_cmd/2 handles it.
+    check_admin_cmd(Node, "bucket-type create foo {props:{[]}}"),
+    check_admin_cmd(Node, "bucket-type update foo {props:{[]}}"),
     check_admin_cmd(Node, "bucket-type list").
 
 

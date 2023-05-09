@@ -1,13 +1,31 @@
+%% -------------------------------------------------------------------
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 %% @doc
 %% This module implements a riak_test to test the auto_check method
 %% in nextgenrepl ttaaefs, with bi-directional full-sync replication
 %% between the clusters - such that a full-sync in one direction will
 %% prompt repairs in both directions
-
 -module(nextgenrepl_ttaaefs_bicheck).
 -behavior(riak_test).
+
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 
 -define(TEST_BUCKET, <<"repl-aae-fullsync-systest_a">>).
 -define(A_RING, 8).
@@ -105,7 +123,7 @@ confirm() ->
         ?B_RING, ?B_NVAL, ?A_NVAL, pb,
         "cluster_a", cluster_b),
     wait_for_convergence(ClusterA1, ClusterB1),
-    
+
     test_repl_between_clusters(ClusterA1, ClusterB1).
 
 update_cluster(
@@ -113,13 +131,13 @@ update_cluster(
     [Peer1, Peer2, Peer3],
     RingSize, NVal, RemoteNVal, Protocol,
     LocalQueue, RemoteQueue) ->
-    
+
     lager:info("Setup automatic replication between clusters"),
     {Protocol, {IP1, Port1}} = lists:keyfind(Protocol, 1, rt:connection_info(Peer1)),
     {Protocol, {IP2, Port2}} = lists:keyfind(Protocol, 1, rt:connection_info(Peer2)),
     {Protocol, {IP3, Port3}} = lists:keyfind(Protocol, 1, rt:connection_info(Peer3)),
     rt:set_advanced_conf(
-        Node1, 
+        Node1,
         ?REPL_CONFIG(
             RingSize,
             NVal,
@@ -130,7 +148,7 @@ update_cluster(
             LocalQueue,
             RemoteQueue)),
     rt:set_advanced_conf(
-        Node2, 
+        Node2,
         ?REPL_CONFIG(
             RingSize,
             NVal,
@@ -141,7 +159,7 @@ update_cluster(
             LocalQueue,
             RemoteQueue)),
     rt:set_advanced_conf(
-        Node3, 
+        Node3,
         ?REPL_CONFIG(
             RingSize,
             NVal,
@@ -164,9 +182,9 @@ setup_clusters() ->
             {3, ?BASE_CONFIG(?B_RING, ?B_NVAL)}]),
     rt:join_cluster(ClusterA),
     rt:join_cluster(ClusterB),
-    
+
     wait_for_convergence(ClusterA, ClusterB),
-    
+
     lager:info("Ready for test"),
     [ClusterA, ClusterB].
 
@@ -175,7 +193,7 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
 
     NodeA = hd(ClusterA),
     NodeB = hd(ClusterB),
-    
+
     lager:info("Check empty clusters will compare"),
 
     {root_compare, 0} =
@@ -196,14 +214,14 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
         end,
         6,
         10 * 1000),
-    
+
     lager:info("Check clusters with common data will compare"),
 
     {root_compare, 0} =
         rpc:call(NodeA, riak_client, ttaaefs_fullsync, [auto_check]),
     {root_compare, 0} =
         rpc:call(NodeB, riak_client, ttaaefs_fullsync, [auto_check]),
-    
+
     SuspendFun =
         fun(QueueName) ->
             fun(N) ->
@@ -216,7 +234,7 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
                 ok = rpc:call(N, riak_kv_replrtq_src, resume_rtq, [QueueName])
             end
         end,
-    
+
     lager:info("Creating delta whilst queue suspended"),
 
     lists:foreach(SuspendFun(cluster_b), ClusterA),
@@ -230,7 +248,7 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
 
     {clock_compare, 100} =
         rpc:call(NodeA, riak_client, ttaaefs_fullsync, [auto_check]),
-    ok = 
+    ok =
         rt:wait_until(
             fun() ->
                 E = read_from_cluster(NodeB, 101, 200),
@@ -239,7 +257,7 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
             end,
             6,
             10 * 1000),
-    
+
     lager:info("Creating new delta whilst queue suspended"),
 
     lists:foreach(SuspendFun(cluster_b), ClusterA),
@@ -262,10 +280,10 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
             end,
             6,
             10 * 1000),
-    
+
     {root_compare, 0} =
         rpc:call(NodeA, riak_client, ttaaefs_fullsync, [auto_check]),
-    
+
     lager:info(
         "Creating new delta in opposite direction - changes protocol used"),
     lists:foreach(SuspendFun(cluster_a), ClusterB),
@@ -288,7 +306,7 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
             end,
             6,
             10 * 1000),
-    
+
     {root_compare, 0} =
         rpc:call(NodeA, riak_client, ttaaefs_fullsync, [auto_check]),
 
@@ -296,7 +314,7 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
         "Creating new delta through deletion - this will create false delta"),
     lager:info(
         "Where the last modified date is less recent (due to non-rep of del)"),
-    
+
     lists:foreach(SuspendFun(cluster_b), ClusterA),
     delete_from_cluster(NodeA, 1, 100),
     timer:sleep(?REPL_WAIT),
@@ -322,7 +340,7 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
             end,
             6,
             10 * 1000),
-    
+
     lager:info("32 objects resurrected - all will have key amnesia as N=1"),
     lager:info("So 68 unreplicated, and 32 to replicate back"),
     lager:info("Range should be detected, and range_check used, 100 found"),
@@ -368,10 +386,10 @@ write_to_cluster(Node, Start, End, Bucket, NewObj, CVB) ->
     lager:info("Writing ~p keys to node ~p.", [End - Start + 1, Node]),
     lager:warning("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
-    F = 
+    F =
         fun(N, Acc) ->
             Key = key(N),
-            Obj = 
+            Obj =
                 case NewObj of
                     true ->
                         riak_object:new(Bucket,
@@ -406,7 +424,7 @@ read_from_cluster(Node, Start, End) ->
 read_from_cluster(Node, Start, End, Bucket, CommonValBin) ->
     lager:info("Reading ~p keys from node ~p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
-    F = 
+    F =
         fun(N, Acc) ->
             Key = key(N),
             case  riak_client:get(Bucket, Key, C) of
@@ -433,7 +451,7 @@ delete_from_cluster(Node, Start, End) ->
 delete_from_cluster(Node, Start, End, Bucket) ->
     lager:info("Deleting ~p keys from node ~p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
-    F = 
+    F =
         fun(N, Acc) ->
             Key = key(N),
             try riak_client:delete(Bucket, Key, C) of
@@ -452,7 +470,7 @@ delete_from_cluster(Node, Start, End, Bucket) ->
 
 % get_stats(Node) ->
 %     lager:info("Fetching stats from ~w", [Node]),
-%     S = verify_riak_stats:get_stats(Node, ?STATS_WAIT),
+%     S = rt:get_stats(Node, ?STATS_WAIT),
 %     {_, ACT} = lists:keyfind(<<"ttaaefs_allcheck_total">>, 1, S),
 %     {_, DCT} = lists:keyfind(<<"ttaaefs_daycheck_total">>, 1, S),
 %     {_, HCT} = lists:keyfind(<<"ttaaefs_hourcheck_total">>, 1, S),

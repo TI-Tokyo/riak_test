@@ -26,7 +26,7 @@
 
 -export([confirm/0]).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(BUCKET, <<"test-bucket">>).
 
@@ -39,11 +39,6 @@
 
 -define(TRACE_FUNC, "riak_kv_vnode:head/3").
 -define(TRACE_FILES, ["vhc_mixed.trace", "vhc_current.trace"]).
-
-%% redbug:stop/0 isn't synchronous, and trace records take non-zero time to
-%% find their way to the output file, so we sleep a little before stop for
-%% them to get written, then after stop for the service to actually stop.
--define(REDBUG_STOP, timer:sleep(2000), redbug:stop(), timer:sleep(2000)).
 
 confirm() ->
     %% Create a mixed cluster of current and previous
@@ -99,9 +94,7 @@ confirm() ->
     [TraceFile1, TraceFile2] = TraceFiles =
         [filename:join(ScratchDir, FN) || FN <- ?TRACE_FILES],
     %% Make sure the trace files don't exist from some previous run!
-    lists:foreach(fun file:delete/1, TraceFiles),
-
-    RedbugOpts = [{arity, true} | rt_redbug:default_trace_options()],
+    delete_files(TraceFiles),
 
     case OldEnough of
         true ->
@@ -110,12 +103,12 @@ confirm() ->
             %% Pick ONE node to trace, which is the one we'll read on
             TraceNode1 = lists:nth(rand:uniform(4), Nodes),
             lager:info("Tracing on node ~w", [TraceNode1]),
-            redbug:start(?TRACE_FUNC,
-                [{target, TraceNode1}, {print_file, TraceFile1} | RedbugOpts]),
+            ?assertMatch(ok, rt_redbug:trace(TraceNode1, ?TRACE_FUNC,
+                #{arity => true, print_file => TraceFile1})),
 
             ReadRes1 = rt:systest_read(TraceNode1, 1, ?NUM_RECS, ?BUCKET, 2),
 
-            ?REDBUG_STOP,
+            ?assertMatch(ok, rt_redbug:stop()),
 
             ?assertMatch(0, head_cnt(TraceFile1)),
             ?assertMatch([], ReadRes1),
@@ -127,7 +120,7 @@ confirm() ->
             rt:upgrade(OldNode2, NewTag);
         _ ->
             % not OldEnough
-            ok
+        ok
     end,
 
     lists:foreach(
@@ -141,28 +134,39 @@ confirm() ->
     %% Pick ONE node to trace, which is the one we'll read on
     TraceNode2 = lists:nth(rand:uniform(4), Nodes),
     lager:info("Tracing on node ~w", [TraceNode2]),
-    redbug:start(?TRACE_FUNC,
-        [{target, TraceNode2}, {print_file, TraceFile2} | RedbugOpts]),
+    ?assertMatch(ok, rt_redbug:trace(TraceNode2, ?TRACE_FUNC,
+        #{arity => true, print_file => TraceFile2})),
 
     ReadRes2 = rt:systest_read(TraceNode2, 1, ?NUM_RECS, ?BUCKET, 2),
 
-    ?REDBUG_STOP,
+    ?assertMatch(ok, rt_redbug:stop()),
 
     %% one per read (should we count the handle_commands instead?)
     ?assertMatch(?NUM_RECS, head_cnt(TraceFile2)),
     ?assertMatch([], ReadRes2),
 
     %% Only delete trace files on success
-    lists:foreach(fun file:delete/1, TraceFiles),
+    delete_files(TraceFiles),
     pass.
 
 
 head_cnt(File) ->
     lager:info("checking ~p", [File]),
-    {ok, FileData} = file:read_file(File),
-    count_matches(re:run(FileData, "\\b" ?TRACE_FUNC "\\b" , [global])).
+    %% redbug doesn't create the file until it has something to write to it,
+    %% so accommodate non-existence
+    case file:read_file(File) of
+        {ok, FileData} ->
+            Pattern = "\\b" ?TRACE_FUNC "\\b",
+            count_matches(re:run(FileData, Pattern, [global]));
+        Error ->
+            ?assertMatch({error, enoent}, Error),
+            0
+    end.
 
 count_matches(nomatch) ->
     0;
 count_matches({match, Matches}) ->
     length(Matches).
+
+delete_files(Files) ->
+    lists:foreach(fun file:delete/1, Files).

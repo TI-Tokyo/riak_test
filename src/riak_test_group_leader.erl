@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2012 Basho Technologies, Inc.
+%% Copyright (c) 2012-2013 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -20,8 +20,6 @@
 -module(riak_test_group_leader).
 
 -export([new_group_leader/1, group_leader_loop/1, tidy_up/1]).
-
--include("stacktrace.hrl").
 
 % @doc spawns the new group leader
 new_group_leader(Runner) ->
@@ -67,12 +65,12 @@ io_request({put_chars, Chars}) ->
     ok;
 io_request({put_chars, M, F, As}) ->
     try apply(M, F, As) of
-    Chars ->
-        log_chars(Chars), 
-        ok
+        Chars ->
+            log_chars(Chars),
+            ok
     catch
-        ?_exception_(C, T, StackToken) ->
-            {error, {C,T,?_get_stacktrace_(StackToken)}}
+        Class:Reason:StackTrace ->
+            {error, {Class, Reason, StackTrace}}
     end;
 io_request({put_chars, _Enc, Chars}) ->
     io_request({put_chars, Chars});

@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 -module(replication2_console_tests).
--include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 %% This test checks to see if the riak repl *shell script*
 %% communicates it's command line args to riak_repl_console
@@ -118,6 +118,6 @@ confirm() ->
 
 check_cmd(Node, Cmd) ->
     lager:info("Testing riak repl ~s on ~s", [Cmd, Node]),
-    {ok, Out} = rt:riak_repl(Node, [Cmd]),
+    S = string:tokens(Cmd, " "),
+    {ok, Out} = rt:riak_repl(Node, S),
     ?assertEqual("pass", Out).
-

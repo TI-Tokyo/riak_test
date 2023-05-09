@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2012 Basho Technologies, Inc.
+%% Copyright (c) 2012-2016 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -19,10 +19,11 @@
 %% -------------------------------------------------------------------
 
 %% @doc Wrapper for the tests in riak_search/tests/riak_search
+%% @deprecated search is no longer present in Riak 3+
 
 -module(verify_search).
--include_lib("eunit/include/eunit.hrl").
--include("tests/job_enable_common.hrl").
+-include_lib("stdlib/include/assert.hrl").
+-include("job_enable_common.hrl").
 
 -export([confirm/0]).
 %% To run in the possibly remote node
@@ -39,13 +40,13 @@ confirm() ->
 
     Path = rt_config:get(rt_scratch_dir),
     lager:info("Creating scratch dir if necessary at ~s", [Path]),
-    ?assertMatch({0, _}, rt:cmd("mkdir -p " ++ Path)),
+    ?assertMatch({0, _}, rt:cmd("mkdir", ["-p", Path])),
     SearchRepoDir = filename:join(Path, "riak_search"),
     lager:info("Deleting any previous riak_search repo ~s", [SearchRepoDir]),
-    ?assertMatch({0, _}, rt:cmd("rm -rf " ++ SearchRepoDir)),
+    ?assertMatch({0, _}, rt:cmd("rm", ["-rf", SearchRepoDir])),
     lager:info("Cloning riak_search repo within scratch dir"),
-    ?assertMatch({0, _}, rt:cmd("git clone --depth 1 "++?SEARCH_REPO,
-                                 [{cd, Path}])),
+    ?assertMatch({0, _, _}, rt_exec:cmd(
+        "git", Path, ["clone", "--depth", "1", ?SEARCH_REPO], [], string)),
     BaseDir = filename:join([Path, "riak_search", "tests", "riak_search"]),
 
     rt:load_modules_on_nodes([?MODULE], [Node0]),

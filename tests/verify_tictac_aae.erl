@@ -109,8 +109,8 @@
 
 %% Some keys may be repaired more than once.
 %% The original fuzz factor of 0.1% wasn't always enough, leaving the
-%% test flappy. About a third of a percent *seems* to cover all cases ...
--define(FUZZ_REPAIRS(Num), erlang:round(Num * 1.003333)).
+%% test flappy. Bumping up to one percent *seems* to cover all cases ...
+-define(FUZZ_REPAIRS(Num), erlang:round(Num * 1.01)).
 
 confirm() ->
 

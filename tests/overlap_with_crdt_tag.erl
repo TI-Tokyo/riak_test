@@ -17,8 +17,10 @@
 %% -------------------------------------------------------------------
 -module(overlap_with_crdt_tag).
 -behavior(riak_test).
+
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 
 %% We unexpectedly saw in basho_bench testing in an environment where we
 %% were testing handoffs, examples of the error logging for a match between
@@ -33,7 +35,7 @@
 %% should occur
 
 confirm() ->
-    Items    = 50, %% How many test items in each group to write/verify?
+    Items    = 500, %% How many test items in each group to write/verify?
     run_test(Items, 4),
 
     lager:info("Test overlap_with_crdt_tag passed."),
@@ -43,7 +45,7 @@ run_test(Items, NTestNodes) ->
     lager:info("Testing handoff (items ~p, nodes: ~p)", [Items, NTestNodes]),
 
     lager:info("Spinning up test nodes"),
-    [RootNode, FirstJoin, SecondJoin, LastJoin] = Nodes = 
+    [RootNode, FirstJoin, SecondJoin, LastJoin] = Nodes =
         deploy_test_nodes(NTestNodes),
 
     rt:wait_for_service(RootNode, riak_kv),
@@ -75,15 +77,14 @@ run_test(Items, NTestNodes) ->
 
     lager:info("Joining new node with cluster."),
     rt:join(FirstJoin, RootNode),
-    ?assertEqual(ok, rt:wait_until_nodes_ready([RootNode, FirstJoin])),
-    rt:wait_until_no_pending_changes([RootNode, FirstJoin]),
+    check_joined([RootNode, FirstJoin]),
     lager:info("Handoff complete"),
 
     lager:info("Validating data - no siblings"),
     systest_read_binary(FirstJoin, 1, Items, B1, 3, CRDT_Tag, false),
     systest_read_binary(FirstJoin, Items + 1, Items * 2, B2, 3, CRDT_Tag, false),
     systest_read_binary(FirstJoin, Items * 2 + 1, Items * 3, B1, 1, CRDT_Tag, false),
-    
+
     lager:info("Populating sibling data"),
     R1B = systest_write_binary(RootNode, 1, Items, B1, 3, Other_Tag),
     R2B = systest_write_binary(RootNode, Items + 1, Items * 2, B2, 3, Other_Tag),
@@ -98,8 +99,7 @@ run_test(Items, NTestNodes) ->
 
     lager:info("Joining new node with cluster."),
     rt:join(SecondJoin, RootNode),
-    ?assertEqual(ok, rt:wait_until_nodes_ready([RootNode, SecondJoin])),
-    rt:wait_until_no_pending_changes([RootNode, SecondJoin]),
+    check_joined([RootNode, FirstJoin, SecondJoin]),
     lager:info("Handoff complete"),
 
     lager:info("Validating data - siblings"),
@@ -121,8 +121,7 @@ run_test(Items, NTestNodes) ->
 
     lager:info("Joining new node with cluster."),
     rt:join(LastJoin, RootNode),
-    ?assertEqual(ok, rt:wait_until_nodes_ready([RootNode, LastJoin])),
-    rt:wait_until_no_pending_changes([RootNode, SecondJoin, LastJoin]),
+    check_joined([RootNode, FirstJoin, SecondJoin, LastJoin]),
     lager:info("Handoff complete"),
 
     lager:info("Validating data - siblings"),
@@ -169,9 +168,13 @@ assert_using(Node, {CapabilityCategory, CapabilityName}, ExpectedCapabilityName)
 
 %% For some testing purposes, making these limits smaller is helpful:
 deploy_test_nodes(N) ->
-    Config = [{riak_core, [{ring_creation_size, 8},
-                           {handoff_acksync_threshold, 20},
-                           {handoff_receive_timeout, 2000}]}],
+    Config =
+        [{riak_core,
+            [{ring_creation_size, 16},
+            {handoff_acksync_threshold, 1},
+            {handoff_receive_timeout, 30000}]},
+        {riak_kv,
+            [{read_repair_log, true}]}],
     rt:deploy_nodes(N, Config).
 
 systest_write_binary(Node, Start, End, Bucket, W, CommonValBin)
@@ -203,12 +206,21 @@ systest_read_binary(Node, Start, End, Bucket, R, CommonValBin, ExpectSiblings)
 
 systest_read_fold_fun(C, Bucket, R, CommonValBin, ExpectSiblings) ->
     fun(N) ->
-        {ok, RObj} = riak_client:get(Bucket, <<N:32/integer>>, R, C),
+        RObj =
+            case riak_client:get(Bucket, <<N:32/integer>>, R, C) of
+                {ok, Obj} ->
+                    Obj;
+                {error, notfound} ->
+                    lager:warning(
+                        "nofound B=~w K=~w", [Bucket, N]
+                    ),
+                    notfound
+            end,
         check_value(RObj, ExpectSiblings, N, CommonValBin)
     end.
 
 check_value(Obj, ExpectSiblings, N, CommonValBin) ->
-    Val = 
+    Val =
         case ExpectSiblings of
             false ->
                 riak_object:get_value(Obj);
@@ -225,3 +237,8 @@ check_value(Obj, ExpectSiblings, N, CommonValBin) ->
                 FirstV
         end,
     ?assertEqual(<<CommonValBin/binary, N:32/integer>>, Val).
+
+check_joined(Nodes) ->
+    ?assertEqual(ok, rt:wait_until_nodes_ready(Nodes)),
+    ?assertEqual(ok, rt:wait_until_no_pending_changes(Nodes)),
+    ?assertEqual(ok, rt:wait_until_nodes_agree_about_ownership(Nodes)).

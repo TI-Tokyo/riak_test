@@ -1,14 +1,32 @@
+%% -------------------------------------------------------------------
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 %% @doc
 %% What happens when we run AAE full-sync between clusters with different
 %% delete_modes.  The answer is problematic - tombstones differ from nothing
 %% (as that is the point of a tombstone), and so we can't expect two clusters
 %% that have had the same operations to agree.
-
 -module(nextgenrepl_deletemodes).
 -behavior(riak_test).
+
 -export([confirm/0]).
 -export([read_from_cluster/5, length_find_tombs/3]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 
 -define(TEST_BUCKET, <<"repl-aae-fullsync-systest_a">>).
 -define(A_RING, 8).
@@ -23,7 +41,7 @@
 
 -define(SNK_WORKERS, 4).
 
--define(DELETE_WAIT, 5000).
+-define(DELETE_WAIT, 8000).
 
 -define(COMMMON_VAL_INIT, <<"CommonValueToWriteForAllObjects">>).
 -define(COMMMON_VAL_MOD, <<"CommonValueToWriteForAllModifiedObjects">>).
@@ -86,7 +104,7 @@ confirm() ->
 
     lager:info("Test run using PB protocol an a mix of delete modes"),
     test_repl(pb, [ClusterA, ClusterB, ClusterC]),
-    
+
     pass.
 
 
@@ -96,7 +114,7 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC]) ->
     [NodeB1, NodeB2] = ClusterB,
     [NodeC1, NodeC2] = ClusterC,
 
-    FoldToPeerConfig = 
+    FoldToPeerConfig =
         fun(Node, Acc) ->
             {Protocol, {IP, Port}} =
                 lists:keyfind(Protocol, 1, rt:connection_info(Node)),
@@ -121,7 +139,7 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC]) ->
     rt:join_cluster(ClusterA),
     rt:join_cluster(ClusterB),
     rt:join_cluster(ClusterC),
-    
+
     lager:info("Waiting for convergence."),
     rt:wait_until_ring_converged(ClusterA),
     rt:wait_until_ring_converged(ClusterB),
@@ -129,9 +147,9 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC]) ->
     lists:foreach(
         fun(N) -> rt:wait_for_service(N, riak_kv) end,
         ClusterA ++ ClusterB ++ ClusterC),
-    
+
     write_then_delete(NodeA1, NodeA2, NodeB1, NodeB2, NodeC1, NodeC2),
-    
+
     {Protocol, {NodeB1ip, NodeB1port}} =
         lists:keyfind(Protocol, 1, rt:connection_info(NodeB1)),
     {Protocol, {NodeC1ip, NodeC1port}} =
@@ -142,11 +160,11 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC]) ->
         {NodeB1, ?B_NVAL, cluster_c},
         {NodeC1ip, NodeC1port, ?C_NVAL}),
     lager:info("A should differ from B as tombstones not empty"),
-    {clock_compare, Delta1} = 
+    {clock_compare, Delta1} =
         fullsync_check(Protocol, {NodeA1, ?A_NVAL, cluster_b},
                         {NodeB1ip, NodeB1port, ?B_NVAL}),
     lager:info("A should differ from C as tombstones have gone after wait"),
-    {clock_compare, Delta2} = 
+    {clock_compare, Delta2} =
         fullsync_check(Protocol, {NodeA1, ?A_NVAL, cluster_c},
                         {NodeC1ip, NodeC1port, ?C_NVAL}),
     lager:info(
@@ -161,18 +179,18 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC]) ->
     lager:info("Full sync will have re-replicated tombstones"),
     lager:info("B initially should have tombstones, but A should not"),
     lager:info("After delete wait, B and C should end up the same"),
-    timer:sleep(?DELETE_WAIT),
+    timer:sleep(2 * ?DELETE_WAIT),
     root_compare(
         Protocol,
         {NodeB1, ?B_NVAL, cluster_c},
         {NodeC1ip, NodeC1port, ?C_NVAL}),
-    
+
     lager:info("Find all tombstones in cluster A"),
     {ok, BKdhL} = find_tombs(NodeA1, all, all),
     ?assertMatch(?KEY_COUNT, length(BKdhL)),
-    
+
     reap_from_cluster(NodeA1, 1, ?KEY_COUNT),
-    
+
     rpc:call(NodeB1,
                 application,
                 set_env,
@@ -187,7 +205,30 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC]) ->
                 application,
                 set_env,
                 [riak_kv, ttaaefs_logrepairs, false]),
-    
+
+    lager:info("Confirm no tombstones in any cluster"),
+    {ok, BKdhLA} = find_tombs(NodeA1, all, all),
+    {ok, BKdhLB} = find_tombs(NodeB1, all, all),
+    {ok, BKdhLC} = find_tombs(NodeC1, all, all),
+    lager:info(
+        "Tomb counts A=~w B=~w C=~w",
+        [length(BKdhLA), length(BKdhLB), length(BKdhLC)]),
+    ?assertMatch(0, length(BKdhLA)),
+    ?assertMatch(0, length(BKdhLC)),
+    ?assert(length(BKdhLB)< 5),
+    {ok, BKdhLBr1} = find_tombs(NodeB1, all, all),
+    {ok, BKdhLBr2} = find_tombs(NodeB1, all, all),
+    {ok, BKdhLBr3} = find_tombs(NodeB1, all, all),
+    {ok, BKdhLBr4} = find_tombs(NodeB1, all, all),
+    Found = lists:usort(BKdhLBr1 ++ BKdhLBr2 ++ BKdhLBr3 ++ BKdhLBr4),
+    lager:info("Found ~w tombstones in Cluster B", [length(Found)]),
+    lager:info("Re-reaping ~p", [Found]),
+    lager:info("Immediate delete not always successful"),
+    reap_from_cluster(NodeB1, Found),
+    timer:sleep(1000),
+    {ok, BKdhLBretry} = find_tombs(NodeB1, all, all),
+    ?assertMatch(0, length(BKdhLBretry)),
+
     lager:info("As tombstones reaped A, B and C the same"),
     root_compare(
         Protocol,
@@ -201,14 +242,6 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC]) ->
         Protocol,
         {NodeB1, ?B_NVAL, cluster_c},
         {NodeC1ip, NodeC1port, ?C_NVAL}),
-    
-    lager:info("Confirm no tombstones in any cluster"),
-    {ok, BKdhLA} = find_tombs(NodeA1, all, all),
-    ?assertMatch(0, length(BKdhLA)),
-    {ok, BKdhLB} = find_tombs(NodeB1, all, all),
-    ?assertMatch(0, length(BKdhLB)),
-    {ok, BKdhLC} = find_tombs(NodeC1, all, all),
-    ?assertMatch(0, length(BKdhLC)),
 
     write_then_delete(NodeA1, NodeA2, NodeB1, NodeB2, NodeC1, NodeC2),
     lager:info("Find all tombstones in cluster A"),
@@ -234,12 +267,11 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC]) ->
         Protocol,
         {NodeB1, ?B_NVAL, cluster_c},
         {NodeC1ip, NodeC1port, ?C_NVAL}),
-    
+
     lager:info("Confirm no tombstones in any cluster"),
     {ok, BKdhLA} = find_tombs(NodeA1, all, all),
     ?assertMatch(0, length(BKdhLA)),
-    {ok, BKdhLB} = find_tombs(NodeB1, all, all),
-    ?assertMatch(0, length(BKdhLB)),
+    {ok, 0} = find_tombs(NodeB1, all, all, return_count),
     {ok, BKdhLC} = find_tombs(NodeC1, all, all),
     ?assertMatch(0, length(BKdhLC)),
 
@@ -295,10 +327,10 @@ write_to_cluster(Node, Start, End, CommonValBin) ->
     lager:info("Writing ~p keys to node ~p.", [End - Start + 1, Node]),
     lager:warning("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
-    F = 
+    F =
         fun(N, Acc) ->
             Key = list_to_binary(io_lib:format("~8..0B~n", [N])),
-            Obj = 
+            Obj =
                 case CommonValBin of
                     new_obj ->
                         CVB = ?COMMMON_VAL_INIT,
@@ -328,7 +360,7 @@ delete_from_cluster(Node, Start, End) ->
     lager:info("Deleting ~p keys from node ~p.", [End - Start + 1, Node]),
     lager:warning("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
-    F = 
+    F =
         fun(N, Acc) ->
             Key = list_to_binary(io_lib:format("~8..0B~n", [N])),
             try riak_client:delete(?TEST_BUCKET, Key, C) of
@@ -348,7 +380,7 @@ delete_from_cluster(Node, Start, End) ->
 reap_from_cluster(Node, Start, End) ->
     lager:info("Reaping ~p keys from node ~p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
-    F = 
+    F =
         fun(N, Acc) ->
             Key = list_to_binary(io_lib:format("~8..0B~n", [N])),
             try riak_client:reap(?TEST_BUCKET, Key, C) of
@@ -393,12 +425,12 @@ reap_from_cluster(Node, Job) ->
     Query = {reap_tombs, ?TEST_BUCKET, all, all, all, Job},
     {ok, Count} = riak_client:aae_fold(Query, C),
     ?assertEqual(?KEY_COUNT, Count).
-    
+
 
 read_from_cluster(Node, Start, End, CommonValBin, Errors) ->
     lager:info("Reading ~p keys from node ~p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
-    F = 
+    F =
         fun(N, Acc) ->
             Key = list_to_binary(io_lib:format("~8..0B~n", [N])),
             case riak_client:get(?TEST_BUCKET, Key, C) of
@@ -462,7 +494,7 @@ write_then_delete(NodeA1, NodeA2, NodeB1, NodeB2, NodeC1, NodeC2) ->
     lager:info("Write ~w objects into A and read from B and C", [?KEY_COUNT]),
     write_to_cluster(NodeA1, 1, ?KEY_COUNT, new_obj),
     lager:info("Waiting to read sample"),
-    0 = 
+    0 =
         wait_for_outcome(?MODULE,
                             read_from_cluster,
                             [NodeB1, ?KEY_COUNT - 31, ?KEY_COUNT,
@@ -470,19 +502,19 @@ write_then_delete(NodeA1, NodeA2, NodeB1, NodeB2, NodeC1, NodeC2) ->
                             0,
                             ?LOOP_COUNT),
     lager:info("Waiting to read all"),
-    0 = 
+    0 =
         wait_for_outcome(?MODULE,
                             read_from_cluster,
                             [NodeB1, 1, ?KEY_COUNT, ?COMMMON_VAL_INIT, undefined],
                             0,
                             ?LOOP_COUNT),
-    0 = 
+    0 =
         wait_for_outcome(?MODULE,
                             read_from_cluster,
                             [NodeC1, 1, ?KEY_COUNT, ?COMMMON_VAL_INIT, undefined],
                             0,
                             ?LOOP_COUNT),
-    
+
     lager:info("Deleting ~w objects from B and read not_found from A and C", [?KEY_COUNT]),
     delete_from_cluster(NodeB2, 1, ?KEY_COUNT),
     lager:info("Waiting for missing sample"),

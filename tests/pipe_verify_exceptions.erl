@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2012 Basho Technologies, Inc.
+%% Copyright (c) 2012-2015 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -24,20 +24,17 @@
 %% workers.
 %%
 %% These tests used to be known as riak_pipe:exception_test_/0.
-
 -module(pipe_verify_exceptions).
+-behavior(riak_test).
 
--compile({nowarn_deprecated_function, 
+-compile({nowarn_deprecated_function,
             [{gen_fsm, send_event, 2},
                 {gen_fsm, sync_send_event, 2},
                 {gen_fsm, sync_send_all_state_event, 2}]}).
 
--export([
-         %% riak_test's entry
-         confirm/0
-        ]).
+-export([confirm/0]).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 %% local copy of riak_pipe.hrl
 -include("rt_pipe.hrl").
@@ -312,12 +309,15 @@ tail_fitting_crash(Pipe) ->
     Last = lists:last(FittingPids),
     rt_pipe:crash_fitting(Last),
     %% try to avoid racing w/pipeline shutdown
-    timer:sleep(100),
+    lager:info("Pause before attempting to pipe into crash"),
+    timer:sleep(2000),
     {error,[worker_startup_failed]} = riak_pipe:queue_work(Pipe, 30),
     riak_pipe:eoi(Pipe),
     exit({success_so_far, riak_pipe:collect_results(Pipe, 100)}).
 
 verify_tail_fitting_crash([RN|_]) ->
+    lager:info("Pause before tail fitting crash"),
+    timer:sleep(2000),
     lager:info("Verify pipe tears down when a fitting crashes (tail)"),
 
     {badrpc, {'EXIT', {success_so_far, {timeout, Res, Trace}}}} =

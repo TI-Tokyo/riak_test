@@ -19,8 +19,10 @@
 %% -------------------------------------------------------------------
 -module(verify_availability).
 -behavior(riak_test).
+
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 
 -define(CONFIG, [
     %% Turbo mode
@@ -45,7 +47,8 @@ confirm() ->
     [check_is_available(Node, 3, 2) || Node <- Nodes],
     [check_is_available(Node, 3, 3) || Node <- Nodes],
     [check_empty_uncovered_preflists_stat(Node) || Node <- Nodes],
-    %%`
+    [check_empty_uncovered_preflists2_stat(Node) || Node <- Nodes],
+    %%
     %% Stop node1.  We should be available for reads for r=1 and r=2, but not r=3
     %%
     stop_node(Node1, [Node2, Node3, Node4, Node5]),
@@ -53,6 +56,7 @@ confirm() ->
     [check_is_available(Node, 3, 2) || Node <- [Node2, Node3, Node4, Node5]],
     [check_is_not_available(Node, 3, 3) || Node <- [Node2, Node3, Node4, Node5]],
     [check_empty_uncovered_preflists_stat(Node) || Node <- [Node2, Node3, Node4, Node5]],
+    [check_empty_uncovered_preflists2_stat(Node) || Node <- [Node2, Node3, Node4, Node5]],
     %%
     %% Stop node3.  We should only be available for reads for r=1
     %%
@@ -61,6 +65,7 @@ confirm() ->
     [check_is_not_available(Node, 3, 2) || Node <- [Node2, Node4, Node5]],
     [check_is_not_available(Node, 3, 3) || Node <- [Node2, Node4, Node5]],
     [check_empty_uncovered_preflists_stat(Node) || Node <- [Node2, Node4, Node5]],
+    [check_nonempty_uncovered_preflists2_stat(Node) || Node <- [Node2, Node4, Node5]],
     %%
     %% Stop node5.  We should _still_ only be available for reads for r=1
     %%
@@ -69,6 +74,7 @@ confirm() ->
     [check_is_not_available(Node, 3, 2) || Node <- [Node2, Node4]],
     [check_is_not_available(Node, 3, 3) || Node <- [Node2, Node4]],
     [check_empty_uncovered_preflists_stat(Node) || Node <- [Node2, Node4]],
+    [check_nonempty_uncovered_preflists2_stat(Node) || Node <- [Node2, Node4]],
     %%
     %% Stop node5.  We should be unavailable for all r values <= 3.
     %%
@@ -77,6 +83,7 @@ confirm() ->
     [check_is_not_available(Node, 3, 2) || Node <- [Node2]],
     [check_is_not_available(Node, 3, 3) || Node <- [Node2]],
     [check_nonempty_uncovered_preflists_stat(Node) || Node <- [Node2]],
+    [check_nonempty_uncovered_preflists2_stat(Node) || Node <- [Node2]],
     %%
     %% Restart all the nodes we stopped
     %%
@@ -92,6 +99,7 @@ confirm() ->
     [check_is_available(Node, 3, 2) || Node <- Nodes],
     [check_is_available(Node, 3, 3) || Node <- Nodes],
     [check_empty_uncovered_preflists_stat(Node) || Node <- Nodes],
+    [check_empty_uncovered_preflists2_stat(Node) || Node <- Nodes],
     %%
     %% dun
     %%
@@ -142,6 +150,19 @@ check_empty_uncovered_preflists_stat(Node) ->
     end,
     rt:wait_until(F).
 
+check_empty_uncovered_preflists2_stat(Node) ->
+    F = fun() ->
+        lager:info("Checking ~p for empty uncovered preflist2s stat", [Node]),
+        case get_uncovered_preflists2_stat(Node) of
+            [] ->
+                true;
+            Other ->
+                lager:warning("Expected empty uncovered preflists2 on node ~p, but got ~p", [Node, Other]),
+                false
+        end
+    end,
+    rt:wait_until(F).
+
 check_nonempty_uncovered_preflists_stat(Node) ->
     F = fun() ->
         lager:info("Checking ~p for non-empty uncovered preflists stat", [Node]),
@@ -155,13 +176,28 @@ check_nonempty_uncovered_preflists_stat(Node) ->
     end,
     rt:wait_until(F).
 
+check_nonempty_uncovered_preflists2_stat(Node) ->
+    F = fun() ->
+        lager:info("Checking ~p for non-empty uncovered preflists2 stat", [Node]),
+        case get_uncovered_preflists2_stat(Node) of
+            L when is_list(L) andalso erlang:length(L) > 0 ->
+                true;
+            Other ->
+                lager:warning("Expected non-empty uncovered preflists2 on node ~p, but got ~p", [Node, Other]),
+                false
+        end
+    end,
+    rt:wait_until(F).
+
 get_uncovered_preflists(Node, NVal, Min) ->
     UpNodes = riak_core_util:safe_rpc(Node, riak_core_node_watcher, nodes, [riak_kv]),
     riak_core_util:safe_rpc(Node, riak_core_ring_util, uncovered_preflists, [UpNodes, NVal, Min]).
 
 get_uncovered_preflists_stat(Node) ->
-    Stats = rt:get_stats(Node),
-    proplists:get_value(<<"uncovered_preflists">>, Stats).
+    rt:get_stat(Node, <<"uncovered_preflists">>).
+
+get_uncovered_preflists2_stat(Node) ->
+    rt:get_stat(Node, <<"uncovered_preflists2">>).
 
 wait_until_node_watcher_converges(Node, ExpectedNodes) ->
     ExpectedSet = sets:from_list(ExpectedNodes),

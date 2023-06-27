@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2018-2022 Workday, Inc.
+%% Copyright (c) 2018-2023 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -17,9 +17,7 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(rt_kv_worker_proc).
-
-%%
+%% @doc
 %% This module defines a named process (rt_kv_worker_proc), which is designed to work
 %% in tandem with the riak_kv_worker intercept.
 %%
@@ -28,28 +26,59 @@
 %% callbacks into this process, which can maintain state information at the
 %% start and stop points, and test various conditions during or after this process
 %% has run.
-%%
+%% @end
+-module(rt_kv_worker_proc).
 
 -export([
     add_intercept/1,
     start_link/0,
     start_link/1,
     stop/0,
-    wait_until_work_completed/0,
-    wait_until_work_completed/1
+    stop/1
 ]).
 
--type accum() :: term().
+%% Spawned process entry
+-export([
+    start_loop/1
+]).
+
+-export_type([
+    accum/0,
+    node_pid/0,
+    result/0,
+    started_callback/0,
+    completed_callback/0,
+    opts/0
+]).
+
+-include_lib("stdlib/include/assert.hrl").
+
+-define(SVC_NAME,           ?MODULE).
+-define(SVC_MSG(Content),   {?SVC_NAME, Content}).
+-define(DEFAULT_TIMEOUT,    60000).
+
+-type accum()               :: term().
+-type node_pid()            :: {node(), pid()}.
+-type result()              :: ok | {error, term()}.
+-type started_callback()    :: fun((node_pid(), accum()) -> accum()).
+-type completed_callback()  :: fun((node_pid(), accum()) -> {result(), accum()}).
+-type opts()                :: list(
+    {started_callback,          started_callback()} |
+    {completed_callback,        completed_callback()} |
+    {num_expected_completions,  pos_integer()} |
+    {accum,                     accum()} |
+    {timeout,                   rtt:millisecs()}
+).
 
 -record(state, {
-    rt_proc                                 :: pid(),
-    started_callback                        :: fun(),
-    completed_callback                      :: fun(),
-    num_completions = 0                     :: pos_integer(),
-    num_expected_completions                :: pos_integer(),
-    current_work = sets:new()               :: any(),
-    accum                                   :: accum(),
-    timeout                                 :: pos_integer()
+    rt_proc                     :: pid(),
+    started_callback            :: started_callback(),
+    completed_callback          :: completed_callback(),
+    num_completions             :: non_neg_integer(),
+    num_expected_completions    :: pos_integer() | undefined,
+    current_work                :: sets:set(),
+    accum                       :: accum(),
+    timeout                     :: rtt:millisecs()
 }).
 
 %% @doc Add the requisite riak_kv_worker intercepts to the selected node/s.
@@ -65,87 +94,87 @@ add_intercept(Node) when is_atom(Node) ->
 add_intercept(Nodes) ->
     [add_intercept(Node) || Node <- Nodes].
 
-%% @doc effects start_link([])
+%% @doc Start the rt_kv_worker_proc
+%% @equiv start_link([])
+-spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
     start_link([]).
 
--type opts() :: [{atom(), term()}].
-
 %% @doc Start the rt_kv_worker_proc
-%% TODO doc options
--spec start_link(opts()) -> {ok, pid()}.
+%% @todo doc options
+-spec start_link(opts()) -> {ok, pid()} | {error, term()}.
 start_link(Opts) ->
     StartedCallback = proplists:get_value(started_callback, Opts, fun no_op_started/2),
     CompletedCallback = proplists:get_value(completed_callback, Opts, fun no_op_completed/2),
     NumExpectedCompletions = proplists:get_value(num_expected_completions, Opts, undefined),
     Accum = proplists:get_value(accum, Opts, undefined),
-    Timeout = proplists:get_value(timeout, Opts, infinity),
-    Self = self(),
+    Timeout = case proplists:get_value(timeout, Opts) of
+        undefined ->
+            rt_config:get(rt_max_wait_time);
+        Val ->
+            Val
+    end,
+    RTProc = erlang:self(),
     State = #state{
-        rt_proc = Self,
+        rt_proc = RTProc,
         started_callback = StartedCallback,
         completed_callback = CompletedCallback,
+        num_completions = 0,
         num_expected_completions = NumExpectedCompletions,
+        current_work = sets:new(),
         accum = Accum,
         timeout = Timeout
     },
-    Pid = spawn_link(fun() -> start_loop(State) end),
-    yes = global:register_name(?MODULE, Pid),
-    receive ok -> {ok, Pid} end.
-
-%% @doc effects stop(60000)
--spec stop() -> accum().
-stop() ->
-    stop(60000).
+    Pid = erlang:spawn_link(?MODULE, start_loop, [State]),
+    receive
+        {ok, Pid} = Result ->
+            yes = global:register_name(?SVC_NAME, Pid),
+            Result
+    after
+        ?DEFAULT_TIMEOUT ->
+            erlang:exit(Pid, kill),
+            {error, timeout}
+    end.
 
 %% @doc stop the rt_kv_worker_proc and return the current app state
--spec stop(Timeout::pos_integer()) -> accum().
+%% @equiv stop(60000)
+-spec stop() -> accum() | {error, term()}.
+stop() ->
+    stop(?DEFAULT_TIMEOUT).
+
+%% @doc stop the rt_kv_worker_proc and return the current app state
+-spec stop(Timeout :: rtt:millisecs()) -> accum() | {error, term()}.
 stop(Timeout) ->
-    _Pid = global:send(?MODULE, stop),
+    _ = global:send(?SVC_NAME, ?SVC_MSG(stop)),
     receive
-        Accum ->
-            global:unregister_name(?MODULE),
-            Accum
-    after Timeout ->
-        {error, timeout}
-    end.
-
-%% @doc effects wait_until_work_completed(60000)
--spec wait_until_work_completed() -> {ok, accum()} | {error, term()}.
-wait_until_work_completed() ->
-    wait_until_work_completed(60000).
-
-%% @doc wait until all expected work has completed, and complete the app state, if
-%% all work has completed as expected; otherwise, return an error.
--spec wait_until_work_completed(Timeout::pos_integer()) -> {ok, accum()} | {error, term()}.
-wait_until_work_completed(Timeout) ->
-    receive
-        X -> X
-    after Timeout ->
-        {error, timeout}
+        ?SVC_MSG(Result) ->
+            _ = global:unregister_name(?SVC_NAME),
+            Result
+    after
+        Timeout ->
+            {error, timeout}
     end.
 
 %%
-%% internal functions
+%% spawned process
 %%
 
-%% @private
-start_loop(State) ->
-    State#state.rt_proc ! ok,
+%% @hidden
+start_loop(#state{rt_proc = RTProc} = State) ->
+    RTProc ! {ok, erlang:self()},
     loop(State).
 
-%% @private
-loop(State) ->
-    #state{
-        rt_proc=RTProc,
-        current_work=CurrentWork,
-        started_callback=StartedCallback,
-        completed_callback=CompletedCallback,
-        num_completions=NumCompletions,
-        num_expected_completions=NumExpectedCompletions,
-        accum=Accum,
-        timeout=Timeout
-    } = State,
+%% @hidden
+loop(#state{
+        rt_proc = RTProc,
+        current_work = CurrentWork,
+        started_callback = StartedCallback,
+        completed_callback = CompletedCallback,
+        num_completions = NumCompletions,
+        num_expected_completions = NumExpectedCompletions,
+        accum = Accum,
+        timeout = Timeout
+    } = State) ->
     receive
         {work_started, {Node, Ref}, Pid} ->
             Accum1 = StartedCallback({Node, Pid}, Accum),
@@ -164,11 +193,12 @@ loop(State) ->
                         ok ->
                             %% what to do next...
                             NewWork = sets:del_element(NodePid, CurrentWork),
-                            case {NumCompletions + 1, sets:to_list(NewWork)} of
-                                {NumExpectedCompletions, []} ->
-                                    RTProc ! {ok, Accum1};
+                            case {NumCompletions + 1, sets:is_empty(NewWork)} of
+                                {NumExpectedCompletions, true} ->
+                                    exit_loop(RTProc, {ok, Accum1});
                                 {NumExpectedCompletions, _} ->
-                                    RTProc ! {error, more_completions_than_expected};
+                                    exit_loop(RTProc,
+                                        {error, more_completions_than_expected});
                                 _ ->
                                     loop(State#state{
                                         current_work = NewWork,
@@ -177,16 +207,32 @@ loop(State) ->
                                     )
                             end;
                         _ ->
-                            RTProc ! {error, {unexpected_result, Result}}
+                            exit_loop(RTProc,
+                                {error, {unexpected_result, Result}})
                     end;
                 _ ->
-                    RTProc ! {error, {not_found, {Node, Pid}}}
+                    exit_loop(RTProc, {error, {not_found, {Node, Pid}}})
             end;
-        stop ->
-            RTProc ! {ok, Accum}
-    after Timeout ->
-        RTProc ! {error, timeout}
+        ?SVC_MSG(stop) ->
+            exit_loop(RTProc, {ok, Accum})
+    after
+        Timeout ->
+            exit_loop(RTProc, {error, timeout})
     end.
 
+%% @hidden
+exit_loop(Dest, Msg) ->
+    Dest ! ?SVC_MSG(Msg),
+    ok.
+
+%%
+%% default callbacks
+%%
+
+%% @hidden
+-spec no_op_started(node_pid(), accum()) -> accum().
 no_op_started(_NodePair, Accum) -> Accum.
+
+%% @hidden
+-spec no_op_completed(node_pid(), accum()) -> {result(), accum()}.
 no_op_completed(_NodePair, Accum) -> {ok, Accum}.

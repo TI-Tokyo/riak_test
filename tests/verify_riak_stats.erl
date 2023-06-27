@@ -160,15 +160,15 @@ confirm() ->
     rt:pbc_set_bucket_prop(Pid, <<"testbucket">>, [{n_val, 4}]),
 
     Stats5 = get_stats(Node1),
-    verify_inc(Stats3, Stats5, [{<<"read_repairs_total">>, 0},
-                                {<<"read_repairs">>, 0}]),
+    verify_inc(Stats3, Stats5, [
+        {<<"read_repairs_total">>, 0}, {<<"read_repairs">>, 0}]),
 
     _Value = rt:pbc_read(Pid, <<"testbucket">>, <<"1">>),
 
     Stats6 = get_stats(Node1),
 
-    verify_inc(Stats3, Stats6, [{<<"read_repairs_total">>, 1},
-                                {<<"read_repairs">>, 1}]),
+    verify_inc(Stats3, Stats6, [
+        {<<"read_repairs_total">>, 1}, {<<"read_repairs">>, 1}]),
 
     _ = do_datatypes(Pid),
 
@@ -190,13 +190,14 @@ confirm() ->
 
     pass.
 
-verify_inc(Prev, Props, Keys) ->
-    [begin
-        Old = proplists:get_value(Key, Prev, 0),
-        New = proplists:get_value(Key, Props, 0),
-        lager:info("~s: ~p -> ~p (expected ~p)", [Key, Old, New, Old + Inc]),
-        ?assertEqual(New, (Old + Inc))
-    end || {Key, Inc} <- Keys].
+verify_inc(Prev, Props, [{Key, Inc} | KeyIncs]) ->
+    Old = proplists:get_value(Key, Prev, 0),
+    New = proplists:get_value(Key, Props, 0),
+    lager:info("~s: ~p -> ~p (expected ~p)", [Key, Old, New, Old + Inc]),
+    ?assertEqual({Key, New}, {Key, (Old + Inc)}),
+    verify_inc(Prev, Props, KeyIncs);
+verify_inc(_Prev, _Props, []) ->
+    ok.
 
 verify_nz(Props, Keys) ->
     [?assertNotEqual(proplists:get_value(Key, Props, 0), 0) || Key <- Keys].
@@ -958,6 +959,7 @@ common_stats() ->
         <<"sys_wordsize">>,
         <<"syslog_version">>,
         <<"uncovered_preflists">>,
+        <<"uncovered_preflists2">>,
         <<"vnode_counter_update">>,
         <<"vnode_counter_update_time_100">>,
         <<"vnode_counter_update_time_95">>,

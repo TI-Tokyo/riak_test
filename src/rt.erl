@@ -3172,12 +3172,21 @@ get_stats(Node, WaitBeforeMS)
     timer:sleep(WaitBeforeMS),
     get_stats(Node).
 
-get_stat(Node, Key) when is_atom(Node) ->
-    Stats = get_stats(Node),
-    get_stat(Stats, Key);
+-spec get_stat(
+    NodeOrStats :: node() | nonempty_list({binary(), term()}),
+    Key :: atom() | binary() | nonempty_string() )
+        -> term().
+get_stat(Node, Key) when erlang:is_atom(Node) ->
+    get_stat(get_stats(Node), Key);
+get_stat([_|_] = Stats, Key)
+        when erlang:is_binary(Key) andalso erlang:size(Key) > 0 ->
+    proplists:get_value(Key, Stats);
+get_stat([_|_] = Stats, Key) when erlang:is_atom(Key) ->
+    get_stat(Stats, erlang:atom_to_list(Key));
+get_stat([_|_] = Stats, [_|_] = Key) ->
+    get_stat(Stats, erlang:list_to_binary(Key));
 get_stat(Stats, Key) ->
-    proplists:get_value(list_to_binary(atom_to_list(Key)), Stats).
-
+    erlang:error(badarg, [Stats, Key]).
 
 expected_stat_values(Node, NameExpectedValues) ->
     Stats = get_stats(Node),

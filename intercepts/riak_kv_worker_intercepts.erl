@@ -57,7 +57,11 @@ handle_work_handoff_intercept({fold, FoldFun, FinishFun}, Sender, State) ->
         Ref = erlang:make_ref(),
         catch global:send(rt_kv_worker_proc, {work_started, {node(), Ref}, self()}),
         receive
-            {Ref, ok} -> ok
+            {Ref, ok} -> 
+                ok
+            after 1000 ->
+                lager:warning("Timed out waiting for ok from rt_kv_worker_proc during start"),
+                timeout
         end,
         FoldFun()
     end,
@@ -66,6 +70,9 @@ handle_work_handoff_intercept({fold, FoldFun, FinishFun}, Sender, State) ->
         catch global:send(rt_kv_worker_proc, {work_completed, {node(), Ref}, self()}),
         receive
             {Ref, ok} -> ok
+        after 1000 ->
+            lager:warning("Timed out waiting for ok from rt_kv_worker_proc during complete"),
+            timeout
         end,
         FinishFun(X)
     end,

@@ -1,18 +1,37 @@
+%% -------------------------------------------------------------------
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 %% @doc
 %% What happens when we run AAE full-sync between clusters with different
 %% delete_modes.  The answer is problematic - tombstones differ from nothing
 %% (as that is the point of a tombstone), and so we can't expect two clusters
 %% that have had the same operations to agree.
-
 -module(nextgenrepl_deletewithfailure).
 -behavior(riak_test).
+
 -export([confirm/0]).
 -export([read_from_cluster/5,
             aae_fold/3,
             length_aae_fold/3,
             wait_for_outcome/5,
             write_to_cluster/4]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(TEST_BUCKET, <<"repl-aae-fullsync-systest_del">>).
 -define(A_RING, 32).
@@ -22,7 +41,7 @@
 
 -define(KEY_COUNT, 10000).
 -define(UPDATE_COUNT, 2000).
--define(LOOP_COUNT, 20).
+-define(LOOP_COUNT, 16).
 -define(ACTION_DELAY, 2000).
 
 -define(SNK_WORKERS, 4).
@@ -84,7 +103,7 @@ confirm() ->
             {5, ?CONFIG(?A_RING, ?A_NVAL, keep)},
             {1, ?CONFIG(?B_RING, ?B_NVAL, immediate)}]),
 
-    
+
     test_repl(pb, [ClusterAP, ClusterBP]),
 
     rt:clean_cluster(ClusterAP),
@@ -96,18 +115,18 @@ confirm() ->
             {1, ?CONFIG(?B_RING, ?B_NVAL, immediate)}]),
 
     test_repl(http, [ClusterAH, ClusterBH]),
-    
+
     pass.
 
 
 test_repl(Protocol, [ClusterA, ClusterB]) ->
-    lager:info("Test run using ~w protocol an a mix of delete modes",
+    ?LOG_INFO("Test run using ~0p protocol an a mix of delete modes",
                 [Protocol]),
 
     [NodeA1, NodeA2, NodeA3, NodeA4, NodeA5] = ClusterA,
     [NodeB1] = ClusterB,
 
-    FoldToPeerConfig = 
+    FoldToPeerConfig =
         fun(Node, Acc) ->
             {Protocol, {IP, Port}} =
                 lists:keyfind(Protocol, 1, rt:connection_info(Node)),
@@ -129,14 +148,14 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
 
     rt:join_cluster(ClusterA),
     rt:join_cluster(ClusterB),
-    
-    lager:info("Waiting for convergence."),
+
+    ?LOG_INFO("Waiting for convergence."),
     rt:wait_until_ring_converged(ClusterA),
     rt:wait_until_ring_converged(ClusterB),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end,
                     ClusterA ++ ClusterB),
-    
-    lager:info("Wait for compare between empty clusters"),
+
+    ?LOG_INFO("Wait for compare between empty clusters"),
     timer:sleep(10000),
     {Protocol, {_NodeA1ip, _NodeA1port}} =
         lists:keyfind(Protocol, 1, rt:connection_info(NodeA1)),
@@ -146,8 +165,8 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
         fullsync_check(Protocol,
                         {NodeA1, ?A_NVAL, cluster_a},
                         {NodeB1ip, NodeB1port, ?B_NVAL}),
-    
-    lager:info("Initial data load and delete"),
+
+    ?LOG_INFO("Initial data load and delete"),
     SW0A = os:timestamp(),
     timer:sleep(?ACTION_DELAY),
     write_then_delete(NodeA1, NodeB1, 1, ?KEY_COUNT),
@@ -159,6 +178,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
     write_then_delete(NodeA1, NodeB1, ?KEY_COUNT + 1, ?KEY_COUNT * 2),
     timer:sleep(?ACTION_DELAY),
     SW1B = os:timestamp(),
+    timer:sleep(?ACTION_DELAY),
 
     {ok, K0} = aae_fold(NodeA1,
                         Protocol,
@@ -167,7 +187,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             {ts_epoch(SW0A), ts_epoch(SW0B)},
                             count}),
-    lager:info("Counted ~w active keys on A1 from first time range", [K0]),
+    ?LOG_INFO("Counted ~b active keys on A1 from first time range", [K0]),
     {ok, K1} = aae_fold(NodeA1,
                         Protocol,
                         {erase_keys,
@@ -175,7 +195,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             {ts_epoch(SW1A), ts_epoch(SW1B)},
                             count}),
-    lager:info("Counted ~w active keys on A1 from second time range", [K1]),
+    ?LOG_INFO("Counted ~b active keys on A1 from second time range", [K1]),
     {ok, KA} = aae_fold(NodeA1,
                         Protocol,
                         {erase_keys,
@@ -183,7 +203,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             all,
                             count}),
-    lager:info("Counted ~w active keys on A1 all time", [KA]),
+    ?LOG_INFO("Counted ~b active keys on A1 all time", [KA]),
     {ok, T0} = aae_fold(NodeA1,
                         Protocol,
                         {reap_tombs,
@@ -191,7 +211,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             {ts_epoch(SW0A), ts_epoch(SW0B)},
                             count}),
-    lager:info("Counted ~w tombs on A1 from first time range", [T0]),
+    ?LOG_INFO("Counted ~b tombs on A1 from first time range", [T0]),
     {ok, T1} = aae_fold(NodeA1,
                         Protocol,
                         {reap_tombs,
@@ -199,7 +219,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             {ts_epoch(SW1A), ts_epoch(SW1B)},
                             count}),
-    lager:info("Counted ~w tombs on A1 from second time range", [T1]),
+    ?LOG_INFO("Counted ~b tombs on A1 from second time range", [T1]),
     {ok, TA} = aae_fold(NodeA1,
                         Protocol,
                         {reap_tombs,
@@ -207,7 +227,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             all,
                             count}),
-    lager:info("Counted ~w tombs on A1 all time", [TA]),
+    ?LOG_INFO("Counted ~0p tombs on A1 all time", [TA]),
     {ok, KB} = aae_fold(NodeB1,
                         Protocol,
                         {erase_keys,
@@ -215,7 +235,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             all,
                             count}),
-    lager:info("Counted ~w active keys on B1 all time", [KB]),
+    ?LOG_INFO("Counted ~0p active keys on B1 all time", [KB]),
     {ok, {keys, TBL}} = aae_fold(NodeB1,
                         Protocol,
                         {find_tombs,
@@ -223,28 +243,28 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             all}),
     TB = length(TBL),
-    lager:info("Counted ~w tombs on B1 all time", [TB]),
+    ?LOG_INFO("Counted ~0p tombs on B1 all time", [TB]),
     {ok, {keys, SKLA0}} = aae_fold(NodeA1,
                                     Protocol,
-                                    {find_keys, 
+                                    {find_keys,
                                         ?TEST_BUCKET, all,
                                         {ts_epoch(SW0A), ts_epoch(SW0B)},
                                         {sibling_count, 1}}),
-    lager:info("Counted ~w siblings on A1 - first timerange", [length(SKLA0)]),
+    ?LOG_INFO("Counted ~0p siblings on A1 - first timerange", [length(SKLA0)]),
     {ok, {keys, SKLA1}} = aae_fold(NodeA1,
                                     Protocol,
-                                    {find_keys, 
+                                    {find_keys,
                                         ?TEST_BUCKET, all,
                                         {ts_epoch(SW1A), ts_epoch(SW1B)},
                                         {sibling_count, 1}}),
-    lager:info("Counted ~w siblings on A1 - second timerange", [length(SKLA1)]),
+    ?LOG_INFO("Counted ~0p siblings on A1 - second timerange", [length(SKLA1)]),
     {ok, {keys, SKLB}} = aae_fold(NodeB1,
                                     Protocol,
-                                    {find_keys, 
+                                    {find_keys,
                                         ?TEST_BUCKET, all,
                                         all,
                                         {sibling_count, 1}}),
-    lager:info("Counted ~w siblings on B1", [length(SKLB)]),
+    ?LOG_INFO("Counted ~0p siblings on B1", [length(SKLB)]),
     KeyCount0 = 2 * ?UPDATE_COUNT, %% 2 lots of updates in each time period
     TombCount0 = ?KEY_COUNT - KeyCount0,
 
@@ -266,7 +286,9 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
     {EK0, 2} = lists:last(SKLA0),
     [{SK1, 2}|_RestA1] = SKLA1,
     {EK1, 2} = lists:last(SKLA1),
-    lager:info("Erasing partial delete siblings from Node"),
+    ?LOG_INFO(
+        "Erasing partial delete siblings from Node ~0p ~0p - local",
+        [SK0, EK0]),
     {ok, EraseCount0} =
         aae_fold(NodeA1,
                     Protocol,
@@ -275,6 +297,9 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                         all,
                         {ts_epoch(SW0A), ts_epoch(SW0B)},
                         local}),
+    ?LOG_INFO(
+        "Erasing partial delete siblings from Node ~0p ~0p - job",
+        [SK1, EK1]),
     {ok, EraseCount1} =
         aae_fold(NodeA1,
                     Protocol,
@@ -283,12 +308,12 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                         all,
                         {ts_epoch(SW1A), ts_epoch(SW1B)},
                         {job, 1}}),
-    lager:info("re-counting siblings until there are none"),
+    ?LOG_INFO("re-counting siblings until there are none"),
     0 = wait_for_outcome(?MODULE,
                             length_aae_fold,
                             [NodeA1,
                                 Protocol,
-                                {find_keys, 
+                                {find_keys,
                                     ?TEST_BUCKET, all, all,
                                     {sibling_count, 1}}],
                                 0,
@@ -297,14 +322,14 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             length_aae_fold,
                             [NodeB1,
                                 Protocol,
-                                {find_keys, 
+                                {find_keys,
                                     ?TEST_BUCKET, all, all,
                                     {sibling_count, 1}}],
                                 0,
                                 ?LOOP_COUNT),
     ?assertEqual(?UPDATE_COUNT, EraseCount0),
     ?assertEqual(?UPDATE_COUNT, EraseCount1),
-    
+
     {ok, TombCount0} =
         aae_fold(NodeA1,
                     Protocol,
@@ -319,8 +344,13 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                         ?TEST_BUCKET, all, all,
                         {ts_epoch(SW1A), ts_epoch(SW1B)},
                         local}),
+    ?LOG_INFO("Reaped ~0p tombs from first time range", [TombCount0]),
+    ?LOG_INFO("Reaped ~0p tombs from second time range", [TombCount1]),
 
     ExpectedEC = EraseCount0 + EraseCount1,
+    ?LOG_INFO(
+        "EraseCount0 ~0p EraseCount1 ~0p expected tombs ~0p",
+        [EraseCount0, EraseCount1, ExpectedEC]),
     {ok, ExpectedEC} =
         wait_for_outcome(?MODULE,
                             aae_fold,
@@ -351,14 +381,14 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                     {erase_keys,
                         ?TEST_BUCKET, all, all, all,
                         count}),
-    lager:info("Cluster A has ~w keys and ~w tombs at Phase 1 exit",
+    ?LOG_INFO("Cluster A has ~0p keys and ~0p tombs at Phase 1 exit",
                     [Phase1KeyCount, ExpectedEC]),
-    
+
     rt:stop_and_wait(NodeA5),
     timer:sleep(2000),
         % There's no pre-built function to confirm all is stable after this
         % but it should be stable soon after - so sleep
-    lager:info("Node 5 has stopped in Cluster A"),
+    ?LOG_INFO("Node 5 has stopped in Cluster A"),
     {ok, Phase2TombCountS1} =
         aae_fold(NodeA1,
                     Protocol,
@@ -399,7 +429,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             undefined,
                             ?LOOP_COUNT),
 
-    lager:info("After reap/erase during fail - tombs ~w keys ~w",
+    ?LOG_INFO("After reap/erase during fail - tombs ~0p keys ~0p",
                 [Phase2TombCountS2, Phase2KeyCountS2]),
     ?assertMatch(true, Phase2TombCountS2 > 0),
     ?assertMatch(true, Phase2KeyCountS2 == 0),
@@ -409,7 +439,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
     ?assertMatch(true, Phase2KeyCountS2 < Phase2KeyCountS1),
 
     rt:start_and_wait(NodeA5),
-    lager:info("Node 5 has re-started in Cluster A"),
+    ?LOG_INFO("Node 5 has re-started in Cluster A"),
 
     {ok, Phase1KeyCount} =
         wait_for_outcome(?MODULE,
@@ -433,7 +463,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             {ok, 0},
                             ?LOOP_COUNT),
         %% All deletes eventually happen
-    
+
     {ok, KB3} = aae_fold(NodeB1,
                             Protocol,
                             {erase_keys, ?TEST_BUCKET, all, all, all, count}),
@@ -483,14 +513,14 @@ aae_fold(Node, Protocol, Query) ->
 
 %% @doc Write a series of keys and ensure they are all written.
 write_to_cluster(Node, Start, End, CommonValBin) ->
-    lager:info("Writing ~p keys to node ~p.", [End - Start + 1, Node]),
-    lager:warning("Note that only utf-8 keys are used"),
+    ?LOG_INFO("Writing ~0p keys to node ~0p.", [End - Start + 1, Node]),
+    ?LOG_WARNING("Note that only utf-8 keys are used"),
     PB = rt:pbc(Node),
     B = ?TEST_BUCKET,
-    F = 
+    F =
         fun(N, Acc) ->
-            Key = list_to_binary(io_lib:format("~8..0B~n", [N])),
-            Obj = 
+            Key = list_to_binary(io_lib:format("~8..0B", [N])),
+            Obj =
                 case CommonValBin of
                     new_obj ->
                         CVB = ?COMMMON_VAL_INIT,
@@ -519,16 +549,16 @@ write_to_cluster(Node, Start, End, CommonValBin) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    lager:warning("~p errors while writing: ~p", [length(Errors), Errors]),
+    ?LOG_WARNING("~0p errors while writing: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 delete_from_cluster(Node, Start, End) ->
-    lager:info("Deleting ~p keys from node ~p.", [End - Start + 1, Node]),
-    lager:warning("Note that only utf-8 keys are used"),
+    ?LOG_INFO("Deleting ~0p keys from node ~0p.", [End - Start + 1, Node]),
+    ?LOG_WARNING("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
-    F = 
+    F =
         fun(N, Acc) ->
-            Key = list_to_binary(io_lib:format("~8..0B~n", [N])),
+            Key = list_to_binary(io_lib:format("~8..0B", [N])),
             try riak_client:delete(?TEST_BUCKET, Key, C) of
                 ok ->
                     Acc;
@@ -540,15 +570,15 @@ delete_from_cluster(Node, Start, End) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    lager:warning("~p errors while deleting: ~p", [length(Errors), Errors]),
+    ?LOG_WARNING("~0p errors while deleting: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 read_from_cluster(Node, Start, End, CommonValBin, Errors) ->
-    lager:info("Reading ~p keys from node ~p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Reading ~0p keys from node ~0p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
-    F = 
+    F =
         fun(N, Acc) ->
-            Key = list_to_binary(io_lib:format("~8..0B~n", [N])),
+            Key = list_to_binary(io_lib:format("~8..0B", [N])),
             case riak_client:get(?TEST_BUCKET, Key, C) of
                 {ok, Obj} ->
                     ExpectedVal = <<N:32/integer, CommonValBin/binary>>,
@@ -565,7 +595,7 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors) ->
     ErrorsFound = lists:foldl(F, [], lists:seq(Start, End)),
     case Errors of
         undefined ->
-            lager:info("Errors Found in read_from_cluster ~w",
+            ?LOG_INFO("Errors Found in read_from_cluster ~0p",
                         [length(ErrorsFound)]),
             length(ErrorsFound);
         _ ->
@@ -582,7 +612,7 @@ wait_for_outcome(Module, Func, Args, ExpOutcome, LoopCount, MaxLoops) ->
         ExpOutcome ->
             ExpOutcome;
         NotRightYet ->
-            lager:info("~w not yet ~w ~w", [Func, ExpOutcome, NotRightYet]),
+            ?LOG_INFO("~0p not yet ~0p ~0p", [Func, ExpOutcome, NotRightYet]),
             timer:sleep(LoopCount * 2000),
             wait_for_outcome(Module, Func, Args, ExpOutcome,
                                 LoopCount + 1, MaxLoops)
@@ -600,29 +630,29 @@ wait_until_stable(Module, Func, Args, LastResult, LoopCount) ->
     end.
 
 write_then_delete(NodeA1, NodeB1, Start, End) ->
-    lager:info("Write ~w objects into A and read from B and C",
+    ?LOG_INFO("Write ~0p objects into A and read from B and C",
                 [End - Start + 1]),
     write_to_cluster(NodeA1, Start, End, new_obj),
-    lager:info("Waiting to read sample"),
-    0 = 
+    ?LOG_INFO("Waiting to read sample"),
+    0 =
         wait_for_outcome(?MODULE,
                             read_from_cluster,
                             [NodeB1, End - 31, End,
                                 ?COMMMON_VAL_INIT, undefined],
                             0,
                             ?LOOP_COUNT),
-    lager:info("Waiting to read all"),
-    0 = 
+    ?LOG_INFO("Waiting to read all"),
+    0 =
         wait_for_outcome(?MODULE,
                             read_from_cluster,
                             [NodeB1, Start, End, ?COMMMON_VAL_INIT, undefined],
                             0,
                             ?LOOP_COUNT),
-    
-    lager:info("Deleting ~w objects from B and read not_found from A and C",
+
+    ?LOG_INFO("Deleting ~0p objects from B and read not_found from A",
                 [?KEY_COUNT]),
     delete_from_cluster(NodeB1, Start, End),
-    lager:info("Waiting for missing sample"),
+    ?LOG_INFO("Waiting for missing sample"),
     32 =
         wait_for_outcome(?MODULE,
                         read_from_cluster,
@@ -630,24 +660,24 @@ write_then_delete(NodeA1, NodeB1, Start, End) ->
                             ?COMMMON_VAL_INIT, undefined],
                         32,
                         ?LOOP_COUNT),
-    lager:info("Waiting for all missing"),
+    ?LOG_INFO("Waiting for all missing"),
     ?KEY_COUNT =
         wait_for_outcome(?MODULE,
                         read_from_cluster,
                         [NodeA1, Start, End, ?COMMMON_VAL_INIT, undefined],
                         ?KEY_COUNT,
                         ?LOOP_COUNT),
-    lager:info("Add ~w updates to A",
+    ?LOG_INFO("Add ~0p updates to A",
                 [?UPDATE_COUNT]),
     write_to_cluster(NodeA1,
                         1 + End - (2 * ?UPDATE_COUNT), End - ?UPDATE_COUNT,
                         ?COMMMON_VAL_MOD),
-    lager:info("Add ~w updates to B - should generate siblings on A",
+    ?LOG_INFO("Add ~0p updates to B - should generate siblings on A",
                 [?UPDATE_COUNT]),
     write_to_cluster(NodeB1,
                         End + 1 - ?UPDATE_COUNT, End,
                         ?COMMMON_VAL_MOD),
-    lager:info("Write and delete cycle confirmed").
+    ?LOG_INFO("Write and delete cycle confirmed").
 
 ts_epoch({MegaSecs, Secs, _MicroSecs}) ->
     Secs + 1000000 * MegaSecs.

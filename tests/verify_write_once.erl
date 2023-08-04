@@ -17,11 +17,13 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
-
 -module(verify_write_once).
+-behavior(riak_test).
+
 -export([confirm/0]).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(DEFAULT_RING_SIZE, 16).
 -define(NVAL, 2).
@@ -48,14 +50,15 @@ confirm() ->
     ]),
     rt:join_cluster(Cluster1),
     % rt:join_cluster(Cluster2),
-    lager:info("Set up clusters: ~p, ~p", [Cluster1, Cluster2]),
+    ?LOG_INFO("Set up clusters: ~0p, ~0p", [Cluster1, Cluster2]),
     %%
     %% Select a random node, and use it to create an immutable bucket
     %%
     Node = lists:nth(rand:uniform(length((Cluster1))), Cluster1),
     rt:create_and_activate_bucket_type(Node, ?BUCKET_TYPE, [{write_once, true}]),
     rt:wait_until_bucket_type_status(?BUCKET_TYPE, active, Cluster1),
-    lager:info("Created ~p bucket type on ~p", [?BUCKET_TYPE, Node]),
+    rt:wait_until_bucket_type_visible(Cluster1, ?BUCKET_TYPE),
+    ?LOG_INFO("Created ~0p bucket type on ~0p", [?BUCKET_TYPE, Node]),
     %%
     %%
     %%
@@ -85,17 +88,18 @@ confirm_put(Node) ->
             ?assertMatch({n_val_violation, 3}, Error)
         end
     ),
-    lager:info("confirm_put...ok"),
+    ?LOG_INFO("confirm_put...ok"),
     pass.
 
 
 confirm_w(Nodes) ->
     %%
-    %% split the cluster into 2 paritions [dev1, dev2, dev3], [dev4]
+    %% split the cluster into 2 partitions [dev1, dev2, dev3], [dev4]
     %%
     P1 = lists:sublist(Nodes, 3),
     P2 = lists:sublist(Nodes, 4, 1),
     PartitonInfo = rt:partition(P1, P2),
+    {_NewCookie, _OldCookie, _, _} = PartitonInfo,
     [Node1 | _Rest1] = P1,
     verify_put(Node1, ?BUCKET, <<"confirm_w_key">>, <<"confirm_w_value">>),
     [Node2 | _Rest2] = P2,
@@ -111,13 +115,13 @@ confirm_w(Nodes) ->
         end
     ),
     rt:heal(PartitonInfo),
-    lager:info("confirm_pw...ok"),
+    ?LOG_INFO("confirm_pw...ok"),
     pass.
 
 
 confirm_pw(Nodes) ->
     %%
-    %% split the cluster into 2 paritions [dev1, dev2, dev3], [dev4]
+    %% split the cluster into 2 partitions [dev1, dev2, dev3], [dev4]
     %%
     P1 = lists:sublist(Nodes, 3),
     P2 = lists:sublist(Nodes, 4, 1),
@@ -137,12 +141,12 @@ confirm_pw(Nodes) ->
         end
     ),
     rt:heal(PartitonInfo),
-    lager:info("confirm_pw...ok"),
+    ?LOG_INFO("confirm_pw...ok"),
     pass.
 
 confirm_rww(Nodes) ->
     %%
-    %% split the cluster into 2 paritions
+    %% split the cluster into 2 partitions
     %%
     P1 = lists:sublist(Nodes, 2),
     P2 = lists:sublist(Nodes, 3, 2),
@@ -155,17 +159,52 @@ confirm_rww(Nodes) ->
     verify_put(Node1, ?BUCKET, <<"confirm_rww_key">>, <<"confirm_rww_value1">>),
     [Node2 | _Rest2] = P2,
     verify_put(Node2, ?BUCKET, <<"confirm_rww_key">>, <<"confirm_rww_value2">>),
-    %%
-    %% After healing, both should agree on an arbitrary value
-    %%
+    %% Wait and confirm no secret healing
+    ?LOG_INFO("Wait and confirm no secret healing"),
+    timer:sleep(1000),
+    <<"confirm_rww_value1">> =
+        get(Node1, ?BUCKET, <<"confirm_rww_key">>),
+    <<"confirm_rww_value2">> =
+        get(Node2, ?BUCKET, <<"confirm_rww_key">>),
+
+    ?LOG_INFO("Heal and confirm answers merge to single value"),
     rt:heal(PartitonInfo),
     rt:wait_until(fun() ->
         V1 = get(Node1, ?BUCKET, <<"confirm_rww_key">>),
         V2 = get(Node2, ?BUCKET, <<"confirm_rww_key">>),
-        V1 =:= V2
+        ?LOG_INFO("Value on ~0p ~0p", [Node1, V1]),
+        ?LOG_INFO("Value on ~0p ~0p", [Node2, V2]),
+        (V1 =:= V2) and (V1 =/= notfound)
     end),
+
+    ?LOG_INFO(
+        "Arbitrary value in P1 ~0p is ~0p",
+        [Node1, get(Node1, ?BUCKET, <<"confirm_rww_key">>)]),
+    ?LOG_INFO(
+        "Arbitrary value in P2 ~0p is ~0p",
+        [Node2, get(Node2, ?BUCKET, <<"confirm_rww_key">>)]),
+
+    ?LOG_INFO("Merge will not happen until handoffs complete"),
+    rt:wait_until_transfers_complete(Nodes),
+
     ?assert(NumFastMerges < num_fast_merges(Nodes)),
-    lager:info("confirm_rww...ok"),
+
+    ?LOG_INFO(
+        "Arbitrary value in P1 ~0p is ~0p",
+        [Node1, get(Node1, ?BUCKET, <<"confirm_rww_key">>)]),
+    ?LOG_INFO(
+        "Arbitrary value in P2 ~0p is ~0p",
+        [Node2, get(Node2, ?BUCKET, <<"confirm_rww_key">>)]),
+
+    ?assertMatch(1,
+        length(
+            lists:usort(
+                lists:map(
+                    fun(N) -> get(N, ?BUCKET, <<"confirm_rww_key">>) end,
+                    Nodes)))
+        ),
+
+    ?LOG_INFO("confirm_rww...ok"),
     pass.
 
 %%
@@ -189,7 +228,7 @@ confirm_async_put(Node) ->
     %%
     rt:create_and_activate_bucket_type(Node, ?ASYNC_PUT_BUCKET_TYPE, [{write_once, true}, {backend, myeleveldb}]),
     rt:wait_until_bucket_type_status(?ASYNC_PUT_BUCKET_TYPE, active, [Node]),
-    lager:info("Created ~p bucket type on ~p", [?ASYNC_PUT_BUCKET_TYPE, Node]),
+    ?LOG_INFO("Created ~0p bucket type on ~0p", [?ASYNC_PUT_BUCKET_TYPE, Node]),
     %%
     %% Clear the intercept counters
     %%
@@ -236,7 +275,7 @@ confirm_async_put(Node) ->
     %%
     %% done!
     %%
-    lager:info("confirm_async_put...ok"),
+    ?LOG_INFO("confirm_async_put...ok"),
     pass.
 
 verify_put(Node, Bucket, Key, Value) ->
@@ -282,43 +321,62 @@ verify_put_timeout(Node, Bucket, Key, Value, Options, Timeout, ExpectedPutReturn
     ok.
 
 num_fast_merges(Nodes) ->
-    lists:foldl(
-        fun(Node, Acc) ->
-            {write_once_merge, N} = proplists:lookup(
-                write_once_merge,
-                rpc:call(Node, riak_kv_stat, get_stats, [])
-            ),
-            Acc + N
-        end,
-        0, Nodes
-    ).
+    NumMerges =
+        lists:foldl(
+            fun(Node, Acc) ->
+                {write_once_merge, N} = proplists:lookup(
+                    write_once_merge,
+                    rpc:call(Node, riak_kv_stat, get_stats, [])
+                ),
+                case N > 0 of
+                    true ->
+                        ?LOG_INFO(
+                            "write_once_merge non-zero ~0p on ~0p",
+                            [N, Node]);
+                    false ->
+                        ok
+                end,
+                Acc + N
+            end,
+            0, Nodes
+        ),
+    ?LOG_INFO(
+        "write_once_merge total across Nodes ~0p in stats is ~0p",
+        [Nodes, NumMerges]),
+    NumMerges.
 
 get(Node, Bucket, Key) ->
     Client = rt:pbc(Node),
-    {ok, Val} = riakc_pb_socket:get(Client, Bucket, Key),
-    riakc_obj:get_value(Val).
+    case riakc_pb_socket:get(Client, Bucket, Key) of
+        {ok, Val} ->
+            riakc_obj:get_value(Val);
+        {error, notfound} ->
+            ?LOG_INFO(
+                "Unexpected notfound on Node ~0p",
+                [Node]),
+            notfound
+    end.
 
 config(RingSize, NVal) ->
-    config(RingSize, NVal, riak_kv_multi_backend).
+    [
+        {riak_core, [
+            {default_bucket_props, [{n_val, NVal}]},
+            {ring_creation_size, RingSize}]
+        },
+        {riak_kv, [
+            {anti_entropy, {off, []}}
+        ]}
+    ].
 
 config(RingSize, NVal, Backend) ->
     [
         {riak_core, [
             {default_bucket_props, [{n_val, NVal}]},
-            {vnode_management_timer, 1000},
             {ring_creation_size, RingSize}]
         },
         {riak_kv, [
-            {anti_entropy_build_limit, {100, 1000}},
-            {anti_entropy_concurrency, 100},
-            {anti_entropy_tick, 100},
-            {anti_entropy, {on, []}},
-            {anti_entropy_timeout, 5000},
-            {storage_backend, Backend},
-            {multi_backend, [
-                {mymemory, riak_kv_memory_backend, []},
-                {myeleveldb, riak_kv_eleveldb_backend, []}
-            ]}
+            {anti_entropy, {off, []}},
+            {storage_backend, Backend}
         ]}
     ].
 

@@ -18,14 +18,12 @@
 %%
 %% -------------------------------------------------------------------
 -module(rpc_output).
-
 -behavior(riak_test).
+-behavior(gen_event).
+
 -export([confirm/0]).
 
--include_lib("eunit/include/eunit.hrl").
--compile([{parse_transform, lager_transform}]).
-
--behavior(gen_event).
+-include_lib("stdlib/include/assert.hrl").
 
 %% gen_event callbacks
 -export([init/1,
@@ -39,7 +37,7 @@ confirm() ->
     gen_event:add_handler(lager_event, ?MODULE, []),
     io:put_chars("This is an io:put_chars/1 call"),
     io:format("This is an io:format/1 call"),
-    io:format("This is an io:format/~w call", [2]),
+    io:format("This is an io:format/~0p call", [2]),
     lager:info("This is a lager message"),
     {ok, {LogId, Failures}} = gen_event:delete_handler(lager_event, ?MODULE, []),
     ?assertEqual(5, LogId),

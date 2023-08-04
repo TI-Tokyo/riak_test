@@ -18,9 +18,12 @@
 %%
 %% -------------------------------------------------------------------
 -module(riak_admin_console_tests).
--include_lib("stdlib/include/assert.hrl").
+-behavior(riak_test).
 
 -export([confirm/0]).
+
+-include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 %% This test passes params to the riak admin shell script on to intercepts
 %% that either return ?PASS or ?FAIL (which print out "pass" or "fail" to
@@ -61,6 +64,8 @@ bucket_tests(Node) ->
     check_admin_cmd(Node, "bucket-type activate foo"),
     %% Note that the 'props' json would need to be quoted on a real command
     %% line - not quoted here because of how check_admin_cmd/2 handles it.
+    % The following tests may fail on OSX post Riak 3.2, please test on a
+    % supported OS (e.g. Linux)
     check_admin_cmd(Node, "bucket-type create foo {props:{[]}}"),
     check_admin_cmd(Node, "bucket-type update foo {props:{[]}}"),
     check_admin_cmd(Node, "bucket-type list").
@@ -155,7 +160,7 @@ riak_admin_tests(Node) ->
 
 confirm() ->
     %% Deploy a node to test against
-    lager:info("Deploy node to test riak command line"),
+    ?LOG_INFO("Deploy node to test riak command line"),
     [Node] = rt:deploy_nodes(1),
     ?assertEqual(ok, rt:wait_until_nodes_ready([Node])),
     rt_intercept:add(Node,
@@ -234,15 +239,15 @@ confirm() ->
 
 check_admin_cmd(Node, Cmd) ->
     S = string:tokens(Cmd, " "),
-    lager:info("Testing riak admin ~s on ~s", [Cmd, Node]),
+    ?LOG_INFO("Testing riak admin ~s on ~s", [Cmd, Node]),
     {ok, Out} = rt:admin(Node, S),
-    ?assertEqual("pass", Out).
+    ?assertEqual("passok\n", Out).
 
 %% Recently we've started calling riak_core_console twice from the
 %% same riak admin invocation; this will result in "passpass" as a
 %% return instead of a simple "pass"
 check_admin_cmd_2x(Node, Cmd) ->
     S = string:tokens(Cmd, " "),
-    lager:info("Testing riak admin ~s on ~s", [Cmd, Node]),
+    ?LOG_INFO("Testing riak admin ~s on ~s", [Cmd, Node]),
     {ok, Out} = rt:admin(Node, S),
-    ?assertEqual("passpass", Out).
+    ?assertEqual("passok\npassok\n", Out).

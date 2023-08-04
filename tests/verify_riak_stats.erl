@@ -23,6 +23,7 @@
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -define(CTYPE, <<"counters">>).
@@ -45,15 +46,15 @@ confirm() ->
     KVBackend = proplists:get_value(backend, TestMetaData),
     HeadSupport = has_head_support(KVBackend),
 
-    lager:info("Verifying that all expected stats keys are present from the HTTP endpoint"),
+    ?LOG_INFO("Verifying that all expected stats keys are present from the HTTP endpoint"),
     ok = verify_stats_keys_complete(Node1, Stats1),
 
     AdminStats1 = get_console_stats(Node1),
-    lager:info("Verifying that the stats keys in riak admin status and HTTP match"),
+    ?LOG_INFO("Verifying that the stats keys in riak admin status and HTTP match"),
     ok = compare_http_and_console_stats(Stats1, AdminStats1),
 
     %% make sure a set of stats have valid values
-    lager:info("Verifying that the system and ring stats have valid values"),
+    ?LOG_INFO("Verifying that the system and ring stats have valid values"),
     verify_nz(Stats1, [
         <<"cpu_nprocs">>,
         <<"mem_total">>,
@@ -75,8 +76,8 @@ confirm() ->
         <<"memory_ets">>
     ]),
 
-    lager:info("perform 5 x  PUT and a GET to increment the stats"),
-    lager:info("as the stat system only does calcs for > 5 readings"),
+    ?LOG_INFO("perform 5 x  PUT and a GET to increment the stats"),
+    ?LOG_INFO("as the stat system only does calcs for > 5 readings"),
 
     C = rt:httpc(Node1),
     [rt:httpc_write(C, <<"systest">>, <<X>>, <<"12345">>) || X <- lists:seq(1, 5)],
@@ -136,7 +137,7 @@ confirm() ->
 
     Stats3 = get_stats(Node1),
 
-    lager:info("Make PBC Connection"),
+    ?LOG_INFO("Make PBC Connection"),
     Pid = rt:pbc(Node1),
 
     KeySeq = [<<X>> || X <- lists:seq(1, 5)],
@@ -151,11 +152,19 @@ confirm() ->
         {<<"pbc_active">>, 1}
     ]),
 
+    Stats4 = get_stats(Node1),
+    %% make sure the stats that were supposed to increment did
+    verify_inc(Stats3, Stats4, [
+        {<<"pbc_connects_total">>, 1},
+        {<<"pbc_connects">>, 1},
+        {<<"pbc_active">>, 1}
+    ]),
+
     %% make sure the stats that were supposed to increment did
     %% PB and HTTP API change stats the same
     verify_inc(Stats3, Stats4, ExpectedNodeStats),
 
-    lager:info("Force Read Repair"),
+    ?LOG_INFO("Force Read Repair"),
     rt:pbc_write(Pid, <<"testbucket">>, <<"1">>, <<"blah!">>),
     rt:pbc_set_bucket_prop(Pid, <<"testbucket">>, [{n_val, 4}]),
 
@@ -172,19 +181,19 @@ confirm() ->
 
     _ = do_datatypes(Pid),
 
-    lager:info("Verifying datatype stats are non-zero."),
+    ?LOG_INFO("Verifying datatype stats are non-zero."),
 
     Stats7 = get_stats(Node1),
     [
      begin
-         lager:info("~s: ~p (expected non-zero)", [S, proplists:get_value(S, Stats6)]),
+         ?LOG_INFO("~s: ~0p (expected non-zero)", [S, proplists:get_value(S, Stats6)]),
          verify_nz(Stats7, [S])
      end || S <- datatype_stats() ],
 
     _ = do_pools(Node1),
 
     Stats8 = get_stats(Node1),
-    lager:info("Verifying pool stats are incremented"),
+    ?LOG_INFO("Verifying pool stats are incremented"),
 
     verify_inc(Stats7, Stats8, inc_by_one(dscp_totals())),
 
@@ -193,7 +202,7 @@ confirm() ->
 verify_inc(Prev, Props, [{Key, Inc} | KeyIncs]) ->
     Old = proplists:get_value(Key, Prev, 0),
     New = proplists:get_value(Key, Props, 0),
-    lager:info("~s: ~p -> ~p (expected ~p)", [Key, Old, New, Old + Inc]),
+    ?LOG_INFO("~s: ~0p -> ~0p (expected ~0p)", [Key, Old, New, Old + Inc]),
     ?assertEqual({Key, New}, {Key, (Old + Inc)}),
     verify_inc(Prev, Props, KeyIncs);
 verify_inc(_Prev, _Props, []) ->
@@ -214,7 +223,7 @@ get_console_stats(Node) ->
     OkStats = rt:admin_stats(Node),
     ?assertMatch({ok, _}, OkStats),
     {ok, Stats} = OkStats,
-    % lager:info("Stats: ~p", [Stats]),
+    % ?LOG_INFO("Stats: ~0p", [Stats]),
     Stats.
 
 compare_http_and_console_stats(HttpStats, AdminStats) ->
@@ -259,7 +268,7 @@ find_and_log_extra_keys(SubjectKeys, ReferenceKeys, ExtraKeysDescription) ->
             Extra = lists:usort(Keys),
             ExtraStr = string:join([
                 stats_key_to_string(K) || K <- Extra], ", "),
-            lager:warning("~s: ~s", [ExtraKeysDescription, ExtraStr]),
+            ?LOG_WARNING("~s: ~s", [ExtraKeysDescription, ExtraStr]),
             %% Allow time for the log to be written, as we're probably about
             %% to exit on an assertion failure.
             timer:sleep(555),
@@ -267,12 +276,14 @@ find_and_log_extra_keys(SubjectKeys, ReferenceKeys, ExtraKeysDescription) ->
     end.
 
 -spec stats_key_to_string(StatsKey :: rtt:stat_key()) -> nonempty_string().
+stats_key_to_string(StatsKey) when erlang:is_atom(StatsKey) ->
+    erlang:atom_to_list(StatsKey);
 stats_key_to_string(StatsKey) when erlang:is_binary(StatsKey) ->
     erlang:binary_to_list(StatsKey);
 stats_key_to_string([_|_] = StatsKey) ->
     StatsKey;
 stats_key_to_string(StatsKey) ->
-    io_lib:format("~p", [StatsKey]).
+    ?LOG_INFO("~0p", [StatsKey]).
 
 datatype_stats() ->
     %% Merge stats are excluded because we likely never merge disjoint
@@ -512,9 +523,6 @@ common_stats() ->
         <<"executing_mappers">>,
         <<"exometer_core_version">>,
         <<"folsom_version">>,
-        % No yokozuna <<"fuse_version">>,
-        <<"getopt_version">>,
-        <<"goldrush_version">>,
         <<"gossip_received">>,
         <<"handoff_acksync_wait_95">>,
         <<"handoff_acksync_wait_99">>,
@@ -554,10 +562,7 @@ common_stats() ->
         <<"index_fsm_time_100">>,
         <<"inets_version">>,
         <<"kernel_version">>,
-        % No yokozuna <<"kvc_version">>,
         <<"kv_index_tictactree_version">>,
-        <<"lager_version">>,
-        <<"lager_syslog_version">>,
         <<"late_put_fsm_coordinator_ack">>,
         %% disabled 937
         %% <<"leveldb_read_block_error">>,
@@ -828,6 +833,7 @@ common_stats() ->
         <<"resize_handoff_inbound_active_transfers">>,
         <<"resize_handoff_objects_sent">>,
         <<"resize_handoff_outbound_active_transfers">>,
+        <<"rhc_version">>,
         <<"riak_api_version">>,
         <<"riak_auth_mods_version">>,
         <<"riak_core_version">>,
@@ -860,75 +866,6 @@ common_stats() ->
         <<"rings_reconciled_total">>,
         <<"runtime_tools_version">>,
         <<"sasl_version">>,
-        % No yokozuna
-        % <<"search_blockedvnode_count">>,
-        % <<"search_blockedvnode_one">>,
-        % <<"search_detected_repairs_count">>,
-        % <<"search_index_bad_entry_count">>,
-        % <<"search_index_bad_entry_one">>,
-        % <<"search_index_error_threshold_blown_count">>,
-        % <<"search_index_error_threshold_blown_one">>,
-        % <<"search_index_error_threshold_failure_count">>,
-        % <<"search_index_error_threshold_failure_one">>,
-        % <<"search_index_error_threshold_ok_count">>,
-        % <<"search_index_error_threshold_ok_one">>,
-        % <<"search_index_error_threshold_recovered_count">>,
-        % <<"search_index_error_threshold_recovered_one">>,
-        % <<"search_index_extract_fail_count">>,
-        % <<"search_index_extract_fail_one">>,
-        % <<"search_index_fail_count">>,
-        % <<"search_index_fail_one">>,
-        % <<"search_index_latency_95">>,
-        % <<"search_index_latency_99">>,
-        % <<"search_index_latency_999">>,
-        % <<"search_index_latency_max">>,
-        % <<"search_index_latency_mean">>,
-        % <<"search_index_latency_median">>,
-        % <<"search_index_latency_min">>,
-        % <<"search_index_throughput_count">>,
-        % <<"search_index_throughput_one">>,
-        % <<"search_query_fail_count">>,
-        % <<"search_query_fail_one">>,
-        % <<"search_query_latency_95">>,
-        % <<"search_query_latency_99">>,
-        % <<"search_query_latency_999">>,
-        % <<"search_query_latency_max">>,
-        % <<"search_query_latency_mean">>,
-        % <<"search_query_latency_median">>,
-        % <<"search_query_latency_min">>,
-        % <<"search_query_throughput_count">>,
-        % <<"search_query_throughput_one">>,
-        % <<"search_queue_batch_latency_95">>,
-        % <<"search_queue_batch_latency_99">>,
-        % <<"search_queue_batch_latency_999">>,
-        % <<"search_queue_batch_latency_max">>,
-        % <<"search_queue_batch_latency_mean">>,
-        % <<"search_queue_batch_latency_median">>,
-        % <<"search_queue_batch_latency_min">>,
-        % <<"search_queue_batch_throughput_count">>,
-        % <<"search_queue_batch_throughput_one">>,
-        % <<"search_queue_batchsize_max">>,
-        % <<"search_queue_batchsize_mean">>,
-        % <<"search_queue_batchsize_median">>,
-        % <<"search_queue_batchsize_min">>,
-        % <<"search_queue_drain_cancel_timeout_count">>,
-        % <<"search_queue_drain_cancel_timeout_one">>,
-        % <<"search_queue_drain_count">>,
-        % <<"search_queue_drain_fail_count">>,
-        % <<"search_queue_drain_fail_one">>,
-        % <<"search_queue_drain_latency_95">>,
-        % <<"search_queue_drain_latency_99">>,
-        % <<"search_queue_drain_latency_999">>,
-        % <<"search_queue_drain_latency_max">>,
-        % <<"search_queue_drain_latency_mean">>,
-        % <<"search_queue_drain_latency_median">>,
-        % <<"search_queue_drain_latency_min">>,
-        % <<"search_queue_drain_one">>,
-        % <<"search_queue_drain_timeout_count">>,
-        % <<"search_queue_drain_timeout_one">>,
-        % <<"search_queue_hwm_purged_count">>,
-        % <<"search_queue_hwm_purged_one">>,
-        % <<"search_queue_total_length">>,
         <<"setup_version">>,
         <<"set_actor_counts_100">>,
         <<"set_actor_counts_95">>,
@@ -957,7 +894,6 @@ common_stats() ->
         <<"sys_thread_pool_size">>,
         <<"sys_threads_enabled">>,
         <<"sys_wordsize">>,
-        <<"syslog_version">>,
         <<"uncovered_preflists">>,
         <<"uncovered_preflists2">>,
         <<"vnode_counter_update">>,
@@ -1166,7 +1102,7 @@ do_pool(Node, Pool) ->
     FinishFun = fun(ok) -> ok end,
     Work = {fold, WorkFun, FinishFun},
     Res = rpc:call(Node, riak_core_node_worker_pool, handle_work, [Pool, Work, undefined]),
-    lager:info("Pool ~p returned ~p", [Pool, Res]).
+    ?LOG_INFO("Pool ~0p returned ~0p", [Pool, Res]).
 
 inc_by_one(StatNames) ->
     inc_by(StatNames, 1).

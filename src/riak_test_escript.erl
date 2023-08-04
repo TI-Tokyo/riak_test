@@ -27,14 +27,9 @@
     add_deps/1
 ]).
 
--compile([
-    {nowarn_unused_function, [
-        %% Unused currently, but could be relevant someday.
-        {get_webhooks, 0},
-        {parse_webhook, 1}
-    ]}
-]).
--include("rt.hrl").
+-include_lib("kernel/include/logger.hrl").
+
+% -define(DEBUG_JUNIT_INPUT, true).
 
 add_deps(Path) ->
     case file:list_dir(Path) of
@@ -42,7 +37,7 @@ add_deps(Path) ->
             io:format("Adding path ~s~n", [Path]),
             lists:foreach(
                 fun(Dep) ->
-                    code:add_path(lists:flatten(filename:join([Path, Dep, "ebin"])))
+                    code:add_path(filename:join([Path, Dep, "ebin"]))
                 end, Deps);
         {error, enoent} ->
             io:format(standard_error, "!!! Warning: Skipping path ~s~n", [Path]);
@@ -73,7 +68,7 @@ cli_options() ->
 
 print_help() ->
     getopt:usage(cli_options(), escript:script_name()),
-    halt(0).
+    erlang:halt(0).
 
 run_help([]) -> true;
 run_help(ParsedArgs) ->
@@ -81,74 +76,75 @@ run_help(ParsedArgs) ->
 
 main(Args) ->
     try
-        case filelib:is_dir("./ebin") of
+        {ok, CWD} = file:get_cwd(),
+        EbinDir = filename:join(CWD, ebin),
+        case filelib:is_dir(EbinDir) of
             true ->
-                code:add_patha("./ebin");
+                code:add_patha(EbinDir);
             _ ->
                 meh
         end,
-
-        register(riak_test, self()),
         {ParsedArgs, HarnessArgs} = case getopt:parse(cli_options(), Args) of
             {ok, {P, H}} -> {P, H};
             _ -> print_help()
         end,
-
         case run_help(ParsedArgs) of
             true -> print_help();
             _ -> ok
         end,
 
-        %% ibrowse
-        application:load(ibrowse),
-        application:start(ibrowse),
-        %% Start Lager
-        application:load(lager),
+        %% Load application defaults
+        application:load(riak_test),
+        %% Load default log handler
+        logger:add_handlers(riak_test),
+
+        erlang:register(riak_test, erlang:self()),
 
         Config = proplists:get_value(config, ParsedArgs),
         ConfigFile = proplists:get_value(file, ParsedArgs),
 
-        %% Loads application defaults
-        application:load(riak_test),
-
         %% Loads from ~/.riak_test.config
         rt_config:load(Config, ConfigFile),
+        LogLevel = rt_config:get(log_level, rt_config:get(lager_level, info)),
+        logger:update_primary_config(#{level => LogLevel}),
 
         %% Sets up extra paths earlier so that tests can be loadable
         %% without needing the -d flag.
         code:add_paths(rt_config:get(test_paths, [])),
 
-        %% Ensure existance of scratch_dir
+        %% Ensure existence of scratch_dir
         case file:make_dir(rt_config:get(rt_scratch_dir)) of
             ok ->
                 great;
             {error, eexist} ->
                 great;
-            SratchError ->
-                lager:error("Could not create scratch dir, ~0p", [SratchError])
+            ScratchError ->
+                ?LOG_ERROR("Could not create scratch dir, ~0p", [ScratchError])
         end,
 
         %% Fileoutput
-        Outdir = proplists:get_value(outdir, ParsedArgs),
-        ConsoleLagerLevel = case Outdir of
-            undefined -> rt_config:get(lager_level, info);
-            _ ->
-                filelib:ensure_dir(Outdir),
-                notice
+        OutDir = case proplists:get_value(outdir, ParsedArgs) of
+            undefined ->
+                CWD;
+            OD ->
+                OD
         end,
+        LogDir = filename:join(OutDir, log),
+        LogFile = filename:join(LogDir, "test.log"),
+        filelib:ensure_dir(LogFile),
+        FileLogBackend = #{
+            config => #{type => file, file => LogFile, file_check => 100 },
+            formatter => {logger_formatter, #{
+                single_line => true, legacy_header => false,
+                template => [
+                    time, " [" ,level, "] " , pid, ":", mfa, ":", line, ": ", msg
+                ]}}
+        },
+        logger:add_handler(rt_file, logger_std_h, FileLogBackend),
 
-        ConsoleFormatter = lager_default_formatter,
-        ConsoleFormatConfig = [time, " [", severity, "] ", pid, " ", message, "\n"],
-        ConsoleBackend =
-            [{level, ConsoleLagerLevel},
-                {formatter, ConsoleFormatter},
-                {formatter_config, ConsoleFormatConfig}],
-        FileBackend =
-            [{file, "log/test.log"}, {level, ConsoleLagerLevel}],
-        application:set_env(lager, error_logger_hwm, 250), %% helpful for debugging
-        application:set_env(lager, handlers, [{lager_console_backend, ConsoleBackend},
-            {lager_file_backend, FileBackend}]),
-        lager:start(),
+        %% ibrowse
+        application:load(ibrowse),
+        application:start(ibrowse),
 
         %% Report
         Report = case proplists:get_value(report, ParsedArgs, undefined) of
@@ -183,13 +179,13 @@ main(Args) ->
                 end,
                 ActualOffset = ((TestCount div Denominator) * Offset) rem (TestCount + 1),
                 {TestA, TestB} = lists:split(ActualOffset, Tests0),
-                lager:info("Offsetting ~b tests by ~b (~b workers, ~b"
+                ?LOG_INFO("Offsetting ~b tests by ~b (~b workers, ~b"
                 " offset)", [TestCount, ActualOffset, Workers,
                     Offset]),
                 TestB ++ TestA
         end,
 
-        io:format("Tests to run: ~p~n", [Tests]),
+        io:format("Tests to run: ~0p~n", [Tests]),
         %% Two hard-coded deps...
         add_deps(rt:get_deps()),
         add_deps("_build/test/lib/riak_test/tests"),
@@ -202,13 +198,13 @@ main(Args) ->
 
         NumTests = erlang:length(Tests),
         TestResults = lists:filter(fun results_filter/1,
-            [run_test(Test, Outdir, TestMetaData, Report, HarnessArgs, NumTests)
+            [run_test(Test, OutDir, TestMetaData, Report, HarnessArgs, NumTests)
                 || {Test, TestMetaData} <- Tests]),
         [rt_cover:maybe_import_coverage(proplists:get_value(coverdata, R)) || R <- TestResults],
         Coverage = rt_cover:maybe_write_coverage(all, CoverDir),
         case proplists:get_value(junit, ParsedArgs, false) of
             true ->
-                JUnitFile = filename:join(junit_outdir(Outdir), junit_filename(StartUTC)),
+                JUnitFile = filename:join(junit_outdir(OutDir), junit_filename(StartUTC)),
                 write_junit_output(JUnitFile, StartUTC, TestResults);
             _ ->
                 ok
@@ -223,7 +219,7 @@ main(Args) ->
             %% We don't know whether the error occurred before or after logger
             %% startup/configuration, so write directly to the console.
             io:format(standard_error,
-                "~p: ~p~n~p", [Class, Reason, StackTrace]),
+                "~0p: ~0p~n~p", [Class, Reason, StackTrace]),
             %% Give it time to write ...
             timer:sleep(333),
             erlang:halt(1)
@@ -239,9 +235,9 @@ maybe_teardown(_Teardown, [] = TestResults, Coverage, Verbose, _Batch) ->
     print_summary(TestResults, Coverage, Verbose);
 maybe_teardown(false, TestResults, Coverage, Verbose, _Batch) ->
     print_summary(TestResults, Coverage, Verbose),
-    lager:info("Keeping cluster running as requested");
+    ?LOG_INFO("Keeping cluster running as requested");
 maybe_teardown(true, [_] = TestResults, Coverage, Verbose, true) ->
-    lager:info("Batch mode specified"),
+    ?LOG_INFO("Batch mode specified"),
     rt:teardown(),
     print_summary(TestResults, Coverage, Verbose);
 maybe_teardown(true, [TestResult] = TestResults, Coverage, Verbose, false) ->
@@ -250,12 +246,12 @@ maybe_teardown(true, [TestResult] = TestResults, Coverage, Verbose, false) ->
             print_summary(TestResults, Coverage, Verbose),
             so_kill_riak_maybe();
         _ ->
-            lager:info("Success"),
+            ?LOG_INFO("Success"),
             rt:teardown(),
             print_summary(TestResults, Coverage, Verbose)
     end;
 maybe_teardown(true, TestResults, Coverage, Verbose, _Batch) ->
-    lager:info("Multiple tests run"),
+    ?LOG_INFO("Multiple tests run"),
     rt:teardown(),
     print_summary(TestResults, Coverage, Verbose).
 
@@ -273,8 +269,6 @@ is_failed_test(Result) ->
 
 junit_outdir(undefined) -> "log";
 junit_outdir(Dir) -> Dir.
-
-% -define(DEBUG_JUNIT_INPUT, true).
 
 -ifdef(DEBUG_JUNIT_INPUT).
 
@@ -454,10 +448,10 @@ extract_test_names(Test, {CodePaths, TestNames}) ->
 which_tests_to_run(_, CommandLineTests) ->
     CommandLineTests.
 
-run_test(Test, Outdir, TestMetaData, Report, HarnessArgs, NumTests) ->
+run_test(Test, OutDir, TestMetaData, Report, HarnessArgs, NumTests) ->
     rt_cover:maybe_start(Test),
     SingleTestResult = riak_test_runner:confirm(
-        Test, Outdir, TestMetaData, HarnessArgs),
+        Test, OutDir, TestMetaData, HarnessArgs),
     CoverDir = rt_config:get(cover_output, "coverage"),
     case NumTests of
         1 -> keep_them_up;
@@ -475,25 +469,6 @@ run_test(Test, Outdir, TestMetaData, Report, HarnessArgs, NumTests) ->
     rt_cover:stop(),
     [{coverdata, CoverageFile} | SingleTestResult].
 
-get_webhooks() ->
-    Hooks = lists:foldl(
-        fun(E, Acc) ->
-            [parse_webhook(E) | Acc]
-        end, [], rt_config:get(webhooks, [])),
-    lists:filter(fun(E) -> E =/= undefined end, Hooks).
-
-parse_webhook(Props) ->
-    Url = proplists:get_value(url, Props),
-    case is_list(Url) of
-        true ->
-            #rt_webhook{url = Url,
-                name = proplists:get_value(name, Props, "Webhook"),
-                headers = proplists:get_value(headers, Props, [])};
-        false ->
-            lager:error("Invalid configuration for webhook : ~p", Props),
-            undefined
-    end.
-
 print_summary(TestResults, CoverResult, Verbose) ->
     io:format("~nTest Results:~n"),
 
@@ -508,7 +483,7 @@ print_summary(TestResults, CoverResult, Verbose) ->
     Print = fun(Test, Status, Reason) ->
         case {Status, Verbose} of
             {fail, true} ->
-                io:format("~s: ~s ~p~n", [string:left(Test, Width), Status, Reason]);
+                io:format("~s: ~s ~0p~n", [string:left(Test, Width), Status, Reason]);
             _ -> io:format("~s: ~s~n", [string:left(Test, Width), Status])
         end
     end,
@@ -519,13 +494,13 @@ print_summary(TestResults, CoverResult, Verbose) ->
     FailCount = length(
         lists:filter(fun(X) -> proplists:get_value(status, X) =:= fail end, TestResults)),
     io:format("---------------------------------------------~n"),
-    io:format("~w Tests Failed~n", [FailCount]),
-    io:format("~w Tests Passed~n", [PassCount]),
+    io:format("~b Tests Failed~n", [FailCount]),
+    io:format("~0p Tests Passed~n", [PassCount]),
     Percentage = case PassCount == 0 andalso FailCount == 0 of
         true -> 0;
         false -> (PassCount / (PassCount + FailCount)) * 100
     end,
-    io:format("That's ~w% for those keeping score~n", [Percentage]),
+    io:format("That's ~0p% for those keeping score~n", [Percentage]),
 
     case CoverResult of
         cover_disabled ->

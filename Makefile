@@ -42,7 +42,7 @@ clean:
 	$(REBAR) clean
 
 distclean: clean
-	$(RM) -rf riak_test smoke_test _build
+	$(RM) -rf riak_test _build
 
 quickbuild: compile
 

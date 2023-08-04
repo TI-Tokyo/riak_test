@@ -29,6 +29,7 @@
     run_test/4
 ]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 %% We've got a separate test for capability negotiation and other mechanisms,
@@ -50,9 +51,9 @@ confirm() ->
         -> pass | fail | no_return().
 
 run_test(FastTestMode, NTestItems, NTestNodes, Encoding) ->
-    lager:info("Testing handoff (items: ~p, encoding: ~p)", [NTestItems, Encoding]),
+    ?LOG_INFO("Testing handoff (items: ~0p, encoding: ~0p)", [NTestItems, Encoding]),
 
-    lager:info("Spinning up ~b test nodes", [NTestNodes]),
+    ?LOG_INFO("Spinning up ~b test nodes", [NTestNodes]),
     [RootNode | TestNodes] = Nodes =
         deploy_test_nodes(FastTestMode, Encoding, NTestNodes),
 
@@ -62,7 +63,7 @@ run_test(FastTestMode, NTestItems, NTestNodes, Encoding) ->
                           [{{visit_item, 3}, delayed_visit_item_3}]})
      || N <- Nodes],
 
-    lager:info("Populating root node."),
+    ?LOG_INFO("Populating root node."),
     rt:systest_write(RootNode, NTestItems),
     %% write one object with a bucket type
     rt:create_and_activate_bucket_type(RootNode, <<"type">>, []),
@@ -70,7 +71,7 @@ run_test(FastTestMode, NTestItems, NTestNodes, Encoding) ->
     rt:systest_write(RootNode, 1, 2, {<<"type">>, <<"bucket">>}, 2),
 
     %% Test ownership handoff on each node:
-    lager:info("Testing ownership handoff for cluster."),
+    ?LOG_INFO("Testing ownership handoff for cluster."),
     lists:foreach(
         fun(TestNode) ->
             test_ownership_handoff(RootNode, TestNode, NTestItems)
@@ -87,35 +88,35 @@ run_test(FastTestMode, NTestItems, NTestNodes, Encoding) ->
 %% See if we get the same data back from our new nodes as we put into the root node:
 test_ownership_handoff(RootNode, NewNode, NTestItems) ->
 
-    lager:info("Testing ownership handoff adding node ~p ...", [NewNode]),
+    ?LOG_INFO("Testing ownership handoff adding node ~0p ...", [NewNode]),
 
-    lager:info("Waiting for service on new node."),
+    ?LOG_INFO("Waiting for service on new node."),
     rt:wait_for_service(NewNode, riak_kv),
 
-    lager:info("Joining new node ~p with cluster.", [NewNode]),
+    ?LOG_INFO("Joining new node ~0p with cluster.", [NewNode]),
     rt:join(NewNode, RootNode),
     rt:wait_until_nodes_ready([RootNode, NewNode]),
     rt:wait_until_no_pending_changes([RootNode, NewNode]),
 
     %% See if we get the same data back from the joined node that we added to the root node.
     %%  Note: systest_read() returns /non-matching/ items, so getting nothing back is good:
-    lager:info("Validating data after handoff:"),
+    ?LOG_INFO("Validating data after handoff:"),
     Results = rt:systest_read(NewNode, NTestItems),
     ?assertEqual(0, length(Results)),
     Results2 = rt:systest_read(RootNode, 1, 2, {<<"type">>, <<"bucket">>}, 2),
     ?assertEqual(0, length(Results2)),
-    lager:info("Data looks ok.").
+    ?LOG_INFO("Data looks ok.").
 
 test_hinted_handoff([RootNode | OtherNodes] = Nodes, NTestItems) ->
 
-    lager:info(
-        "Testing hinted handoff by stopping ~p, doing some writes, and restarting ...",
+    ?LOG_INFO(
+        "Testing hinted handoff by stopping ~0p, doing some writes, and restarting ...",
         [RootNode]),
 
     rt:stop(RootNode),
 
     AnotherNode = rt_util:random_element(OtherNodes),
-    lager:info("Writing ~p objects to ~p ...", [NTestItems, AnotherNode]),
+    ?LOG_INFO("Writing ~0p objects to ~0p ...", [NTestItems, AnotherNode]),
     rt:systest_write(AnotherNode, NTestItems),
     Results = rt:systest_read(AnotherNode, NTestItems),
     ?assertMatch(0, length(Results)),
@@ -131,15 +132,15 @@ test_repair_handoff(Nodes) ->
         [_|_] = BackendDir ->
             test_repair_handoff(Nodes, BackendDir);
         _ ->
-            lager:info(
-                "Skipping handoff repair test for unsupported backend: ~p",
+            ?LOG_INFO(
+                "Skipping handoff repair test for unsupported backend: ~0p",
                 [Backend])
     end.
 
 test_repair_handoff([RootNode | _OtherNodes] = Nodes, BackendDir) ->
 
-    lager:info(
-        "Testing repair handoff by stopping ~p, deleting some data,"
+    ?LOG_INFO(
+        "Testing repair handoff by stopping ~0p, deleting some data,"
         " and issuing a repair ...", [RootNode]),
 
     %% Pick a random partition to delete/repair
@@ -173,7 +174,7 @@ delete_partition_dir(Node, BackendDir, Partition) ->
     rt:clean_data_dir(Node, BEPath).
 
 issue_repair(Node, Partition) ->
-    lager:info("issuing repair on node ~p partition ~p", [Node, Partition]),
+    ?LOG_INFO("issuing repair on node ~0p partition ~0p", [Node, Partition]),
     ?assertMatch({ok, [_|_]}, rpc:call(Node, riak_kv_vnode, repair, [Partition])).
 
 -spec deploy_test_nodes(
@@ -186,7 +187,7 @@ deploy_test_nodes(FastTestMode, default = Encoding, NumNodes) ->
     NodeConfig = node_config(FastTestMode),
     [RootNode | _] = Nodes = rt:deploy_nodes(NumNodes, NodeConfig),
     assert_supported_encoding(RootNode, Encoding),
-    lager:info("Using default handoff encoding '~p'",
+    ?LOG_INFO("Using default handoff encoding '~0p'",
         [rt:capability(RootNode, {riak_kv, handoff_data_encoding})]),
     Nodes;
 deploy_test_nodes(FastTestMode, Encoding, NumNodes) ->
@@ -207,7 +208,7 @@ deploy_test_nodes(FastTestMode, Encoding, NumNodes) ->
         ?assertEqual(Encoding, rt:capability(Node, CapabilityKey))
     end,
     _ = rt:pmap(CapFun, Nodes),
-    lager:info("Using handoff encoding '~p'", [Encoding]),
+    ?LOG_INFO("Using handoff encoding '~0p'", [Encoding]),
     Nodes.
 
 -spec node_config(FastTestMode :: boolean()) -> rtt:app_config().
@@ -216,7 +217,7 @@ deploy_test_nodes(FastTestMode, Encoding, NumNodes) ->
 %% It's questionable what value some of these have in this context,
 %% but they're preserved for posterity.
 node_config(true) ->
-    lager:info("WARNING: Using turbo settings for testing."),
+    ?LOG_INFO("WARNING: Using turbo settings for testing."),
     [{riak_core, [
         {forced_ownership_handoff,      8},
         {gossip_limit,                  {10000000, 60000}},
@@ -238,5 +239,5 @@ assert_supported_encoding(Node, Encoding) ->
     AllCaps = rt:capability(Node, all),
     SupCaps = proplists:get_value('$supported', AllCaps),
     SupEncs = proplists:get_value({riak_kv, handoff_data_encoding}, SupCaps),
-    lager:info("Supported handoff encodings: ~p", [SupEncs]),
+    ?LOG_INFO("Supported handoff encodings: ~0p", [SupEncs]),
     Encoding =:= default orelse ?assert(lists:member(Encoding, SupEncs)).

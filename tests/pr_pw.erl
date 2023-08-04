@@ -22,6 +22,7 @@
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -define(TYPE_ALL, <<"ptype_all">>).
@@ -29,7 +30,7 @@
 
 confirm() ->
     application:start(inets),
-    lager:info("Deploy some nodes"),
+    ?LOG_INFO("Deploy some nodes"),
     Nodes = rt:build_cluster(4),
 
     %% calculate the preflist for foo/bar
@@ -39,14 +40,14 @@ confirm() ->
         rpc:call(hd(Nodes), riak_core_node_watcher, nodes, [riak_kv]),
     N = 3,
 
-    lager:info("Setting Custom bucket types for pr/pw test"),
+    ?LOG_INFO("Setting Custom bucket types for pr/pw test"),
     TypePropsAll = [{pr, 3}, {pw, 3}, {allow_mult, false}],
-    lager:info("Create bucket type ~p, wait for propagation", [?TYPE_ALL]),
+    ?LOG_INFO("Create bucket type ~0p, wait for propagation", [?TYPE_ALL]),
     rt:create_and_activate_bucket_type(hd(Nodes), ?TYPE_ALL, TypePropsAll),
     rt:wait_until_bucket_type_status(?TYPE_ALL, active, Nodes),
     rt:wait_until_bucket_props(Nodes, {?TYPE_ALL, <<"bucket">>}, TypePropsAll),
     TypePropsQ = [{pr, quorum}, {pw, quorum}, {allow_mult, false}],
-    lager:info("Create bucket type ~p, wait for propagation", [?TYPE_QUORUM]),
+    ?LOG_INFO("Create bucket type ~0p, wait for propagation", [?TYPE_QUORUM]),
     rt:create_and_activate_bucket_type(hd(Nodes), ?TYPE_QUORUM, TypePropsQ),
     rt:wait_until_bucket_type_status(?TYPE_QUORUM, active, Nodes),
     rt:wait_until_bucket_props(Nodes, {?TYPE_QUORUM, <<"bucket">>}, TypePropsQ),
@@ -58,15 +59,15 @@ confirm() ->
         end,
     Preflist2 = PreflistFun(<<"foo">>, <<"bar">>),
 
-    lager:info("Beginning key search"),
+    ?LOG_INFO("Beginning key search"),
     AllKey = find_key(PreflistFun, {?TYPE_ALL, <<"foo">>}, Preflist2),
     QKey = find_key(PreflistFun, {?TYPE_QUORUM, <<"foo">>}, Preflist2),
 
-    lager:info("Preflist is ~p", [Preflist2]),
+    ?LOG_INFO("Preflist is ~0p", [Preflist2]),
     PLNodes = [Node || {{_Index, Node}, _Status} <- Preflist2],
-    lager:info("Nodes in preflist ~p", [PLNodes]),
+    ?LOG_INFO("Nodes in preflist ~0p", [PLNodes]),
     [SafeNode] = Nodes -- PLNodes,
-    lager:info("Node not involved in this preflist ~p", [SafeNode]),
+    ?LOG_INFO("Node not involved in this preflist ~0p", [SafeNode]),
     %% connect to the only node in the preflist we won't break, to avoid
     %% random put forwarding
     {ok, C} = riak:client_connect(hd(PLNodes)),
@@ -113,8 +114,8 @@ confirm() ->
     rt_intercept:add(Node, {riak_kv_vnode,  [{{do_get,4}, drop_do_get},
                                                 {{do_head, 4}, drop_do_head},
                                                 {{do_put, 7}, drop_do_put}]}),
-    lager:info("disabling do_get and do_head for index ~p on ~p", [Index, Node]),
-    rt:log_to_nodes(Nodes, "disabling do_get and do_head for index ~p on ~p", [Index, Node]),
+    ?LOG_INFO("disabling do_get and do_head for index ~0p on ~0p", [Index, Node]),
+    rt:log_to_nodes(Nodes, "disabling do_get and do_head for index ~0p on ~0p", [Index, Node]),
     timer:sleep(100),
 
     %% one vnode will never return, so we get timeouts
@@ -160,8 +161,8 @@ confirm() ->
     rt_intercept:add(Node2, {riak_kv_vnode,  [{{do_get,4}, drop_do_get},
                                                 {{do_head, 4}, drop_do_head},
                                                 {{do_put, 7}, drop_do_put}]}),
-    lager:info("disabling do_get, do_put and do_head for index ~p on ~p", [Index2, Node2]),
-    rt:log_to_nodes(Nodes, "disabling do_get, do_put and do_head for index ~p on ~p", [Index2, Node2]),
+    ?LOG_INFO("disabling do_get, do_put and do_head for index ~0p on ~0p", [Index2, Node2]),
+    rt:log_to_nodes(Nodes, "disabling do_get, do_put and do_head for index ~0p on ~0p", [Index2, Node2]),
     timer:sleep(100),
 
     %% can't even meet quorum now
@@ -209,8 +210,8 @@ confirm() ->
     %% make a vnode start to fail puts
     make_intercepts_tab(Node2, Index2),
     rt_intercept:add(Node2, {riak_kv_vnode,  [{{do_put, 7}, error_do_put}]}),
-    lager:info("failing do_put for index ~p on ~p", [Index2, Node2]),
-    rt:log_to_nodes(Nodes, "failing do_put for index ~p on ~p", [Index2, Node2]),
+    ?LOG_INFO("failing do_put for index ~0p on ~0p", [Index2, Node2]),
+    rt:log_to_nodes(Nodes, "failing do_put for index ~0p on ~0p", [Index2, Node2]),
     timer:sleep(100),
 
     %% there's now a failing vnode in the preflist, so PW/DW won't be satisfied
@@ -267,8 +268,8 @@ find_key(PreflistFun, Bucket, TargetPreflist) ->
                 io_lib:format("K~8..0B", [leveled_rand:uniform(1000000)]))),
     case PreflistFun(Bucket, TestK) of
         TargetPreflist ->
-            lager:info(
-                "Found key ~p with preflist ~p for Bucket ~p",
+            ?LOG_INFO(
+                "Found key ~0p with preflist ~0p for Bucket ~0p",
                 [TestK, TargetPreflist, Bucket]),
             TestK;
         _ ->

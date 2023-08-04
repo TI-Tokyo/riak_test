@@ -20,6 +20,7 @@
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 %% We unexpectedly saw in basho_bench testing in an environment where we
@@ -38,13 +39,13 @@ confirm() ->
     Items    = 500, %% How many test items in each group to write/verify?
     run_test(Items, 4),
 
-    lager:info("Test overlap_with_crdt_tag passed."),
+    ?LOG_INFO("Test overlap_with_crdt_tag passed."),
     pass.
 
 run_test(Items, NTestNodes) ->
-    lager:info("Testing handoff (items ~p, nodes: ~p)", [Items, NTestNodes]),
+    ?LOG_INFO("Testing handoff (items ~0p, nodes: ~0p)", [Items, NTestNodes]),
 
-    lager:info("Spinning up test nodes"),
+    ?LOG_INFO("Spinning up test nodes"),
     [RootNode, FirstJoin, SecondJoin, LastJoin] = Nodes =
         deploy_test_nodes(NTestNodes),
 
@@ -52,7 +53,7 @@ run_test(Items, NTestNodes) ->
 
     set_handoff_encoding(default, Nodes),
 
-    lager:info("Initialise bucket type."),
+    ?LOG_INFO("Initialise bucket type."),
     CRDT_Tag = <<69:8/integer>>,
     Other_Tag = <<255:8/integer>>,
     BProps = [{allow_mult, true}, {last_write_wins, false},
@@ -63,7 +64,7 @@ run_test(Items, NTestNodes) ->
     ok = riak_client:set_bucket(B2, BProps, C),
     ok = rt:create_and_activate_bucket_type(RootNode, <<"type1">>, BProps),
 
-    lager:info("Populating initial data."),
+    ?LOG_INFO("Populating initial data."),
     R1A = systest_write_binary(RootNode, 1, Items, B1, 3, CRDT_Tag),
     R2A = systest_write_binary(RootNode, Items + 1, Items * 2, B2, 3, CRDT_Tag),
     R3A = systest_write_binary(RootNode, Items * 2 + 1, Items * 3, B1, 3, CRDT_Tag),
@@ -72,20 +73,20 @@ run_test(Items, NTestNodes) ->
     ?assertEqual([], R2A),
     ?assertEqual([], R3A),
 
-    lager:info("Waiting for service on second node."),
+    ?LOG_INFO("Waiting for service on second node."),
     rt:wait_for_service(FirstJoin, riak_kv),
 
-    lager:info("Joining new node with cluster."),
+    ?LOG_INFO("Joining new node with cluster."),
     rt:join(FirstJoin, RootNode),
     check_joined([RootNode, FirstJoin]),
-    lager:info("Handoff complete"),
+    ?LOG_INFO("Handoff complete"),
 
-    lager:info("Validating data - no siblings"),
+    ?LOG_INFO("Validating data - no siblings"),
     systest_read_binary(FirstJoin, 1, Items, B1, 3, CRDT_Tag, false),
     systest_read_binary(FirstJoin, Items + 1, Items * 2, B2, 3, CRDT_Tag, false),
     systest_read_binary(FirstJoin, Items * 2 + 1, Items * 3, B1, 1, CRDT_Tag, false),
 
-    lager:info("Populating sibling data"),
+    ?LOG_INFO("Populating sibling data"),
     R1B = systest_write_binary(RootNode, 1, Items, B1, 3, Other_Tag),
     R2B = systest_write_binary(RootNode, Items + 1, Items * 2, B2, 3, Other_Tag),
     R3B = systest_write_binary(RootNode, Items * 2 + 1, Items * 3, B1, 3, Other_Tag),
@@ -94,20 +95,20 @@ run_test(Items, NTestNodes) ->
     ?assertEqual([], R2B),
     ?assertEqual([], R3B),
 
-    lager:info("Waiting for service on third node."),
+    ?LOG_INFO("Waiting for service on third node."),
     rt:wait_for_service(SecondJoin, riak_kv),
 
-    lager:info("Joining new node with cluster."),
+    ?LOG_INFO("Joining new node with cluster."),
     rt:join(SecondJoin, RootNode),
     check_joined([RootNode, FirstJoin, SecondJoin]),
-    lager:info("Handoff complete"),
+    ?LOG_INFO("Handoff complete"),
 
-    lager:info("Validating data - siblings"),
+    ?LOG_INFO("Validating data - siblings"),
     systest_read_binary(SecondJoin, 1, Items, B1, 3, CRDT_Tag, true),
     systest_read_binary(SecondJoin, Items + 1, Items * 2, B2, 3, CRDT_Tag, true),
     systest_read_binary(SecondJoin, Items * 2 + 1, Items * 3, B1, 1, CRDT_Tag, true),
 
-    lager:info("Populating more sibling data"),
+    ?LOG_INFO("Populating more sibling data"),
     R1C = systest_write_binary(RootNode, 1, Items, B1, 3, CRDT_Tag),
     R2C = systest_write_binary(RootNode, Items + 1, Items * 2, B2, 3, CRDT_Tag),
     R3C = systest_write_binary(RootNode, Items * 2 + 1, Items * 3, B1, 3, CRDT_Tag),
@@ -116,29 +117,29 @@ run_test(Items, NTestNodes) ->
     ?assertEqual([], R2C),
     ?assertEqual([], R3C),
 
-    lager:info("Waiting for service on final node."),
+    ?LOG_INFO("Waiting for service on final node."),
     rt:wait_for_service(LastJoin, riak_kv),
 
-    lager:info("Joining new node with cluster."),
+    ?LOG_INFO("Joining new node with cluster."),
     rt:join(LastJoin, RootNode),
     check_joined([RootNode, FirstJoin, SecondJoin, LastJoin]),
-    lager:info("Handoff complete"),
+    ?LOG_INFO("Handoff complete"),
 
-    lager:info("Validating data - siblings"),
+    ?LOG_INFO("Validating data - siblings"),
     systest_read_binary(LastJoin, 1, Items, B1, 3, CRDT_Tag, true),
     systest_read_binary(LastJoin, Items + 1, Items * 2, B2, 3, CRDT_Tag, true),
     systest_read_binary(LastJoin, Items * 2 + 1, Items * 3, B1, 1, CRDT_Tag, true),
 
 
     %% Prepare for the next call to our test (we aren't polite about it, it's faster that way):
-    lager:info("Bringing down test nodes."),
+    ?LOG_INFO("Bringing down test nodes."),
     lists:foreach(fun(N) -> rt:brutal_kill(N) end, Nodes).
 
 set_handoff_encoding(default, _) ->
-    lager:info("Using default encoding type."),
+    ?LOG_INFO("Using default encoding type."),
     true;
 set_handoff_encoding(Encoding, Nodes) ->
-    lager:info("Forcing encoding type to ~p.", [Encoding]),
+    ?LOG_INFO("Forcing encoding type to ~0p.", [Encoding]),
 
     %% Update all nodes (capabilities are not re-negotiated):
     [begin
@@ -146,6 +147,8 @@ set_handoff_encoding(Encoding, Nodes) ->
          assert_using(Node, {riak_kv, handoff_data_encoding}, Encoding)
      end || Node <- Nodes].
 
+%% ToDo: This is known not to work - should be riak_kv - see verify_handoff
+%% Not fixing it now - it's not used in this test and should be refactored
 override_data(Encoding) ->
     [
      { riak_core,
@@ -163,7 +166,7 @@ override_data(Encoding) ->
        ]}].
 
 assert_using(Node, {CapabilityCategory, CapabilityName}, ExpectedCapabilityName) ->
-    lager:info("assert_using ~p =:= ~p", [ExpectedCapabilityName, CapabilityName]),
+    ?LOG_INFO("assert_using ~0p =:= ~0p", [ExpectedCapabilityName, CapabilityName]),
     ExpectedCapabilityName =:= rt:capability(Node, {CapabilityCategory, CapabilityName}).
 
 %% For some testing purposes, making these limits smaller is helpful:
@@ -211,8 +214,8 @@ systest_read_fold_fun(C, Bucket, R, CommonValBin, ExpectSiblings) ->
                 {ok, Obj} ->
                     Obj;
                 {error, notfound} ->
-                    lager:warning(
-                        "nofound B=~w K=~w", [Bucket, N]
+                    ?LOG_WARNING(
+                        "nofound B=~0p K=~0p", [Bucket, N]
                     ),
                     notfound
             end,

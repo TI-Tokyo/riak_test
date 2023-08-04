@@ -30,6 +30,7 @@
 %% Called by verify_... tests
 -export([set_allow_mult_true/1, set_allow_mult_true/2]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -define(BUCKET, <<"test-counters">>).
@@ -52,20 +53,20 @@ confirm() ->
 
     [?assertEqual(8, get_counter(C, Key)) || C <- Clients],
 
-    lager:info("Partition cluster in two."),
+    ?LOG_INFO("Partition cluster in two."),
 
     PartInfo = rt:partition([N1, N2], [N3, N4]),
 
-    lager:info("Increment counter on partitioned cluster"),
+    ?LOG_INFO("Increment counter on partitioned cluster"),
 
     %% increment one side
     increment_counter(C1, Key, 5),
 
     C1Incr = get_counter(C1, Key),
     C2Incr = get_counter(C2, Key),
-    lager:info("Validate counter after increment applied"),
-    lager:info(
-        "Initial value on increment side ~w ~w",
+    ?LOG_INFO("Validate counter after increment applied"),
+    ?LOG_INFO(
+        "Initial value on increment side ~0p ~0p",
         [C1Incr, C2Incr]),
 
     case {C1Incr, C2Incr} of
@@ -75,10 +76,10 @@ confirm() ->
             SW = os:timestamp(),
             rt:wait_until(fun() -> 13 == get_counter(C1, Key) end),
             rt:wait_until(fun() -> 13 == get_counter(C2, Key) end),
-            lager:warning(
-                "Maybe waited for increment ~w ms",
+            ?LOG_WARNING(
+                "Maybe waited for increment ~b ms",
                 [timer:now_diff(os:timestamp(), SW) div 1000]),
-            lager:warning(
+            ?LOG_WARNING(
                 "Maybe cluster unstable after partition?")
     end,
 
@@ -97,7 +98,7 @@ confirm() ->
     [?assertEqual(6, get_counter(C, Key)) || C <- [C3, C4]],
 
     %% heal
-    lager:info("Heal and check merged values"),
+    ?LOG_INFO("Heal and check merged values"),
     ok = rt:heal(PartInfo),
     ok = rt:wait_for_cluster_service(Nodes, riak_kv),
 
@@ -115,7 +116,7 @@ set_allow_mult_true(Nodes, Bucket) ->
     %% Counters REQUIRE allow_mult=true
     N1 = hd(Nodes),
     AllowMult = [{allow_mult, true}],
-    lager:info("Setting bucket properties ~p for bucket ~p on node ~p",
+    ?LOG_INFO("Setting bucket properties ~0p for bucket ~0p on node ~0p",
                [AllowMult, Bucket, N1]),
     rpc:call(N1, riak_core_bucket, set_bucket, [Bucket, AllowMult]),
     rt:wait_until_ring_converged(Nodes).
@@ -135,7 +136,7 @@ not_404(Client, Key) ->
                 %% NOTE: only 404, any other error is unexpected to
                 %% resolve itself
                 {error, {ok,"404", _Headers, <<"not found\n">>}} ->
-                    lager:info("Key ~p not found on ~p", [Key, Client]),
+                    ?LOG_INFO("Key ~0p not found on ~0p", [Key, Client]),
                     false;
                 _ ->
                     true
@@ -159,7 +160,7 @@ update_counter(Client, Key, Amt) ->
         ok ->
             ok;
         {error,req_timedout} ->
-            lager:warning("Increment timed out"),
-            lager:warning("Assuming increment has not been made"),
+            ?LOG_WARNING("Increment timed out"),
+            ?LOG_WARNING("Assuming increment has not been made"),
             ok = rhc:counter_incr(Client, ?BUCKET, Key, Amt)
     end.

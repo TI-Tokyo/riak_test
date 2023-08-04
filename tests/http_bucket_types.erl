@@ -26,6 +26,7 @@
 %% MFA callbacks
 -export([mapred_modfun/3, mapred_modfun_type/3]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 -include_lib("riakc/include/riakc.hrl").
 
@@ -52,7 +53,7 @@
 
 confirm() ->
     application:start(ibrowse),
-    lager:info("Deploy some nodes"),
+    ?LOG_INFO("Deploy some nodes"),
     Nodes = rt:build_cluster(4, [], [
                                      {riak_core, [{default_bucket_props,
                                                    [
@@ -70,7 +71,7 @@ confirm() ->
                   end,
 
     RHC = rt:httpc(Node),
-    lager:info("default type get/put test"),
+    ?LOG_INFO("default type get/put test"),
     %% write explicitly to the default type
     ok = rhc:put(RHC, riakc_obj:new({<<"default">>, <<"bucket">>},
                                <<"key">>, <<"value">>)),
@@ -96,18 +97,18 @@ confirm() ->
 
     ?assertEqual(<<"newvalue">>, riakc_obj:get_value(O3)),
 
-    lager:info("list_keys test"),
+    ?LOG_INFO("list_keys test"),
     %% list keys
     ?WAIT({ok, [<<"key">>]} == rhc:list_keys(RHC, <<"bucket">>)),
     ?WAIT({ok, [<<"key">>]} == rhc:list_keys(RHC, {<<"default">>, <<"bucket">>})),
 
-    lager:info("list_buckets test"),
+    ?LOG_INFO("list_buckets test"),
     %% list buckets
     ?WAIT({ok, [<<"bucket">>]} == rhc:list_buckets(RHC)),
     ?WAIT({ok, [<<"bucket">>]} == rhc:list_buckets(RHC, <<"default">>)),
 
     timer:sleep(5000),
-    lager:info("default type delete test"),
+    ?LOG_INFO("default type delete test"),
     %% delete explicitly via the default bucket
     ok = rhc:delete_obj(RHC, O3),
 
@@ -145,33 +146,33 @@ confirm() ->
     ?WAIT({ok, []} == rhc:list_buckets(RHC)),
     ?WAIT({ok, []} == rhc:list_buckets(RHC, <<"default">>)),
 
-    lager:info("custom type get/put test"),
+    ?LOG_INFO("custom type get/put test"),
     %% create a new type
     ok = rt:create_activate_and_wait_for_bucket_type(Nodes, <<"mytype">>, [{n_val,3}]),
 
-    lager:info("doing put"),
+    ?LOG_INFO("doing put"),
     ok = rhc:put(RHC, riakc_obj:new({<<"mytype">>, <<"bucket">>},
                                <<"key">>, <<"newestvalue">>)),
 
-    lager:info("doing get"),
+    ?LOG_INFO("doing get"),
     {ok, O5} = rhc:get(RHC, {<<"mytype">>, <<"bucket">>}, <<"key">>),
 
     ?assertEqual(<<"newestvalue">>, riakc_obj:get_value(O5)),
 
-    lager:info("doing get"),
+    ?LOG_INFO("doing get"),
     %% this type is NOT aliased to the default buckey
     {error, notfound} = rhc:get(RHC, <<"bucket">>, <<"key">>),
 
-    lager:info("custom type list_keys test"),
+    ?LOG_INFO("custom type list_keys test"),
     ?WAIT({ok, []} == rhc:list_keys(RHC, <<"bucket">>)),
     ?WAIT({ok, [<<"key">>]} == rhc:list_keys(RHC, {<<"mytype">>, <<"bucket">>})),
 
-    lager:info("custom type list_buckets test"),
+    ?LOG_INFO("custom type list_buckets test"),
     %% list buckets
     ?WAIT({ok, []} == rhc:list_buckets(RHC)),
     ?WAIT({ok, [<<"bucket">>]} == rhc:list_buckets(RHC, <<"mytype">>)),
 
-    lager:info("UTF-8 type get/put test"),
+    ?LOG_INFO("UTF-8 type get/put test"),
     %% こんにちは - konnichiwa (Japanese)
     UnicodeTypeBin = unicode:characters_to_binary([12371,12435,12395,12385,12399], utf8),
     %% سلام - Salam (Arabic)
@@ -181,19 +182,19 @@ confirm() ->
 
     ok = rt:create_activate_and_wait_for_bucket_type(Nodes, UnicodeTypeBin, [{n_val,3}]),
 
-    lager:info("doing put"),
+    ?LOG_INFO("doing put"),
     ok = rhc:put(RHC, riakc_obj:new(UCBBin,
                                     <<"key">>, <<"unicode">>)),
 
-    lager:info("doing get"),
+    ?LOG_INFO("doing get"),
     {ok, O6} = rhc:get(RHC, UCBBin, <<"key">>),
 
     ?assertEqual(<<"unicode">>, riakc_obj:get_value(O6)),
 
-    lager:info("unicode type list_keys test"),
+    ?LOG_INFO("unicode type list_keys test"),
     ?WAIT({ok, [<<"key">>]}== rhc:list_keys(RHC, UCBBin)),
 
-    lager:info("unicode type list_buckets test"),
+    ?LOG_INFO("unicode type list_buckets test"),
     %% list buckets
 
     %% This is a rather awkward representation, but it's what rhc is
@@ -204,7 +205,7 @@ confirm() ->
     %% name
     ?WAIT({ok, [<<"0633064406270645">>]} == rhc:list_buckets(RHC, UnicodeTypeBin)),
 
-    lager:info("bucket properties tests"),
+    ?LOG_INFO("bucket properties tests"),
     rhc:set_bucket(RHC, {<<"default">>, <<"mybucket">>},
                    [{n_val, 5}]),
     {ok, BProps} = rhc:get_bucket(RHC, <<"mybucket">>),
@@ -231,7 +232,7 @@ confirm() ->
                                          <<"mybucket">>}),
     ?assertEqual(3, proplists:get_value(n_val, BProps4)),
 
-    lager:info("bucket type properties test"),
+    ?LOG_INFO("bucket type properties test"),
 
     rhc:set_bucket_type(RHC, <<"mytype">>,
                         [{n_val, 5}]),
@@ -438,8 +439,8 @@ confirm() ->
 
     rt:clean_cluster(Nodes),
     rt_redbug:set_tracing_applied(true),
-    lager:info("Deploy a single node cluster"),
-    lager:info("Can only monitor one node with redbug"),
+    ?LOG_INFO("Deploy a single node cluster"),
+    ?LOG_INFO("Can only monitor one node with redbug"),
     [SingleNode]
         = rt:build_cluster(1,
                             [],
@@ -450,7 +451,7 @@ confirm() ->
                                         {dvv_enabled, true}
                                     ]}]}]),
 
-    lager:info("Create a bucket type with selective sync enabled"),
+    ?LOG_INFO("Create a bucket type with selective sync enabled"),
     ok =
         rt:create_activate_and_wait_for_bucket_type(
             [SingleNode], <<"sync_backend">>, [{sync_on_write,backend}, {n_val,3}]),
@@ -468,15 +469,15 @@ confirm() ->
     %% Make sure the trace files don't exist from some previous run!
     delete_files(TraceFiles),
 
-    lager:info("STARTING TRACE"),
+    ?LOG_INFO("STARTING TRACE"),
     Backend = proplists:get_value(backend, riak_test_runner:metadata()),
     TraceFun = flushputfun(Backend),
 
     redbug_start(TraceFun, OneTrcFile, SingleNode),
-    lager:info("doing put"),
+    ?LOG_INFO("doing put"),
     ok = rhc:put(RHC,
         riakc_obj:new({<<"sync_one">>, <<"b_sync_one">>}, <<"key">>, <<"newestvalue">>)),
-    lager:info("doing get"),
+    ?LOG_INFO("doing get"),
     {ok, _} = rhc:get(RHC, {<<"sync_one">>, <<"b_sync_one">>}, <<"key">>),
 
     redbug_stop(),
@@ -484,20 +485,20 @@ confirm() ->
 
 
     redbug_start(TraceFun, BackendTrcFile, SingleNode),
-    lager:info("doing put"),
+    ?LOG_INFO("doing put"),
     ok = rhc:put(RHC,
         riakc_obj:new({<<"sync_backend">>, <<"b_sync_backend">>}, <<"key">>, <<"newestvalue">>)),
-    lager:info("doing get"),
+    ?LOG_INFO("doing get"),
     {ok, _} = rhc:get(RHC, {<<"sync_backend">>, <<"b_sync_backend">>}, <<"key">>),
 
     redbug_stop(),
     ?assertMatch(0, flushput_cnt(TraceFun, BackendTrcFile)),
 
     redbug_start(TraceFun, AllTrcFile, SingleNode),
-    lager:info("doing put"),
+    ?LOG_INFO("doing put"),
     ok = rhc:put(RHC,
         riakc_obj:new({<<"sync_all">>, <<"b_sync_all">>}, <<"key">>, <<"newestvalue">>)),
-    lager:info("doing get"),
+    ?LOG_INFO("doing get"),
     {ok, _} = rhc:get(RHC, {<<"sync_all">>, <<"b_sync_all">>}, <<"key">>),
 
     redbug_stop(),
@@ -508,20 +509,18 @@ confirm() ->
     pass.
 
 redbug_start(TraceFun, TrcFile, Node) ->
-    lager:info("TracingFun ~s on ~s", [TraceFun, Node]),
+    ?LOG_INFO("TracingFun ~s on ~s", [TraceFun, Node]),
     ?assertMatch(ok, rt_redbug:trace(Node, TraceFun,
         #{arity => true, print_file => TrcFile})).
 
 redbug_stop() ->
     ?assertMatch(ok, rt_redbug:stop()).
 
-mapred_modfun(Pipe, Args, _Timeout) ->
-    lager:info("Args for mapred modfun are ~p", [Args]),
+mapred_modfun(Pipe, _Args, _Timeout) ->
     riak_pipe:queue_work(Pipe, {{<<"MRbucket">>, <<"foo">>}, {struct, []}}),
     riak_pipe:eoi(Pipe).
 
-mapred_modfun_type(Pipe, Args, _Timeout) ->
-    lager:info("Args for mapred modfun are ~p", [Args]),
+mapred_modfun_type(Pipe, _Args, _Timeout) ->
     riak_pipe:queue_work(Pipe, {{{<<"mytype">>, <<"MRbucket">>}, <<"bam">>}, {struct, []}}),
     riak_pipe:eoi(Pipe).
 
@@ -535,7 +534,7 @@ flushputfun(undefined) ->
     flushputfun(bitcask).
 
 flushput_cnt(TraceFun, File) ->
-    lager:info("checking ~p", [File]),
+    ?LOG_INFO("checking ~0p", [File]),
     %% redbug doesn't create the file until it has something to write to it,
     %% so accommodate non-existence
     case file:read_file(File) of

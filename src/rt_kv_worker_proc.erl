@@ -51,6 +51,7 @@
     opts/0
 ]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -define(SVC_NAME,           ?MODULE).
@@ -84,7 +85,7 @@
 %% @doc Add the requisite riak_kv_worker intercepts to the selected node/s.
 -spec add_intercept(node() | [node()]) -> ok | [ok].
 add_intercept(Node) when is_atom(Node) ->
-    lager:info("Adding handle_work_handoff_intercept to node ~p", [Node]),
+    ?LOG_INFO("Adding handle_work_handoff_intercept to node ~0p", [Node]),
     rt_intercept:add(
         Node, {
             riak_kv_worker,
@@ -136,13 +137,13 @@ start_link(Opts) ->
             {error, timeout}
     end.
 
-%% @doc stop the rt_kv_worker_proc and return the current app state
+%% @doc Stop the rt_kv_worker_proc and return the current app state
 %% @equiv stop(60000)
 -spec stop() -> accum() | {error, term()}.
 stop() ->
     stop(?DEFAULT_TIMEOUT).
 
-%% @doc stop the rt_kv_worker_proc and return the current app state
+%% @doc Stop the rt_kv_worker_proc and return the current app state
 -spec stop(Timeout :: rtt:millisecs()) -> accum() | {error, term()}.
 stop(Timeout) ->
     _ = global:send(?SVC_NAME, ?SVC_MSG(stop)),

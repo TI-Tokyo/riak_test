@@ -34,10 +34,9 @@
 -module(kv679_dataloss).
 -behavior(riak_test).
 
--export([confirm/0]).
-%% shared
--export([delete_datadir/1]).
+-export([confirm/0, delete_datadir/1]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -define(BUCKET, <<"kv679">>).
@@ -64,11 +63,11 @@ confirm() ->
 
     {ok, Bod} =  write_key(Client, <<"bob">>, [return_body]),
 
-    lager:info("wrote value <<bob>>"),
+    ?LOG_INFO("wrote value <<bob>>"),
 
     VCE0 = riakc_obj:vclock(Bod),
     VC0 = rpc:call(Node, riak_object, decode_vclock, [VCE0]),
-    lager:info("VC ~p~n", [VC0]),
+    ?LOG_INFO("VC ~0p", [VC0]),
 
 
     %% delete the local data for Key
@@ -78,10 +77,10 @@ confirm() ->
 
     VCE1 = riakc_obj:vclock(Bod2),
     VC1 = rpc:call(Node, riak_object, decode_vclock, [VCE1]),
-    lager:info("VC ~p~n", [VC1]),
+    ?LOG_INFO("VC ~0p", [VC1]),
 
 
-    lager:info("wrote value <<jon>>"),
+    ?LOG_INFO("wrote value <<jon>>"),
 
     %% At this point, two puts with empty contexts should be siblings
     %% due to the data loss at the coordinator we lose the second
@@ -94,7 +93,7 @@ confirm() ->
 
     VCE = riakc_obj:vclock(O),
     VC = rpc:call(Node, riak_object, decode_vclock, [VCE]),
-    lager:info("VC ~p~n", [VC]),
+    ?LOG_INFO("VC ~0p", [VC]),
 
     ?assertEqual([<<"bob">>, <<"jon">>, <<"phil">>], lists:sort(riakc_obj:get_values(O))),
 
@@ -107,7 +106,7 @@ write_object(Client, Object, Opts) ->
     riakc_pb_socket:put(Client, Object, Opts).
 
 delete_datadir({{Idx, Node}, Type}) ->
-    lager:info("deleting backend data dir for ~p ~p on ~p", [Idx, Node, Type]),
+    ?LOG_INFO("deleting backend data dir for ~0p ~0p on ~0p", [Idx, Node, Type]),
     %% Get default backend
     Backend = rpc:call(Node, app_helper, get_env, [riak_kv, storage_backend]),
 

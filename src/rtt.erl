@@ -32,7 +32,7 @@
 
 %% Shared types
 %%
-%% Regenerate the list (massaging required) with:```
+%% For generating the export list (massaging required):```
 %%  sed -En 's!^-(type|opaque) *([^\(]+)\(\) *::.+$!\2/0,!p' src/rtt.erl
 %%  sed -En 's!^-(type|opaque) *([^\(]+)\(([^\)]+)\) *::.+$!\2/\3,!p' src/rtt.erl
 %% '''
@@ -87,6 +87,8 @@
     interact_send/0,
     interface/0,
     interfaces/0,
+    log_line/0,
+    log_lines/0,
     millisecs/0,
     modules/0,
     net_endpoint/0,
@@ -296,6 +298,12 @@
 
 -type interfaces() :: list(interface()).
 %% A list of protocol/endpoint pairs.
+
+-type log_line() :: unicode:chardata().
+%% As returned by the `logger:FModule:format/2' callback.
+
+-type log_lines() :: list(log_line()).
+%% A collection of log lines, generally in chronological order.
 
 -type millisecs() :: 1..16#FFFFFFFF.
 %% A timeout value, in milliseconds.

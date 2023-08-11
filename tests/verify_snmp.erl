@@ -17,11 +17,14 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+%% @deprecated snmp is no longer present in Riak 3+
 -module(verify_snmp).
+-deprecated(module).
 -behavior(riak_test).
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 confirm() ->
@@ -45,24 +48,24 @@ confirm() ->
         {nodePutTime99, <<"node_put_fsm_time_99">>},
         {nodePutTime100, <<"node_put_fsm_time_100">>}],
 
-    lager:info("Waiting for SNMP to start."),
+    ?LOG_INFO("Waiting for SNMP to start."),
 
     rpc:call(Node1, riak_core, wait_for_application, [snmp]),
     rpc:call(Node1, riak_core, wait_for_application, [riak_snmp]),
 
-    lager:info("Mapping SNMP names to OIDs"),
+    ?LOG_INFO("Mapping SNMP names to OIDs"),
 
     OIDPairs = [begin
         {value, OID} = rpc:call(Node1, snmpa, name_to_oid, [SKey]),
         {OID ++ [0], HKey}
     end || {SKey, HKey} <- Keys],
 
-    lager:info("Doing some reads and writes to record some stats."),
+    ?LOG_INFO("Doing some reads and writes to record some stats."),
 
     rt:systest_write(Node1, 10),
     rt:systest_read(Node1, 10),
 
-    lager:info("Waiting for HTTP Stats to be non-zero"),
+    ?LOG_INFO("Waiting for HTTP Stats to be non-zero"),
     ?assertEqual(ok,
         rt:wait_until(Node1, fun(N) ->
             Stats = rt:get_stats(N),
@@ -84,7 +87,7 @@ verify_eq(Keys, Node) ->
                 lists:all(
                     fun({A, B}) ->
                         Stat = proplists:get_value(B, Stats),
-                        lager:info("Comparing ~p | Stats ~p ~~ SNMP ~p", [B, Stat, A]),
+                        ?LOG_INFO("Comparing ~0p | Stats ~0p ~~ SNMP ~0p", [B, Stat, A]),
                         A == Stat
                     end,
                     SPairs)

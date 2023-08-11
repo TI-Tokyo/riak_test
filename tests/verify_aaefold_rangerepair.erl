@@ -285,9 +285,9 @@ get_read_repair_total(Nodes) ->
             Stats = rt:get_stats(Node),
             {<<"read_repairs_total">>, RR} =
                 lists:keyfind(<<"read_repairs_total">>, 1, Stats),
-            ?LOG_INFO("Repairs on ~0p ~0p", [Node, RR]),
+            ?LOG_INFO("Repairs on ~0p ~w", [Node, RR]),
             Acc + RR
         end,
     RRT = lists:foldl(FoldFun, 0, Nodes),
-    ?LOG_INFO("Read repair total ~0p", [RRT]),
+    ?LOG_INFO("Read repair total ~w", [RRT]),
     RRT.

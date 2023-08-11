@@ -262,17 +262,11 @@ confirm() ->
 
     ?LOG_INFO("Complete all necessary replications using all"),
 
-    {ok, KC_NC0} =
-        range_repl_compare(
-            SrcHTTPCB, SrcPBCB, ?CONFIRMS_BUCKET, all, all, cluster_c),
-    ?assertEqual(1000, KC_NC0),
-    0 =
-        wait_for_outcome(FunMod,
-                            read_from_cluster,
-                            [NodeC, 1, 1000, undefined,
-                                ?CONFIRMS_BUCKET, ?VAL_INIT],
-                            0,
-                            5),
+    ?assertMatch({ok, 1000}, range_repl_compare(
+            SrcHTTPCB, SrcPBCB, ?CONFIRMS_BUCKET, all, all, cluster_c)),
+
+    ?assertMatch(0, wait_for_outcome(FunMod, read_from_cluster,
+        [NodeC, 1, 1000, undefined, ?CONFIRMS_BUCKET, ?VAL_INIT], 0, 5)),
 
     pass.
 

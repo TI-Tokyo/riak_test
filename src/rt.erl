@@ -47,6 +47,8 @@
 %% in order to run on the machine hosting the `Node', not the harness, but
 %% it's not worth the effort to make that change unless/until someone wants
 %% to resurrect the `rtssh' (or similar) remote harness.
+%%
+%% @end
 -module(rt).
 
 %% Public API
@@ -284,7 +286,7 @@ ensure_network_node() ->
         {ok, _} ->
             true = erlang:get_cookie() =:= Cookie
                 orelse erlang:set_cookie(RtNode, Cookie),
-            ?LOG_INFO("Node '~s' started with cookie '~s'", [RtNode, Cookie]);
+            ?LOG_NOTICE("Node '~s' started with cookie '~s'", [RtNode, Cookie]);
         {error, {already_started, _}} ->
             case erlang:get_cookie() of
                 Cookie ->
@@ -303,7 +305,7 @@ ensure_epmd() ->
         {ok, _} ->
             ok;
         _ ->
-            ?LOG_INFO("EPMD not running, starting it ..."),
+            ?LOG_NOTICE("EPMD not running, starting it ..."),
             ErtsEpmd = filename:join([code:root_dir(), bin, epmd]),
             EpmdExe = case rt_exec:resolve_cmd(ErtsEpmd) of
                 {error, Posix} ->
@@ -451,9 +453,10 @@ get_deps() ->
 str(String, Substr) ->
     string:find(String, Substr) /= nomatch.
 
+%% @doc Appends the specified elements to `riak.conf'
 -spec set_conf(
     Where :: node() | rtt:fs_path() | all,
-    ConfigElems :: rtt:app_config() )
+    ConfigElems :: list({string(), string()}) )
         -> ok | rtt:std_error().
 set_conf(all, NameValuePairs) ->
     ?HARNESS:set_conf(all, NameValuePairs);
@@ -463,6 +466,7 @@ set_conf(Node, NameValuePairs) when is_atom(Node) ->
     ?HARNESS:set_conf(Node, NameValuePairs),
     start(Node).
 
+%% @doc Updates `advanced.config'
 -spec set_advanced_conf(
     Where :: node() | rtt:fs_path() | all,
     ConfigElems :: rtt:app_config() )
@@ -475,7 +479,7 @@ set_advanced_conf(Node, NameValuePairs) when is_atom(Node) ->
     ?HARNESS:set_advanced_conf(Node, NameValuePairs),
     start(Node).
 
-%% @doc Rewrite the given node's app.config file, overriding the varialbes
+%% @doc Rewrite the given node's app.config file, overriding the variables
 %%      in the existing app.config with those in `Config'.
 -spec update_app_config(
     Where :: node() | rtt:fs_path() | all,
@@ -1056,7 +1060,7 @@ cmd(Cmd, Args) ->
 cmd(Cmd, Args, Form) ->
     ?HARNESS:cmd(Cmd, Args, Form).
 
-%% @doc pretty much the same as os:cmd/1 but it will stream the output to lager.
+%% @doc pretty much the same as os:cmd/1 but it will stream the output to logger.
 %%      If you're running a long running command, it will dump the output
 %%      once per second, as to not create the impression that nothing is happening.
 -spec stream_cmd(iolist()) -> {integer(), string()}.
@@ -1360,7 +1364,7 @@ no_pending_changes(Nodes) ->
                     {Node, false} <- lists:zip(Nodes -- BadNodes, Changes)],
             ?LOG_INFO(
                 "Changes not yet complete, or bad nodes. "
-                "BadNodes=~0p, Nodes with Pending Changes=~0p~n",
+                "BadNodes=~0p, Nodes with Pending Changes=~0p",
                 [BadNodes, NodesWithChanges]),
             false
     end.
@@ -1601,7 +1605,7 @@ wait_until_node_partitioned(Node, Nodes) ->
     ?assertMatch(ok,
         wait_until(fun() -> is_node_partitioned(Node, Nodes) end)).
 
--spec is_node_connected(Node :: node(), Nodes :: rtt:nodes()) -> ok.
+-spec is_node_connected(Node :: node(), Nodes :: rtt:nodes()) -> boolean().
 is_node_connected(Node, Nodes) ->
     TestFun = fun(Peers, Connected) ->
         sets:is_subset(
@@ -1609,7 +1613,7 @@ is_node_connected(Node, Nodes) ->
         end,
     test_node_connected(TestFun, Node, Nodes).
 
--spec is_node_partitioned(Node :: node(), Nodes :: rtt:nodes() ) -> ok.
+-spec is_node_partitioned(Node :: node(), Nodes :: rtt:nodes() ) -> boolean().
 is_node_partitioned(Node, Nodes) ->
     TestFun = fun(Peers, Connected) ->
         sets:is_empty(sets:intersection(
@@ -1666,7 +1670,7 @@ wait_until_capability(Node, Capability, Value) ->
     rt:wait_until(Node,
                   fun(_) ->
                       Cap = capability(Node, Capability),
-                      ?LOG_INFO("Capability on node ~0p is ~0p~n",[Node, Cap]),
+                      ?LOG_INFO("Capability on node ~0p is ~0p",[Node, Cap]),
                       cap_equal(Value, Cap)
                   end).
 
@@ -1674,7 +1678,7 @@ wait_until_capability(Node, Capability, Value, Default) ->
     rt:wait_until(Node,
                   fun(_) ->
                           Cap = capability(Node, Capability, Default),
-                          ?LOG_INFO("Capability on node ~0p is ~0p~n",[Node, Cap]),
+                          ?LOG_INFO("Capability on node ~0p is ~0p",[Node, Cap]),
                           cap_equal(Value, Cap)
                   end).
 
@@ -1683,7 +1687,7 @@ wait_until_capability_contains(Node, Capability, Value) ->
     rt:wait_until(Node,
                 fun(_) ->
                     Cap = capability(Node, Capability),
-                    ?LOG_INFO("Capability on node ~0p is ~0p~n",[Node, Cap]),
+                    ?LOG_INFO("Capability on node ~0p is ~0p",[Node, Cap]),
                     cap_subset(Value, Cap)
                 end).
 
@@ -2001,7 +2005,7 @@ restore_data_dir(Nodes, BackendFldr, BackupFldr) ->
     ?HARNESS:restore_data_dir(Nodes, BackendFldr, BackupFldr).
 
 %% @doc Shutdown every node, this is for after a test run is complete.
--spec teardown() -> ok | rtt:std_error().
+-spec teardown() -> ok.
 teardown() ->
     ?HARNESS:teardown().
 
@@ -2287,9 +2291,8 @@ pbc(Node) ->
 -spec pbc(node(), proplists:proplist()) -> pid().
 pbc(Node, Options) ->
     rt:wait_for_service(Node, riak_kv),
-    ConnInfo = proplists:get_value(Node, connection_info([Node])),
-    {IP, PBPort} = proplists:get_value(pb, ConnInfo),
-    {ok, Pid} = riakc_pb_socket:start_link(IP, PBPort, Options),
+    {ok, {IP, Port}} = get_pb_conn_info(Node),
+    {ok, Pid} = riakc_pb_socket:start_link(IP, Port, Options),
     Pid.
 
 %% @doc does a read via the erlang protobuf client
@@ -2655,9 +2658,9 @@ set_backend(memory, _) ->
 set_backend(multi, Extras) ->
     set_backend(riak_kv_multi_backend, Extras);
 set_backend(Backend, _) when Backend == riak_kv_bitcask_backend;
-		             Backend == riak_kv_eleveldb_backend;
-			     Backend == riak_kv_memory_backend;
-			     Backend == riak_kv_leveled_backend ->
+                             Backend == riak_kv_eleveldb_backend;
+                             Backend == riak_kv_memory_backend;
+                             Backend == riak_kv_leveled_backend ->
     ?LOG_INFO("rt:set_backend(~0p)", [Backend]),
     update_app_config(all, [{riak_kv, [{storage_backend, Backend}]}]),
     get_backends();
@@ -2765,29 +2768,26 @@ get_ip(Node) ->
 
 %% @doc Log a message to the console of the specified test nodes.
 %%      Messages are prefixed by the string "---riak_test--- "
-%%      Uses lager:info/1 'Fmt' semantics
-log_to_nodes(Nodes, Fmt) ->
-    log_to_nodes(Nodes, Fmt, []).
+%%      Uses ?LOG_INFO/1 'String' semantics
+-spec log_to_nodes(Nodes :: rtt:nodes(), String :: unicode:chardata()) -> ok.
+log_to_nodes(Nodes, String) ->
+    log_to_nodes(Nodes, "~s", [String]).
 
 %% @doc Log a message to the console of the specified test nodes.
 %%      Messages are prefixed by the string "---riak_test--- "
-%%      Uses lager:info/2 'LFmt' and 'LArgs' semantics
-log_to_nodes(Nodes0, LFmt, LArgs) ->
+%%      Uses ?LOG_INFO/2 'LFmt' and 'LArgs' semantics
+-spec log_to_nodes(
+    Nodes :: rtt:nodes(), LFmt :: io:format(), LArgs :: list()) -> ok.
+log_to_nodes(Nodes, LFmt, LArgs) ->
     %% This logs to a node's info level, but if riak_test is running
     %% at debug level, we want to know when we send this and what
     %% we're saying
-    Nodes = lists:flatten(Nodes0),
     ?LOG_DEBUG("log_to_nodes: " ++ LFmt, LArgs),
-    Module = logger,
-    Function = info,
-    Args = case LArgs of
-        [] -> ["---riak_test--- " ++ LFmt];
-        _  -> ["---riak_test--- " ++ LFmt, LArgs]
-    end,
+    Format = "---riak_test--- " ++ LFmt,
     lists:foreach(
         fun(Node) ->
-            rpc:call(Node, Module, Function, Args)
-        end, Nodes).
+            rt_logger:log_to_node(Node, info, Format, LArgs)
+        end, lists:flatten(Nodes)).
 
 %% @doc Spawns processes to invoke Fun(Arg) on each element of Args.
 %% @equiv pmap(Fun, Args, rt_config:get(rt_max_wait_time))
@@ -3076,9 +3076,9 @@ wait_until_bucket_props(Nodes, Bucket, Props) ->
 
 %% @doc Set up in memory log capture to check contents in a test.
 setup_log_capture(Nodes) when is_list(Nodes) ->
-    lists:foreach(fun(N) -> rt_logger:plugin_logger(N) end, Nodes);
+    lists:foreach(fun rt_logger:plugin_logger/1, Nodes);
 setup_log_capture(Node) when not is_list(Node) ->
-    setup_log_capture([Node]).
+    rt_logger:plugin_logger(Node).
 
 expect_in_log(Node, Pattern) ->
     {Delay, Retry} = get_retry_settings(),
@@ -3320,12 +3320,21 @@ get_stats(Node, WaitBeforeMS)
 -spec get_stat(
     NodeOrStats :: node() | nonempty_list({binary(), term()}),
     Key :: atom() | binary() | nonempty_string() )
-        -> term().
+        -> term() | undefined.
 get_stat(Node, Key) when erlang:is_atom(Node) ->
     get_stat(get_stats(Node), Key);
 get_stat([_|_] = Stats, Key)
         when erlang:is_binary(Key) andalso erlang:size(Key) > 0 ->
-    proplists:get_value(Key, Stats);
+    %% lists:keyfind/3 is implemented directly as a NIF, so use it for speed
+    %% over large Stats lists (as Riak produces).
+    %% proplists:get_value/[23] is implemented in Erlang and takes much longer
+    %% on usual Riak stats.
+    case lists:keyfind(Key, 1, Stats) of
+        {_Key, Val} ->
+            Val;
+        _ ->
+            undefined
+    end;
 get_stat([_|_] = Stats, Key) when erlang:is_atom(Key) ->
     get_stat(Stats, erlang:atom_to_list(Key));
 get_stat([_|_] = Stats, [_|_] = Key) ->

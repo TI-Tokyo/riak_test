@@ -17,9 +17,9 @@
 %% -------------------------------------------------------------------
 %% @doc
 %% Will the range_repl command replicate tombstones
+
 -module(nextgenrepl_rangerepltomb).
 -behavior(riak_test).
-
 -export([confirm/0]).
 
 -include_lib("kernel/include/logger.hrl").
@@ -158,7 +158,7 @@ test_range_repl(Protocol, [ClusterA, ClusterB]) ->
         fun() ->
             QueueLength =
                 rpc:call(NodeA1, riak_kv_replrtq_src, length_rtq, [cluster_b]),
-            ?LOG_INFO("Queue length ~b", [QueueLength]),
+            ?LOG_INFO("Queue length ~w", [QueueLength]),
             QueueLength == {cluster_b, {0, 0, 0}}
         end,
     rt:wait_until(QueueEmpty),
@@ -172,7 +172,7 @@ test_range_repl(Protocol, [ClusterA, ClusterB]) ->
 
 %% @doc Write a series of keys and ensure they are all written.
 write_to_cluster(Node, Start, End, CommonValBin) ->
-    ?LOG_INFO("Writing ~0p keys to node ~0p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Writing ~b keys to node ~0p.", [End - Start + 1, Node]),
     ?LOG_WARNING("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F =
@@ -201,11 +201,11 @@ write_to_cluster(Node, Start, End, CommonValBin) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    ?LOG_WARNING("~0p errors while writing: ~0p", [length(Errors), Errors]),
+    ?LOG_WARNING("~b errors while writing: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 delete_from_cluster(Node, Start, End) ->
-    ?LOG_INFO("Deleting ~0p keys from node ~0p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Deleting ~b keys from node ~0p.", [End - Start + 1, Node]),
     ?LOG_WARNING("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F =
@@ -222,5 +222,5 @@ delete_from_cluster(Node, Start, End) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    ?LOG_WARNING("~0p errors while deleting: ~0p", [length(Errors), Errors]),
+    ?LOG_WARNING("~b errors while deleting: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).

@@ -22,7 +22,8 @@
 
 -export([confirm/0]).
 
-% -include_lib("stdlib/include/assert.hrl").
+-include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(INDEX, <<"maps">>).
 -define(TYPE, <<"maps">>).
@@ -50,7 +51,7 @@ confirm() ->
     %% Create bucket type for maps.
     rt:create_and_activate_bucket_type(Node, ?TYPE, [{datatype, map}]),
 
-    lager:info("Write map on 2.0.2"),
+    ?LOG_INFO("Write map on 2.0.2"),
     %% Write some sample data.
     Map = riakc_map:update(
             {<<"name">>, register},
@@ -67,11 +68,11 @@ confirm() ->
     %% Stop PB connection.
     riakc_pb_socket:stop(Pid),
 
-    lager:info("Upgrade to current"),
+    ?LOG_INFO("Upgrade to current"),
     %% Upgrade all nodes.
     [upgrade(N, current) || N <- Nodes],
 
-    lager:info("Update map on upgraded cluster"),
+    ?LOG_INFO("Update map on upgraded cluster"),
     %% Create PB connection.
     Pid2 = rt:pbc(Node),
     riakc_pb_socket:set_options(Pid2, [queue_if_disconnected]),
@@ -97,7 +98,7 @@ confirm() ->
     pass.
 
 upgrade(Node, NewVsn) ->
-    lager:info("Upgrading ~p to ~p", [Node, NewVsn]),
+    ?LOG_INFO("Upgrading ~0p to ~0p", [Node, NewVsn]),
     rt:upgrade(Node, NewVsn),
     rt:wait_for_service(Node, riak_kv),
     ok.

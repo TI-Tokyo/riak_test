@@ -22,6 +22,7 @@
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -define(CONFIG, [
@@ -115,7 +116,7 @@ start_node(Node, ExpectedNodes) ->
 
 check_is_available(Node, NVal, Min) ->
     F = fun() ->
-        lager:info("Checking ~p for availability with NVal ~p and Min ~p", [Node, NVal, Min]),
+        ?LOG_INFO("Checking ~0p for availability with NVal ~b and Min ~b", [Node, NVal, Min]),
         case get_uncovered_preflists(Node, NVal, Min) of
             [] ->
                 true;
@@ -127,7 +128,7 @@ check_is_available(Node, NVal, Min) ->
 
 check_is_not_available(Node, NVal, Min) ->
     F = fun() ->
-        lager:info("Checking ~p for non-availability with NVal ~p and Min ~p", [Node, NVal, Min]),
+        ?LOG_INFO("Checking ~0p for non-availability with NVal ~b and Min ~b", [Node, NVal, Min]),
         case get_uncovered_preflists(Node, NVal, Min) of
             L when is_list(L) andalso erlang:length(L) > 0 ->
                 true;
@@ -139,12 +140,12 @@ check_is_not_available(Node, NVal, Min) ->
 
 check_empty_uncovered_preflists_stat(Node) ->
     F = fun() ->
-        lager:info("Checking ~p for empty uncovered preflists stat", [Node]),
+        ?LOG_INFO("Checking ~0p for empty uncovered preflists stat", [Node]),
         case get_uncovered_preflists_stat(Node) of
             [] ->
                 true;
             Other ->
-                lager:warning("Expected empty uncovered preflists on node ~p, but got ~p", [Node, Other]),
+                ?LOG_WARNING("Expected empty uncovered preflists on node ~0p, but got ~0p", [Node, Other]),
                 false
         end
     end,
@@ -152,12 +153,12 @@ check_empty_uncovered_preflists_stat(Node) ->
 
 check_empty_uncovered_preflists2_stat(Node) ->
     F = fun() ->
-        lager:info("Checking ~p for empty uncovered preflist2s stat", [Node]),
+        ?LOG_INFO("Checking ~0p for empty uncovered preflist2s stat", [Node]),
         case get_uncovered_preflists2_stat(Node) of
             [] ->
                 true;
             Other ->
-                lager:warning("Expected empty uncovered preflists2 on node ~p, but got ~p", [Node, Other]),
+                ?LOG_WARNING("Expected empty uncovered preflists2 on node ~0p, but got ~0p", [Node, Other]),
                 false
         end
     end,
@@ -165,12 +166,12 @@ check_empty_uncovered_preflists2_stat(Node) ->
 
 check_nonempty_uncovered_preflists_stat(Node) ->
     F = fun() ->
-        lager:info("Checking ~p for non-empty uncovered preflists stat", [Node]),
+        ?LOG_INFO("Checking ~0p for non-empty uncovered preflists stat", [Node]),
         case get_uncovered_preflists_stat(Node) of
             L when is_list(L) andalso erlang:length(L) > 0 ->
                 true;
             Other ->
-                lager:warning("Expected non-empty uncovered preflists on node ~p, but got ~p", [Node, Other]),
+                ?LOG_WARNING("Expected non-empty uncovered preflists on node ~0p, but got ~0p", [Node, Other]),
                 false
         end
     end,
@@ -178,12 +179,12 @@ check_nonempty_uncovered_preflists_stat(Node) ->
 
 check_nonempty_uncovered_preflists2_stat(Node) ->
     F = fun() ->
-        lager:info("Checking ~p for non-empty uncovered preflists2 stat", [Node]),
+        ?LOG_INFO("Checking ~0p for non-empty uncovered preflists2 stat", [Node]),
         case get_uncovered_preflists2_stat(Node) of
             L when is_list(L) andalso erlang:length(L) > 0 ->
                 true;
             Other ->
-                lager:warning("Expected non-empty uncovered preflists2 on node ~p, but got ~p", [Node, Other]),
+                ?LOG_WARNING("Expected non-empty uncovered preflists2 on node ~0p, but got ~0p", [Node, Other]),
                 false
         end
     end,
@@ -203,7 +204,7 @@ wait_until_node_watcher_converges(Node, ExpectedNodes) ->
     ExpectedSet = sets:from_list(ExpectedNodes),
     rt:wait_until(
         fun() ->
-            lager:info("Waiting for ~p to have expected up nodes: ~p", [Node, ExpectedNodes]),
+            ?LOG_INFO("Waiting for ~0p to have expected up nodes: ~0p", [Node, ExpectedNodes]),
             UpNodes = riak_core_util:safe_rpc(Node, riak_core_node_watcher, nodes, [riak_kv]),
             UpSet = sets:from_list(UpNodes),
             equal_sets(UpSet, ExpectedSet)

@@ -19,6 +19,7 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+%%
 %% @private Harness operating on devrels in the local filesystem.
 -module(rtdev).
 -behavior(rt_harness).
@@ -68,8 +69,8 @@
     nowarn_export_all
 ]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("eunit/include/eunit.hrl").
--include("logging.hrl").
 
 -define(DEVS(N),    lists:concat(["dev", N, "@127.0.0.1"])).
 -define(DEV(N),     erlang:list_to_atom(?DEVS(N))).
@@ -387,12 +388,12 @@ upgrade(Node, NewVersion, Config, UpgradeCallback) ->
 
 upgrade(Node, SameVersion, SameVersion, same, _UpgradeCallback) ->
     ?LOG_INFO(
-        "Upgrade requested on node ~p, version ~p : nothing to do",
+        "Upgrade requested on node ~0p, version ~0p : nothing to do",
         [Node, SameVersion]),
     ok;
 upgrade(Node, SameVersion, SameVersion, Config, _UpgradeCallback) ->
     ?LOG_INFO(
-        "Upgrade requested on node ~p, version ~p : updating config only",
+        "Upgrade requested on node ~0p, version ~0p : updating config only",
         [Node, SameVersion]),
     stop(Node),
     rt:wait_until_unpingable(Node),
@@ -403,7 +404,7 @@ upgrade(Node, SameVersion, SameVersion, Config, _UpgradeCallback) ->
 upgrade(Node, OldVersion, NewVersion, Config, UpgradeCallback) ->
     NodeNum = get_node_id(Node),
     OldVersion = get_node_version(NodeNum),
-    ?LOG_INFO("Upgrading ~p : ~p -> ~p", [Node, OldVersion, NewVersion]),
+    ?LOG_INFO("Upgrading ~0p : ~0p -> ~0p", [Node, OldVersion, NewVersion]),
     stop(Node),
     rt:wait_until_unpingable(Node),
 
@@ -445,7 +446,7 @@ upgrade(Node, OldVersion, NewVersion, Config, UpgradeCallback) ->
     FromVersion :: rtt:vsn_tag(),
     ToVersion :: rtt:vsn_tag() ) -> ok | rtt:std_error().
 copy_conf(NumNodes, FromVersion, ToVersion) when ?is_pos_integer(NumNodes) ->
-    ?LOG_INFO("Copying config from ~p to ~p", [FromVersion, ToVersion]),
+    ?LOG_INFO("Copying config from ~0p to ~0p", [FromVersion, ToVersion]),
     FromPath = relpath(FromVersion),
     ToPath = relpath(ToVersion),
     lists:foreach(
@@ -466,7 +467,7 @@ copy_node_conf(NodeNum, FromPath, ToPath) ->
 
 -spec set_conf(atom() | string(), [{string(), string()}]) -> ok.
 set_conf(all, NameValuePairs) ->
-    ?LOG_INFO("rtdev:set_conf(all, ~p)", [NameValuePairs]),
+    ?LOG_INFO("rtdev:set_conf(all, ~0p)", [NameValuePairs]),
     [set_conf(DevPath, NameValuePairs) || DevPath <- devpaths()],
     ok;
 set_conf(Node, NameValuePairs) when is_atom(Node) ->
@@ -478,7 +479,7 @@ set_conf(DevPath, NameValuePairs) ->
     ok.
 
 set_advanced_conf(all, NameValuePairs) ->
-    ?LOG_INFO("rtdev:set_advanced_conf(all, ~p)", [NameValuePairs]),
+    ?LOG_INFO("rtdev:set_advanced_conf(all, ~0p)", [NameValuePairs]),
     [set_advanced_conf(DevPath, NameValuePairs) || DevPath <- devpaths()],
     ok;
 set_advanced_conf(Node, NameValuePairs) when is_atom(Node) ->
@@ -492,14 +493,14 @@ set_advanced_conf(DevPath, NameValuePairs) ->
         Confs ->
             Confs
     end,
-    ?LOG_INFO("AdvancedConfs = ~p~n", [AdvancedConfs]),
+    ?LOG_INFO("AdvancedConfs = ~0p", [AdvancedConfs]),
     [update_app_config_file(RiakConf, NameValuePairs) || RiakConf <- AdvancedConfs],
     ok.
 
 make_advanced_confs(DevPath) ->
     case filelib:is_dir(DevPath) of
         false ->
-            ?LOG_ERROR("Failed generating advanced.conf ~p is not a directory.", [DevPath]),
+            ?LOG_ERROR("Failed generating advanced.conf ~0p is not a directory.", [DevPath]),
             [];
         true ->
             Wildcard = io_lib:format("~s/dev/dev*/riak/etc", [DevPath]),
@@ -507,7 +508,7 @@ make_advanced_confs(DevPath) ->
             [
                 begin
                     AC = filename:join(Path, "advanced.config"),
-                    ?LOG_DEBUG("writing advanced.conf to ~p", [AC]),
+                    ?LOG_DEBUG("writing advanced.conf to ~0p", [AC]),
                     file:write_file(AC, io_lib:fwrite("~p.\n", [[]])),
                     AC
                 end || Path <- ConfDirs]
@@ -550,7 +551,7 @@ all_the_app_configs(DevPath) ->
     end.
 
 update_app_config(all, Config) ->
-    ?LOG_INFO("rtdev:update_app_config(all, ~p)", [Config]),
+    ?LOG_INFO("rtdev:update_app_config(all, ~0p)", [Config]),
     [update_app_config(DevPath, Config) || DevPath <- devpaths()];
 update_app_config(Node, Config) when is_atom(Node) ->
     N = get_node_id(Node),
@@ -570,7 +571,7 @@ update_app_config(DevPath, Config) ->
     [update_app_config_file(AppConfig, Config) || AppConfig <- all_the_app_configs(DevPath)].
 
 update_app_config_file(ConfigFile, Config) ->
-    ?LOG_INFO("rtdev:update_app_config_file(~s, ~p)", [ConfigFile, Config]),
+    ?LOG_INFO("rtdev:update_app_config_file(~s, ~0p)", [ConfigFile, Config]),
 
     BaseConfig = case file:consult(ConfigFile) of
         {ok, [ValidConfig]} ->
@@ -654,7 +655,7 @@ get_backend(AppConfig) ->
         {ok, [Config]} ->
             rt:get_backend(Config);
         E ->
-            ?LOG_ERROR("Error reading ~s, ~p", [ConfigFile, E]),
+            ?LOG_ERROR("Error reading ~s, ~0p", [ConfigFile, E]),
             error
     end.
 
@@ -704,7 +705,7 @@ clean_data_dir([], _)
 
 -spec delete_dirs(Dirs :: list(rtt:fs_path())) -> ok | rtt:std_error().
 delete_dirs([_|_] = Dirs) ->
-    ?LOG_INFO("Removing directories ~p", [Dirs]),
+    ?LOG_INFO("Removing directories ~0p", [Dirs]),
     ?assertMatch({0, _}, rt_exec:cmd("/bin/rm", ["-rf" | Dirs])),
     ?assertNot(lists:any(fun filelib:is_file/1, Dirs));
 delete_dirs([]) ->
@@ -731,7 +732,7 @@ add_default_node_config(Nodes) ->
             end, Nodes),
             ok;
         BadValue ->
-            ?LOG_ERROR("Invalid value for rt_default_config : ~p", [BadValue]),
+            ?LOG_ERROR("Invalid value for rt_default_config : ~0p", [BadValue]),
             throw({invalid_config, {rt_default_config, BadValue}})
     end.
 
@@ -756,7 +757,7 @@ deploy_clusters(ClusterConfigs) ->
 -spec deploy_nodes(rtt:node_configs()) -> rtt:nodes().
 deploy_nodes([_|_] = NodeConfigs) ->
     PathMap = get_tag_path_map(),
-    ?LOG_INFO("Riak path: ~p", [maps:get(root, PathMap)]),
+    ?LOG_INFO("Riak path: ~0p", [maps:get(root, PathMap)]),
     {Versions, Configs} = lists:unzip(NodeConfigs),
     %% Check that you have the right versions available
     lists:foreach(
@@ -812,9 +813,6 @@ deploy_nodes([_|_] = NodeConfigs) ->
         %% ensure node started
         rt:wait_until_pingable(N),
 
-        %% enable debug logging if ya wanna
-        % _ = rpc:call(N, lager, set_loglevel, [lager_console_backend, debug]),
-
         %% ensure riak_core_ring_manager is running before we go on
         rt:wait_until_registered(N, riak_core_ring_manager),
 
@@ -836,7 +834,7 @@ deploy_nodes([_|_] = NodeConfigs) ->
                 fun(R) -> ?assertMatch(ok, R) end, rt:pmap(WaitForNode, Nodes))
     end,
 
-    ?LOG_INFO("Deployed nodes: ~p", [Nodes]),
+    ?LOG_INFO("Deployed nodes: ~0p", [Nodes]),
     Nodes.
 
 %% @hidden Single-parameter function to stop a node if it's running.
@@ -860,7 +858,7 @@ stop_node_fun(#stop_node{
     case rpc:call(Node, os, getpid, []) of
         [_|_] = PidStr ->
             ?LOG_INFO(
-                "Stopping node ~p (OS PID ~s) with init:stop/0 ...",
+                "Stopping node ~0p (OS PID ~s) with init:stop/0 ...",
                 [Node, PidStr]),
             rpc:call(Node, init, stop, []),
             %% If init:stop/0 fails here, the wait_for_pid/2 call
@@ -875,7 +873,7 @@ stop_node_fun(#stop_node{
         BadRpc ->
             [Exe | Args] = CmdList = riak_cmd(DevRiakDir, ["stop"]),
             ?LOG_INFO(
-                "RPC to node ~p returned ~p, will try stop anyway ... ~s",
+                "RPC to node ~0p returned ~0p, will try stop anyway ... ~s",
                 [Node, BadRpc, rt_exec:cmd_line(CmdList)]),
             Status = case rt_exec:cmd(Exe, cwd, Args, [], rlines, TTO) of
                 {0, rlines, OK} ->
@@ -886,7 +884,7 @@ stop_node_fun(#stop_node{
                     ?LOG_ERROR("~0p", [Error]),
                     Error
             end,
-            ?LOG_INFO("Stopped node ~p, stop status: ~s.", [Node, Status])
+            ?LOG_INFO("Stopped node ~0p, stop status: ~s.", [Node, Status])
     end.
 
 %% @hidden Kill any Erlang processes under the specified DevPath.
@@ -912,7 +910,7 @@ kill_stragglers(DevPath, Timeout) ->
             ok;
         Pids ->
             %% send them all a SIGTERM to start ...
-            ?LOG_INFO("Killing stragglers ~p", [Pids]),
+            ?LOG_INFO("Killing stragglers ~0p", [Pids]),
             ?assertMatch(
                 {RC, _} when erlang:is_integer(RC),
                 rt_exec:cmd("/bin/kill", Pids)),
@@ -1000,7 +998,7 @@ find_shutdown_timeout([], undefined) ->
         [?DEFAULT_RIAK_SHUTDOWN_TIME]),
     ?DEFAULT_RIAK_SHUTDOWN_TIME;
 find_shutdown_timeout([], ImproperValue) ->
-    ?LOG_WARN(
+    ?LOG_WARNING(
         "Using improperly specified node shutdown_time of ~b ms",
         [ImproperValue]),
     ImproperValue;
@@ -1013,7 +1011,7 @@ find_shutdown_timeout([{ok, [TimeoutStr]} | Rest], ImproperValue) ->
             find_shutdown_timeout(Rest, ImproperValue)
     end;
 %% This pattern is returned by some Riak v3.x instances using a buggy
-%% relx-generated `riak' script. Refer to RIAK-1104.
+%% relx-generated `riak' script.
 %% The instance's `init' module will have (properly) ignored the bad
 %% configuration option and will use an effective shutdown_time of infinity,
 %% but we can still parse out the intended value to use if no properly-
@@ -1077,7 +1075,7 @@ admin(Node, Args, Options) ->
                     Output
             end
     end,
-    ?LOG_INFO("~p", [Result]),
+    ?LOG_DEBUG("~0p", [Result]),
     {ok, Result}.
 
 %% @private Call 'bin/riak admin status' command on `Node'.
@@ -1125,7 +1123,7 @@ riak(Node, Args) ->
     N = get_node_id(Node),
     Path = relpath(get_node_version(N)),
     Result = run_riak(N, Path, Args),
-    ?LOG_INFO("~s", [Result]),
+    ?LOG_DEBUG("~s", [string:trim(Result)]),
     {ok, Result}.
 
 %% @private
@@ -1134,7 +1132,7 @@ riak_repl(Node, Args) ->
     N = get_node_id(Node),
     Path = relpath(get_node_version(N)),
     Result = run_riak_repl(N, Path, Args),
-    ?LOG_INFO("~s", [Result]),
+    ?LOG_DEBUG("~s", [string:trim(Result)]),
     {ok, Result}.
 
 -spec get_node_id(Node :: node()) -> Result :: rtt:node_id().
@@ -1170,7 +1168,7 @@ spawned_result(CmdToken) ->
 %%    set_backend(Backend, []).
 %%
 %%set_backend(Backend, OtherOpts) ->
-%%    ?LOG_INFO("rtdev:set_backend(~p, ~p)", [Backend, OtherOpts]),
+%%    ?LOG_INFO("rtdev:set_backend(~0p, ~0p)", [Backend, OtherOpts]),
 %%    Opts = [{storage_backend, Backend} | OtherOpts],
 %%    update_app_config(all, [{riak_kv, Opts}]),
 %%    get_backends().
@@ -1201,30 +1199,15 @@ get_relpath_version(Path) ->
     end.
 
 %% @private Stop all discoverable nodes.
--spec teardown() -> ok | rtt:std_error().
+-spec teardown() -> ok.
 teardown() ->
     %% make sure we stop any cover processes on any nodes
     %% otherwise, if the next test boots a legacy node we'll end up with cover
     %% incompatibilities and crash the cover server
     rt_cover:maybe_stop_on_nodes(),
     DevPaths = [filename:join(P, "dev") || P <- devpaths()],
-    Results = rt:pmap(fun(DevPath) -> stop_all(DevPath) end, DevPaths),
-    lists:foldl(fun fold_teardown_result/2, ok, Results).
-
-%% @hidden list fold, used only by teardown/0
--spec fold_teardown_result(
-    StopResult :: term(), Result :: ok | rtt:std_error() )
-        -> ok | rtt:std_error().
-fold_teardown_result(ok, Result) ->
-    Result;
-fold_teardown_result({error, Reason}, ok) ->
-    {error, [Reason]};
-fold_teardown_result(Reason, ok) ->
-    {error, [Reason]};
-fold_teardown_result({error, Reason}, {error, [Reasons]}) ->
-    {error, [Reason | Reasons]};
-fold_teardown_result(Reason, {error, [Reasons]}) ->
-    {error, [Reason | Reasons]}.
+    _ = rt:pmap(fun stop_all/1, DevPaths),
+    ok.
 
 %% @private Display running nodes.
 whats_up() ->
@@ -1394,8 +1377,16 @@ release_versions_test() ->
         {"3.0.3",   "/no/such/rt/root/riak/3.0.3"},
         {<<3,2,1>>, "/no/such/rt/root/riak/3.2.1"}
     ],
-    ?assertMatch(ok, application:load(riak_test)),
-    ?assertMatch(ok, rt_config:set(rtdev_path, Config)),
+    LoadRes = case application:load(riak_test) of
+        ok ->
+            ok;
+        {error, {already_loaded, riak_test}} ->
+            ok;
+        Other ->
+            Other
+    end,
+    ?assertMatch(ok, LoadRes),
+    ok = rt_config:set(rtdev_path, Config),
 
     ?assertEqual("/no/such/rt/root/riak/3.0.6", relpath(previous)),
     ?assertEqual("/no/such/rt/root/riak/2.9.5", relpath('2.9.5')),

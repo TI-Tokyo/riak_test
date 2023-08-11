@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2012 Basho Technologies, Inc.
+%% Copyright (c) 2012-2013 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -19,12 +19,15 @@
 %% -------------------------------------------------------------------
 -module(verify_basic_upgrade).
 -behavior(riak_test).
+
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(NUM_KEYS, 20000).
 
--define(CONFIG(RingSize, NVal), 
+-define(CONFIG(RingSize, NVal),
     [
         {riak_core,
             [
@@ -39,22 +42,22 @@
         },
         {leveled,
             [
-                {journal_objectcount, 2000} 
+                {journal_objectcount, 2000}
                 % setting  low object count ensures we test rolled journal
                 % files, not just active ones
             ]}
         ]).
 
 confirm() ->
-    
+
     TestMetaData = riak_test_runner:metadata(),
     OldVsn = proplists:get_value(upgrade_version, TestMetaData, previous),
 
-    [Nodes] = 
+    [Nodes] =
         rt:build_clusters([{4, OldVsn, ?CONFIG(8, 3)}]),
     [Node1|_] = Nodes,
 
-    lager:info("Writing ~w keys to ~p", [?NUM_KEYS, Node1]),
+    ?LOG_INFO("Writing ~b keys to ~0p", [?NUM_KEYS, Node1]),
     rt:systest_write(Node1, ?NUM_KEYS, 3),
     ?assertEqual([], rt:systest_read(Node1, ?NUM_KEYS, 1)),
 
@@ -65,9 +68,9 @@ confirm() ->
     pass.
 
 upgrade(Node, NewVsn) ->
-    lager:info("Upgrading ~p to ~p", [Node, NewVsn]),
+    ?LOG_INFO("Upgrading ~0p to ~0p", [Node, NewVsn]),
     rt:upgrade(Node, NewVsn),
     rt:wait_for_service(Node, riak_kv),
-    lager:info("Ensuring keys still exist"),
+    ?LOG_INFO("Ensuring keys still exist"),
     ?assertEqual([], rt:systest_read(Node, ?NUM_KEYS, 1)),
     ok.

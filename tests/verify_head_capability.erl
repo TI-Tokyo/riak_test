@@ -26,6 +26,7 @@
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -define(BUCKET, <<"test-bucket">>).
@@ -64,16 +65,16 @@ confirm() ->
             rt_vsn:find_version_before(MinHeadVsn, CfgVersions) of
         {OldTag, OldVsn} ->
             OldStr = rt_vsn:version_to_string(OldVsn),
-            lager:info(
+            ?LOG_INFO(
                 "Version ~s (~s) found not supporting fsm Head requests",
                 [OldStr, OldTag]),
-            lager:info(
+            ?LOG_INFO(
                 "Building mixed cluster of version ~s (~s) and ~s (~s) nodes",
                 [OldStr, OldTag, NewStr, NewTag]),
             {true, rt:build_cluster([OldTag, OldTag, NewTag, NewTag])};
         _ ->
-            lager:info("No version found not supporting fsm Head requests"),
-            lager:info(
+            ?LOG_INFO("No version found not supporting fsm Head requests"),
+            ?LOG_INFO(
                 "Building cluster of version ~s (~s) nodes",
                 [NewStr, NewTag]),
             {false, rt:build_cluster(lists:duplicate(4, NewTag))}
@@ -84,7 +85,7 @@ confirm() ->
 
     %% Write ?NUM_RECS records.
     %% Write to old and new nodes, in case it's a mixed cluster.
-    lager:info("Writing ~b records", [?NUM_RECS]),
+    ?LOG_INFO("Writing ~b records", [?NUM_RECS]),
     ?assertMatch([], rt:systest_write(
         lists:nth(2, Nodes), 1, (?NUM_RECS div 2), ?BUCKET, 2)),
     ?assertMatch([], rt:systest_write(
@@ -96,30 +97,30 @@ confirm() ->
     %% Make sure the trace files don't exist from some previous run!
     delete_files(TraceFiles),
 
-    case OldEnough of
-        true ->
-            lager:info("STARTING MIXED CLUSTER TRACE"),
+    if OldEnough ->
 
-            %% Pick ONE node to trace, which is the one we'll read on
-            TraceNode1 = lists:nth(rand:uniform(4), Nodes),
-            lager:info("Tracing on node ~w", [TraceNode1]),
-            ?assertMatch(ok, rt_redbug:trace(TraceNode1, ?TRACE_FUNC,
-                #{arity => true, print_file => TraceFile1})),
+        ?LOG_INFO("STARTING MIXED CLUSTER TRACE"),
 
-            ReadRes1 = rt:systest_read(TraceNode1, 1, ?NUM_RECS, ?BUCKET, 2),
+        %% Pick ONE node to trace, which is the one we'll read on
+        TraceNode1 =  rt_util:random_element(Nodes),
+        ?LOG_INFO("Tracing on node ~0p", [TraceNode1]),
+        ?assertMatch(ok, rt_redbug:trace(TraceNode1, ?TRACE_FUNC,
+            #{arity => true, print_file => TraceFile1})),
 
-            ?assertMatch(ok, rt_redbug:stop()),
+        ReadRes1 = rt:systest_read(TraceNode1, 1, ?NUM_RECS, ?BUCKET, 2),
 
-            ?assertMatch(0, head_cnt(TraceFile1)),
-            ?assertMatch([], ReadRes1),
+        ?assertMatch(ok, rt_redbug:stop()),
 
-            lager:info("upgrade all to ~s", [NewTag]),
+        ?assertMatch(0, head_cnt(TraceFile1)),
+        ?assertMatch([], ReadRes1),
 
-            [OldNode1, OldNode2 | _] = Nodes,
-            rt:upgrade(OldNode1, NewTag),
-            rt:upgrade(OldNode2, NewTag);
-        _ ->
-            % not OldEnough
+        ?LOG_INFO("upgrade all to ~s", [NewTag]),
+
+        [OldNode1, OldNode2 | _] = Nodes,
+        rt:upgrade(OldNode1, NewTag),
+        rt:upgrade(OldNode2, NewTag);
+
+    true ->    % ! OldEnough
         ok
     end,
 
@@ -129,11 +130,11 @@ confirm() ->
                 rt:wait_until_capability(Node, {riak_kv, get_request_type}, head))
         end, Nodes),
 
-    lager:info("STARTING HOMOGENEOUS CLUSTER TRACE"),
+    ?LOG_INFO("STARTING HOMOGENEOUS CLUSTER TRACE"),
 
     %% Pick ONE node to trace, which is the one we'll read on
-    TraceNode2 = lists:nth(rand:uniform(4), Nodes),
-    lager:info("Tracing on node ~w", [TraceNode2]),
+    TraceNode2 = rt_util:random_element(Nodes),
+    ?LOG_INFO("Tracing on node ~0p", [TraceNode2]),
     ?assertMatch(ok, rt_redbug:trace(TraceNode2, ?TRACE_FUNC,
         #{arity => true, print_file => TraceFile2})),
 
@@ -151,7 +152,7 @@ confirm() ->
 
 
 head_cnt(File) ->
-    lager:info("checking ~p", [File]),
+    ?LOG_INFO("checking ~s", [File]),
     %% redbug doesn't create the file until it has something to write to it,
     %% so accommodate non-existence
     case file:read_file(File) of

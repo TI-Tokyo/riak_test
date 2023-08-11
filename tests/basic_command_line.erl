@@ -55,16 +55,19 @@ confirm() ->
 console_up_test(Node) ->
     ?LOG_INFO("Node is already up, `riak console` should fail"),
     {ok, ConsoleFail} = rt:riak(Node, ["console"]),
-    ?assert(rt:str(ConsoleFail, "Node is already running!")),
-    ok.
+    ?assert(rt:str(ConsoleFail, "Node is already running!")).
 
 console_test(Node) ->
-    %% Make sure the cluster will start up with /usr/sbin/riak console, then quit
+    %% Make sure the cluster will start up with /sbin/riak console, then quit
     ?LOG_INFO("Testing riak console on ~s", [Node]),
 
+    %% Console prompt changes with OTP version, but rather than check what's
+    %% running with rt:otp_release/1 we'll just use a RegEx that'll be easier
+    %% to maintain over time.
+    Prompt = {re, "abort with \\^G|press Ctrl+G to abort"},
     %% Start and stop node, to test console working
     Ops = [
-        {expect, "(abort with ^G)", 20000}, % give it some time to start
+        {expect, Prompt, 20000},    % give it some time to start
         {send, "riak_core_ring_manager:get_my_ring().\n"},
         {expect, "dict,", 10000},
         {send, "q().\n"},
@@ -77,55 +80,47 @@ start_up_test(Node) ->
     %% Try starting again and check you get the node is already running message
     ?LOG_INFO("Testing riak start now will return 'already running'"),
     {ok, StartOut} = rt:riak(Node, ["start"]),
-    ?assert(rt:str(StartOut, "Node is already running!")),
-    ok.
-
+    ?assert(rt:str(StartOut, "Node is already running!")).
 
 start_test(Node) ->
     %% Test starting with /bin/riak start
     ?LOG_INFO("Testing riak start works on ~s", [Node]),
-
     {ok, Output} = rt:riak(Node, ["start"]),
     StartPass = string:trim(Output),
     ?LOG_INFO("StartPass: ~0p", [StartPass]),
+    %% Depending on relx version, a variety of output may be printed.
     ?assert(
         StartPass =:= ""
-        orelse string:str(StartPass, "WARNING") =/= 0
-        orelse string:str(StartPass, "riak start is deprecated") =/= 0),
-    rt:stop_and_wait(Node),
-    ok.
+        orelse rt:str(StartPass, "WARNING")
+        orelse rt:str(StartPass, " deprecated") ),
+    rt:stop_and_wait(Node).
 
 stop_test(Node) ->
+    ?LOG_INFO("Testing riak stop works on ~s", [Node]),
     ?assert(rt:is_pingable(Node)),
-
-    {ok, "ok\n"} = rt:riak(Node, ["stop"]),
-
-    ?assertNot(rt:is_pingable(Node)),
-    ok.
+    {ok, Output} = rt:riak(Node, ["stop"]),
+    StopOut = string:trim(Output),  % trailing newline
+    ?assertMatch("ok", StopOut),
+    ?assertNot(rt:is_pingable(Node)).
 
 ping_up_test(Node) ->
-
-    %% check /usr/sbin/riak ping
     ?LOG_INFO("Testing riak ping on ~s", [Node]),
-
     %% ping / pong
     %% rt:start_and_wait(Node),
     ?LOG_INFO("Node up, should ping"),
     {ok, PongOut} = rt:riak(Node, ["ping"]),
-    ?assert(rt:str(PongOut, "pong")),
-    ok.
+    ?assert(rt:str(PongOut, "pong")).
 
 ping_down_test(Node) ->
     %% ping / pang
     ?LOG_INFO("Node down, should pang"),
     {ok, PangOut} = rt:riak(Node, ["ping"]),
-    ?assert(rt:str(PangOut, "not responding to pings")),
-    ok.
+    ?assert(rt:str(PangOut, "Node is not running!")).
 
 attach_down_test(Node) ->
     ?LOG_INFO("Testing riak 3+ 'attach' while down"),
     {ok, AttachOut} = rt:riak(Node, ["attach"]),
-    ?assert(rt:str(AttachOut, "not responding to pings")).
+    ?assert(rt:str(AttachOut, "Node is not running!")).
 
 attach_direct_up_test(Node) ->
     ?LOG_INFO("Testing riak 3+ 'attach'"),
@@ -140,29 +135,30 @@ attach_direct_up_test(Node) ->
 status_up_test(Node) ->
     ?LOG_INFO("Test riak admin status on ~s", [Node]),
     {ok, {ExitCode, StatusOut}} = rt:admin(Node, ["status"], [return_exit_code]),
-    ?LOG_INFO("Result of status: ~s", [StatusOut]),
+    ?LOG_DEBUG("Result of status: ~s", [StatusOut]),
     ?assertEqual(0, ExitCode),
     ?assert(rt:str(StatusOut, "1-minute stats")),
-    ?assert(rt:str(StatusOut, "kernel_version")),
-    ok.
+    ?assert(rt:str(StatusOut, "kernel_version")).
 
 status_down_test(Node) ->
     ?LOG_INFO("Test riak admin status on ~s while down", [Node]),
     {ok, {ExitCode, StatusOut}} = rt:admin(Node, ["status"], [return_exit_code]),
     ?assertNotEqual(0, ExitCode),
-    ?assert(rt:str(StatusOut, "not responding to pings")),
-    ok.
+    ?assert(rt:str(StatusOut, "Node is not running!")).
 
 getpid_up_test(Node) ->
     ?LOG_INFO("Test riak get pid on ~s", [Node]),
     {ok, Output} = rt:riak(Node, ["pid"]),
     PidOut = string:trim(Output),   % trailing newline
     ?assertMatch([_|_], PidOut),
-    ?assertEqual(PidOut, rpc:call(Node, os, getpid, [])),
-    ok.
+    ?assertEqual(PidOut, rpc:call(Node, os, getpid, [])).
 
 getpid_down_test(Node) ->
     ?LOG_INFO("Test riak getpid fails on ~s", [Node]),
-    {ok, PidOut} = rt:riak(Node, ["pid"]),
-    ?assert(rt:str(PidOut, "not responding to pings")),
-    ok.
+    {ok, Output} = rt:riak(Node, ["pid"]),
+    PidOut = string:trim(Output),   % trailing newline
+    %% Depending on relx version, a variety of output may be printed.
+    ?assert(
+        PidOut =:= ""
+        orelse rt:str(PidOut, " not responding to ping")
+        orelse rt:str(PidOut, " not running") ).

@@ -35,6 +35,8 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
+-include_lib("kernel/include/logger.hrl").
+
 -define(SERVER, ?MODULE).
 
 -record(state, { get_fsm_count,
@@ -111,7 +113,7 @@ handle_call({is_settled, ThresholdSecs}, _From, State=#state{last_msg_ts=LastMsg
               end,
       {reply, Reply, State};
 handle_call(Request, _From, State) ->
-    lager:error("Unknown message received: ~p~n", [Request]),
+    ?LOG_ERROR("Unknown message received: ~0p", [Request]),
     {reply, ok, State}.
 
 %%--------------------------------------------------------------------

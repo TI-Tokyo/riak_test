@@ -282,9 +282,8 @@ with_insomnia_test(ClusterA, ClusterB) ->
 
     PeerConfigFun =
         fun(Node) ->
-            {pb, {IP, Port}} =
-                lists:keyfind(pb, 1, rt:connection_info(Node)),
-            {IP, Port}
+            {ok, PbEndpoint} = rt:get_pb_conn_info(Node),
+            PbEndpoint
         end,
 
     reset_peer_config(
@@ -369,11 +368,11 @@ rotating_full_sync(NodeA, NodeB, GetStatsFun, LogFun, 0) ->
     lists:foreach(LoopLogFun, lists:seq(1, ?LOOP_COUNT)),
     GetStatsFun();
 rotating_full_sync(NodeA, NodeB, GetStatsFun, LogFun, Rotations) ->
-    ?LOG_INFO("Full sync from Cluster B - loops to go ~0p", [Rotations]),
+    ?LOG_INFO("Full sync from Cluster B - loops to go ~b", [Rotations]),
     rpc:call(NodeB, riak_client, ttaaefs_fullsync, [all_check, 60]),
     timer:sleep(?BIG_REPL_SLEEP),
     _ = LogFun(NodeA, NodeB),
-    ?LOG_INFO("Full sync from Cluster A - loops to go ~0p", [Rotations]),
+    ?LOG_INFO("Full sync from Cluster A - loops to go ~b", [Rotations]),
     rpc:call(NodeA, riak_client, ttaaefs_fullsync, [all_check, 60]),
     timer:sleep(?BIG_REPL_SLEEP),
     _ = LogFun(NodeA, NodeB),
@@ -392,13 +391,13 @@ count_keys_fun(N, ExpectedC, Type) ->
                 riak_client,
                 aae_fold,
                 [{Type, ?TEST_BUCKET, all, all, all, count}]),
-        ?LOG_INFO("Count of ~0p on ~0p for ~0p", [C, N, Type]),
+        ?LOG_INFO("Count of ~w on ~w for ~w", [C, N, Type]),
         ExpectedC == C
     end.
 
 %% @doc Write a series of keys and ensure they are all written.
 write_to_cluster(Node, Start, End, CommonValBin) ->
-    ?LOG_INFO("Writing ~0p keys to node ~0p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Writing ~b keys to node ~0p.", [End - Start + 1, Node]),
     ?LOG_WARNING("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F =
@@ -427,11 +426,11 @@ write_to_cluster(Node, Start, End, CommonValBin) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    ?LOG_WARNING("~0p errors while writing: ~0p", [length(Errors), Errors]),
+    ?LOG_WARNING("~b errors while writing: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 delete_from_cluster(Node, Start, End) ->
-    ?LOG_INFO("Deleting ~0p keys from node ~0p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Deleting ~b keys from node ~0p.", [End - Start + 1, Node]),
     ?LOG_WARNING("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F =
@@ -448,7 +447,7 @@ delete_from_cluster(Node, Start, End) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    ?LOG_WARNING("~0p errors while deleting: ~0p", [length(Errors), Errors]),
+    ?LOG_WARNING("~b errors while deleting: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 

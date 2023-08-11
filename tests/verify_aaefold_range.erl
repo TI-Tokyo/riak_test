@@ -147,9 +147,7 @@ verify_aae_fold(Nodes) ->
         end,
     lists:foldl(KeyLoadTypeBFun, 1, Nodes),
     TypedBucketObjectCount = (?NUM_KEYS_PERNODE div 4) * length(Nodes),
-    ?LOG_INFO(
-        "Loaded ~b objects",
-        [TypedBucketObjectCount]),
+    ?LOG_INFO("Loaded ~b objects", [TypedBucketObjectCount]),
     timer:sleep(1000),
 
     ObjectStatsTypedBucketQuery = {object_stats, Nv4B, all, all},

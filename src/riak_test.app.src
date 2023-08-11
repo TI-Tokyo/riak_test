@@ -1,6 +1,7 @@
 %% ------------------------------------------------------------------
 %%
 %% Copyright (c) 2012-2013 Basho Technologies, Inc.
+%% Copyright (c) 2023 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -18,20 +19,48 @@
 %%
 %% ------------------------------------------------------------------
 {application, riak_test, [
-    {description, "Testing Infrastructure for Riak"},
-    {vsn, git},
-    {registered, []},
+    {description,   "Testing Infrastructure for Riak"},
+    {vsn,           "3.2"},
+    {registered,    [riak_test]},
     {applications, [
         kernel,
         stdlib,
-        lager,
         mapred_verify
     ]},
     {env, [
-        {platform, undefined},
-        {rt_scratch_dir, "/tmp/riak_test_scratch"},
-        {rt_max_wait_time, 180000},
-        {rt_retry_delay, 500},
-        {rt_harness, rtdev}
+        %% Log formatter templates, used by multiple modules
+        {log_templates, #{
+            minimal => [
+                time, " [", level, "] ", msg
+            ],
+            minimal_nl => [
+                time, " [", level, "] ", msg, "\n"
+            ],
+            verbose => [
+                time, " [", level, "] ", {pid, [pid, "@"], []},
+                {mfa, [mfa, ":"], []}, {line, [line, ":"], []}, " ", msg
+            ],
+            verbose_nl => [
+                time, " [", level, "] ", {pid, [pid, "@"], []},
+                {mfa, [mfa, ":"], []}, {line, [line, ":"], []}, " ", msg, "\n"
+            ]
+        }},
+
+        %% Common log formatter, used by multiple modules
+        {log_formatter, {logger_formatter, #{
+            %% Allow multiple lines, primarily for stack traces
+            single_line => false,
+            legacy_header => false, time_designator => $\s }
+            %% Always add "template => <one of ours above>"
+        }},
+
+        %% Config defaults that we always want defined
+        {log_level,         info},
+        {platform,          undefined},
+        {rt_harness,        rtdev},
+        {rt_max_wait_time,  180000},
+        {rt_retry_delay,    500},
+        {rt_scratch_dir,    "/tmp/riak_test_scratch"},
+        {verbose,           false}
     ]}
 ]}.

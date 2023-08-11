@@ -21,7 +21,25 @@
 -behavior(riak_test).
 
 -export([confirm/0]).
--compile([nowarn_unused_function]).
+
+%% MFA test invocations
+-export([
+    test_fsm_protection/2,
+    test_no_overload_protection/2,
+    test_vnode_protection/2
+]).
+
+%% RPC calls back into this module
+-export([
+    remote_suspend_and_overload/0,
+    remote_suspend_vnode/1,
+    remote_suspend_vnode_proxy/1,
+    remote_vnode_gets_in_queue/1,
+    remote_vnode_queues_empty/0
+]).
+
+%% Lots of unused functions, easier than commenting them out
+-compile(nowarn_unused_function).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
@@ -108,7 +126,7 @@ confirm() ->
              test_fsm_protection],
 
     [begin
-         ?LOG_INFO("Starting Test ~0p for ~0p~n", [Test, BKV]),
+         ?LOG_INFO("Starting Test ~0p for ~0p", [Test, BKV]),
          ok = erlang:apply(?MODULE, Test, [Nodes, BKV])
      end || Test <- Tests,
             BKV <- [NormalBKV,
@@ -209,8 +227,8 @@ test_fsm_protection(Nodes, BKV) ->
     {ok, ExpectedFsms} = get_calculated_sj_limit(Node1, riak_kv_get_fsm_sj, 1),
 
     %% We expect exactly ExpectedFsms, but because of a race in SideJob we sometimes get 1 more
-    %% Adding 2 (the highest observed rasce to date) to the lte predicate to handle the occasional case.
-    %% Once SideJob is fixed we should remove it (RIAK-2219).
+    %% Adding 2 (the highest observed race to date) to the lte predicate to handle the occasional case.
+    %% Once SideJob is fixed we should remove it (Basho #2219).
     ProcFun = build_predicate_lte(test_fsm_protection, (ExpectedFsms+2),
                                  "ProcFun", "Procs"),
     QueueFun = build_predicate_lt(test_fsm_protection, (?NUM_REQUESTS),
@@ -344,11 +362,11 @@ node_overload_check(Pid) ->
     end.
 
 list_keys(Node) ->
-    ?LOG_INFO("Connecting to node ~0p~n", [Node]),
+    ?LOG_INFO("Connecting to node ~0p", [Node]),
     Pid = rt:pbc(Node),
-    ?LOG_INFO("Listing keys on node ~0p~n", [Node]),
-    Res = riakc_pb_socket:list_keys(Pid, {<<"normal_type">>, ?BUCKET}, 10000),
-    ?LOG_INFO("List keys on node ~0p completed with result ~0p~n", [Node, Res]),
+    ?LOG_INFO("Listing keys on node ~0p", [Node]),
+    Res = riakc_pb_socket:list_keys(Pid, {<<"normal_type">>, ?BUCKET}, 20000),
+    ?LOG_INFO("List keys on node ~0p completed with result ~0p", [Node, Res]),
     riakc_pb_socket:stop(Pid),
     Res.
 
@@ -452,7 +470,7 @@ remote_suspend_and_overload() ->
     spawn(fun() ->
                   Vnodes = riak_core_vnode_manager:all_vnodes(),
                   [begin
-                       ?LOG_INFO("Suspending vnode pid: ~0p~n", [Pid]),
+                       ?LOG_INFO("Suspending vnode pid: ~0p", [Pid]),
                        erlang:suspend_process(Pid)
                    end || {riak_kv_vnode, _, Pid} <- Vnodes],
                   wait_for_input(Vnodes)
@@ -461,9 +479,9 @@ remote_suspend_and_overload() ->
 wait_for_input(Vnodes) ->
     receive
         {overload, From} ->
-            ?LOG_INFO("Overloading vnodes.", []),
+            ?LOG_INFO("Overloading vnodes."),
             [overload(Vnodes, Pid) || {riak_kv_vnode, _, Pid} <- Vnodes],
-            ?LOG_INFO("Sending overloaded message back to test.", []),
+            ?LOG_INFO("Sending overloaded message back to test."),
             From ! {overloaded, self()},
             wait_for_input(Vnodes);
         {verify_overload, From} ->
@@ -471,7 +489,7 @@ wait_for_input(Vnodes) ->
             From ! OverloadCheck,
             wait_for_input(Vnodes);
         resume ->
-            ?LOG_INFO("Resuming vnodes~n"),
+            ?LOG_INFO("Resuming vnodes"),
             [erlang:resume_process(Pid) || {riak_kv_vnode, _, Pid}
                                                <- Vnodes]
     end.
@@ -577,7 +595,7 @@ remote_vnode_gets_in_queue(Idx) ->
     {ok, Pid} = riak_core_vnode_manager:get_vnode_pid(Idx, riak_kv_vnode),
     {messages, AllMessages} = process_info(Pid, messages),
     GetMessages = lists:filter(fun is_get_req/1, AllMessages),
-    ?LOG_INFO("Get requests (~0p): ~0p", [Idx, length(GetMessages)]),
+    ?LOG_INFO("Get requests (~0p): ~b", [Idx, length(GetMessages)]),
     length(GetMessages).
 
 %% This is not the greatest thing ever, since we're coupling this test pretty

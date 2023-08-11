@@ -51,12 +51,10 @@
     version_to_string/1
 ]).
 
+-include_lib("kernel/include/logger.hrl").
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
-%% Lager won't be running, EUnit throws away stdout from passing tests.
--define(LOG_TO_STDIO, true).
 -endif. % TEST
--include("logging.hrl").
 
 %% A comparable, strictly-ordered version representation.
 %% MUST be kept in sync with `rtt:vsn_rec()'
@@ -324,7 +322,7 @@ configured_tagged_versions([Tag | Tags], Result) ->
             configured_tagged_versions(Tags, [TV | Result]);
         NoVer ->
             % Drop anything without a version
-            ?LOG_WARN("Tag ~p has no explicit version: ~p", [Tag, NoVer]),
+            ?LOG_WARNING("Tag ~0p has no explicit version: ~0p", [Tag, NoVer]),
             configured_tagged_versions(Tags, Result)
     end.
 

@@ -48,8 +48,8 @@
     agent_proc/1        %% spawned agent process
 ]).
 
+-include_lib("kernel/include/logger.hrl").
 % -include_lib("stdlib/include/assert.hrl").
--include("logging.hrl").
 
 %% First version with riak_api_pb_listener:wait_for_listener_ready.
 %% ToDo: Update when the feature is in a published Riak release.
@@ -219,11 +219,11 @@ connect_write_read(Rec, IP, Port, Stats) ->
                 ok ->
                     B = riakc_obj:bucket(Rec),
                     K = riakc_obj:key(Rec),
-                    ?LOG_INFO("PUT ~p:~p => ~p", [
+                    ?LOG_INFO("PUT ~0p:~0p => ~0p", [
                         B, K, riakc_obj:get_update_value(Rec)]),
                     Result = case riakc_pb_socket:get(Pid, B, K) of
                         {ok, Out} ->
-                            ?LOG_INFO("GET ~p:~p => ~p", [
+                            ?LOG_INFO("GET ~0p:~0p => ~0p", [
                                 riakc_obj:bucket(Out), riakc_obj:key(Out),
                                 riakc_obj:get_value(Out)]),
                             Stats;
@@ -242,7 +242,7 @@ connect_write_read(Rec, IP, Port, Stats) ->
             connect_write_read(Rec, IP, Port, Stats, Unexpected)
     catch
         Class:Reason ->
-            ?LOG_ERROR("~p : ~p", [Class, Reason]),
+            ?LOG_ERROR("~0p : ~0p", [Class, Reason]),
             connect_write_read(Rec, IP, Port, Stats, except)
     end.
 
@@ -381,5 +381,5 @@ silence_crashes() ->
 silence_crashes(#{msg := {report, #{label := {proc_lib, crash}}}}, ?MODULE) ->
     stop;
 silence_crashes(Map, Param) ->
-    ?LOG_INFO("~p ~p", [Param, Map]),
+    ?LOG_INFO("~0p ~0p", [Param, Map]),
     ignore.

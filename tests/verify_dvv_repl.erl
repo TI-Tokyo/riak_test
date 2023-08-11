@@ -17,7 +17,6 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
-
 %%% @copyright (C) 2014, Basho Technologies
 %%% @doc
 %%% riak_test repl caused sibling explosion Encodes scenario as
@@ -26,11 +25,13 @@
 %%% to A 100 times. Without DVV you have 100 siblings on B, with, you
 %%% have 2 (the original B write, and the converged A writes)
 %%% @end
-
 -module(verify_dvv_repl).
 -behavior(riak_test).
+
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(BUCKET, <<"dvv-repl-bucket">>).
 -define(KEY, <<"dvv-repl-key">>).
@@ -65,7 +66,7 @@ confirm() ->
     %% different nodes concurrently in the n_val=3 preflist.
     ?assertMatch(Count when Count =< 3, riakc_obj:value_count(AObj)),
     WaitFun = fun() ->
-                      lager:info("Checking sink object"),
+                      ?LOG_INFO("Checking sink object"),
                       BObj = get_object(ClientB),
                       Resolved0 = resolve(riakc_obj:get_values(BObj)),
                       Resolved = lists:sort(sets:to_list(Resolved0)),
@@ -153,7 +154,7 @@ resolve_update(Values) ->
 
 %% Set up one way RT repl
 connect_realtime(ClusterA, ClusterB) ->
-    lager:info("repl power...ACTIVATE!"),
+    ?LOG_INFO("repl power...ACTIVATE!"),
     LeaderA = get_leader(hd(ClusterA)),
     MgrPortB = get_mgr_port(hd(ClusterB)),
     repl_util:connect_cluster(LeaderA, "127.0.0.1", MgrPortB),

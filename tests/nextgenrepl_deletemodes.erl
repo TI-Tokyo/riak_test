@@ -217,7 +217,7 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC]) ->
     {ok, BKdhLB} = find_tombs(NodeB1, all, all),
     {ok, BKdhLC} = find_tombs(NodeC1, all, all),
     ?LOG_INFO(
-        "Tomb counts A=~0p B=~0p C=~0p",
+        "Tomb counts A=~b B=~b C=~b",
         [length(BKdhLA), length(BKdhLB), length(BKdhLC)]),
     ?assertMatch(0, length(BKdhLA)),
     ?assertMatch(0, length(BKdhLC)),
@@ -227,7 +227,7 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC]) ->
     {ok, BKdhLBr3} = find_tombs(NodeB1, all, all),
     {ok, BKdhLBr4} = find_tombs(NodeB1, all, all),
     Found = lists:usort(BKdhLBr1 ++ BKdhLBr2 ++ BKdhLBr3 ++ BKdhLBr4),
-    ?LOG_INFO("Found ~0p tombstones in Cluster B", [length(Found)]),
+    ?LOG_INFO("Found ~b tombstones in Cluster B", [length(Found)]),
     ?LOG_INFO("Re-reaping ~0p", [Found]),
     ?LOG_INFO("Immediate delete not always successful"),
     reap_from_cluster(NodeB1, Found),
@@ -287,7 +287,7 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC]) ->
         "*** Re-re-write and re-re-delete after initial tombstones reaped ***"),
     write_then_delete(NodeA1, NodeA2, NodeB1, NodeB2, NodeC1, NodeC2),
     reap_from_cluster(NodeA1, {job, 1}),
-    ?LOG_INFO("Immediate reap count ~0p after fsm managed reap",
+    ?LOG_INFO("Immediate reap count ~w after fsm managed reap",
                 [length_find_tombs(NodeA1, all, all)]),
     wait_for_outcome(?MODULE, length_find_tombs, [NodeA1, all, all], 0, 20),
     wait_for_outcome(?MODULE, length_find_tombs, [NodeB1, all, all], 0, 20),
@@ -295,7 +295,7 @@ test_repl(Protocol, [ClusterA, ClusterB, ClusterC]) ->
 
     write_then_delete(NodeA1, NodeA2, NodeB1, NodeB2, NodeC1, NodeC2),
     reap_from_cluster(NodeA1, local),
-    ?LOG_INFO("Immediate reap count ~0p after distributed reap",
+    ?LOG_INFO("Immediate reap count ~w after distributed reap",
                 [length_find_tombs(NodeA1, all, all)]),
     wait_for_outcome(?MODULE, length_find_tombs, [NodeA1, all, all], 0, 20),
     wait_for_outcome(?MODULE, length_find_tombs, [NodeB1, all, all], 0, 20),
@@ -334,7 +334,7 @@ fullsync_check(Protocol, {SrcNode, SrcNVal, SnkCluster},
 
 %% @doc Write a series of keys and ensure they are all written.
 write_to_cluster(Node, Start, End, CommonValBin) ->
-    ?LOG_INFO("Writing ~0p keys to node ~0p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Writing ~b keys to node ~0p.", [End - Start + 1, Node]),
     ?LOG_WARNING("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F =
@@ -363,11 +363,11 @@ write_to_cluster(Node, Start, End, CommonValBin) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    ?LOG_WARNING("~0p errors while writing: ~0p", [length(Errors), Errors]),
+    ?LOG_WARNING("~b errors while writing: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 delete_from_cluster(Node, Start, End) ->
-    ?LOG_INFO("Deleting ~0p keys from node ~0p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Deleting ~b keys from node ~0p.", [End - Start + 1, Node]),
     ?LOG_WARNING("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F =
@@ -384,11 +384,11 @@ delete_from_cluster(Node, Start, End) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    ?LOG_WARNING("~0p errors while deleting: ~0p", [length(Errors), Errors]),
+    ?LOG_WARNING("~b errors while deleting: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 reap_from_cluster(Node, Start, End) ->
-    ?LOG_INFO("Reaping ~0p keys from node ~0p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Reaping ~b keys from node ~0p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
     F =
         fun(N, Acc) ->
@@ -406,11 +406,11 @@ reap_from_cluster(Node, Start, End) ->
             end
         end,
     Aborts = lists:foldl(F, [], lists:seq(Start, End)),
-    ?LOG_WARNING("~0p aborts while reaping: ~0p", [length(Aborts), Aborts]),
+    ?LOG_WARNING("~b aborts while reaping: ~0p", [length(Aborts), Aborts]),
     ?assertEqual([], Aborts).
 
 reap_from_cluster(Node, BKdhL) when is_list(BKdhL) ->
-    ?LOG_INFO("Reaping ~0p found tombs from node ~0p.", [length(BKdhL), Node]),
+    ?LOG_INFO("Reaping ~b found tombs from node ~0p.", [length(BKdhL), Node]),
     {ok, C} = riak:client_connect(Node),
     F =
         fun({B, K, DH}, Acc) ->
@@ -427,7 +427,7 @@ reap_from_cluster(Node, BKdhL) when is_list(BKdhL) ->
             end
         end,
     Aborts = lists:foldl(F, [], BKdhL),
-    ?LOG_WARNING("~0p aborts while reaping: ~0p", [length(Aborts), Aborts]),
+    ?LOG_WARNING("~b aborts while reaping: ~0p", [length(Aborts), Aborts]),
     ?assertEqual([], Aborts);
 reap_from_cluster(Node, Job) ->
     ?LOG_INFO("Auto-reaping found tombs from node ~0p Job ~0p", [Node, Job]),
@@ -438,7 +438,7 @@ reap_from_cluster(Node, Job) ->
 
 
 read_from_cluster(Node, Start, End, CommonValBin, Errors) ->
-    ?LOG_INFO("Reading ~0p keys from node ~0p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Reading ~b keys from node ~0p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
     F =
         fun(N, Acc) ->
@@ -463,7 +463,7 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors) ->
     ErrorsFound = lists:foldl(F, [], lists:seq(Start, End)),
     case Errors of
         undefined ->
-            ?LOG_INFO("Errors Found in read_from_cluster ~0p",
+            ?LOG_INFO("Errors Found in read_from_cluster ~b",
                         [length(ErrorsFound)]),
             length(ErrorsFound);
         _ ->
@@ -505,7 +505,7 @@ wait_for_outcome(Module, Func, Args, ExpOutcome, LoopCount, MaxLoops) ->
     end.
 
 write_then_delete(NodeA1, NodeA2, NodeB1, NodeB2, NodeC1, NodeC2) ->
-    ?LOG_INFO("Write ~0p objects into A and read from B and C", [?KEY_COUNT]),
+    ?LOG_INFO("Write ~b objects into A and read from B and C", [?KEY_COUNT]),
     write_to_cluster(NodeA1, 1, ?KEY_COUNT, new_obj),
     ?LOG_INFO("Waiting to read sample"),
     0 =
@@ -529,7 +529,7 @@ write_then_delete(NodeA1, NodeA2, NodeB1, NodeB2, NodeC1, NodeC2) ->
                             0,
                             ?LOOP_COUNT),
 
-    ?LOG_INFO("Deleting ~0p objects from B and read not_found from A and C", [?KEY_COUNT]),
+    ?LOG_INFO("Deleting ~b objects from B and read not_found from A and C", [?KEY_COUNT]),
     delete_from_cluster(NodeB2, 1, ?KEY_COUNT),
     ?LOG_INFO("Waiting for missing sample"),
     32 =
@@ -547,7 +547,7 @@ write_then_delete(NodeA1, NodeA2, NodeB1, NodeB2, NodeC1, NodeC2) ->
                         ?KEY_COUNT,
                         ?LOOP_COUNT),
     ?LOG_INFO(
-        "Waiting for delete wait before reading from delete_mode ~0p cluster "
+        "Waiting for delete wait before reading from delete_mode ~w cluster "
         "as otherwise read may overlap with reap and prompt a repair",
         [?DELETE_WAIT]),
     timer:sleep(?DELETE_WAIT),
@@ -581,7 +581,7 @@ root_compare(
                 %% Workaround for the purpose of this test is to permit
                 %% a small discrepancy in this case
                 ?LOG_WARNING(
-                    "Immediate delete issue - ~0p not cleared ~0p",
+                    "Immediate delete issue - ~w not cleared ~w",
                     [N, Outcome]),
                 timer:sleep(2 * ?DELETE_WAIT),
                 root_compare(

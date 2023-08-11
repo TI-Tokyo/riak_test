@@ -23,12 +23,15 @@
 -include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
--import(location,
-    [setup_location/2, set_location/2, plan_and_wait/2,
-        assert_ring_satisfy_n_val/1,
-        assert_no_location_violation/3,
-        assert_no_ownership_change/4
-    ]).
+-import(location, [
+    algorithm_supported/1,
+    assert_no_location_violation/3,
+    assert_no_ownership_change/4,
+    assert_ring_satisfy_n_val/1,
+    plan_and_wait/2,
+    setup_algorithm_cache/0,
+    setup_location/2
+]).
 
 -define(N_VAL, 3).
 -define(CLAIMANT_TICK, 5000).
@@ -41,9 +44,21 @@
 -define(RACK_F, "rack_f").
 
 confirm() ->
+    setup_algorithm_cache(),
+
     % Test takes a long time, so testing other ring sizes is expensive
-    pass = run_test(64, choose_claim_v4, 3, 3),
-    pass = run_test(512, choose_claim_v4, 3, 3),
+
+%%    Algo4 = choose_claim_v4,
+    Algo4 = choose_claim_v3,
+    case algorithm_supported(Algo4) of
+        true ->
+            pass = run_test(64, Algo4, 3, 3),
+            pass = run_test(512, Algo4, 3, 3);
+        _ ->
+            ?LOG_INFO("*************************"),
+            ?LOG_INFO("Skipping unsupported algorithm ~w", [Algo4]),
+            ?LOG_INFO("*************************")
+    end,
     pass.
 
 run_test(RingSize, ClaimAlgorithm, LNV, ActualL) ->
@@ -54,10 +69,10 @@ run_test(RingSize, ClaimAlgorithm, LNV, ActualL) ->
             [
               {ring_creation_size, RingSize},
               {claimant_tick, ?CLAIMANT_TICK},
-              {vnode_management_timer, 2000},
+%%              {vnode_management_timer, 2000},
               {vnode_inactivity_timeout, 4000},
-              {handoff_concurrency, 16},
-              {choose_claim_fun, ClaimAlgorithm},
+              {handoff_concurrency, 100},
+              {choose_claim_fun, {riak_core_claim, ClaimAlgorithm}},
               {target_location_n_val, 3},
               {full_rebalance_onleave, true},
               {default_bucket_props,
@@ -67,7 +82,7 @@ run_test(RingSize, ClaimAlgorithm, LNV, ActualL) ->
 
     ?LOG_INFO("*************************"),
     ?LOG_INFO("Testing with ring-size ~b", [RingSize]),
-    ?LOG_INFO("Testing with claim algorithm ~0p", [ClaimAlgorithm]),
+    ?LOG_INFO("Testing with claim algorithm ~w", [ClaimAlgorithm]),
     ?LOG_INFO("*************************"),
 
     AllNodes = rt:deploy_nodes(8, Conf),

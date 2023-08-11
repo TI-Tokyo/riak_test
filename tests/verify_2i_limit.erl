@@ -19,11 +19,21 @@
 %% -------------------------------------------------------------------
 -module(verify_2i_limit).
 -behavior(riak_test).
+
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 -include_lib("riakc/include/riakc.hrl").
--import(secondary_index_tests, [put_an_object/2, put_an_object/4, int_to_key/1,
-                                stream_pb/3, http_query/3, pb_query/3]).
+
+-import(secondary_index_tests, [
+    http_query/3,
+    int_to_key/1,
+    pb_query/3,
+    put_an_object/2,
+    put_an_object/4,
+    stream_pb/3
+]).
+
 -define(BUCKET, <<"2ibucket">>).
 -define(FOO, <<"foo">>).
 -define(MAX_RESULTS, 50).
@@ -58,7 +68,7 @@ confirm() ->
                            [{max_results, ?MAX_RESULTS}]),
     ?assertMatch({ok, ?INDEX_RESULTS{}}, HttpRes),
     {ok, ?INDEX_RESULTS{keys=HttpResKeys,
-                        continuation=HttpContinuation}} = HttpRes, 
+                        continuation=HttpContinuation}} = HttpRes,
     ?assertEqual(FirstHalf, HttpResKeys),
     ?assertEqual(PBContinuation, HttpContinuation),
 

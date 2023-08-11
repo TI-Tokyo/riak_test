@@ -39,12 +39,11 @@
 
 confirm() ->
     Conf = [
-            {riak_repl,
-             [
-                {fullsync_on_connect, false},
-                {fullsync_interval, disabled},
-                {diff_batch_size, 10}
-             ]}
+        {riak_repl, [
+            {fullsync_on_connect, false},
+            {fullsync_interval, disabled},
+            {diff_batch_size, 10}
+        ]}
     ],
     rt:set_advanced_conf(all, Conf),
     [ANodes, BNodes] = rt:build_clusters([3, 3]),
@@ -124,7 +123,7 @@ replication([AFirst|_] = ANodes, [BFirst|_] = BNodes, Connected) ->
     rt:log_to_nodes(AllNodes, "Write data to A"),
     %% write some data on A
     ?assertEqual(ok, wait_until_connection(LeaderA)),
-    %?LOG_INFO("~0p~n", [rpc:call(LeaderA, riak_repl_console, status, [quiet])]),
+    ?LOG_DEBUG("~0p", [rpc:call(LeaderA, riak_repl_console, status, [quiet])]),
     ?LOG_INFO("Writing 100 more keys to ~0p", [LeaderA]),
     ?assertEqual([], do_write(LeaderA, 101, 200, TestBucket, 2)),
 
@@ -436,14 +435,14 @@ gen_fake_listeners(Num) ->
     lists:zip3(IPs, Ports, Nodes).
 
 fake_node(Num) ->
-    lists:flatten(io_lib:format("fake~0p@127.0.0.1", [Num])).
+    lists:flatten(io_lib:format("fake~b@127.0.0.1", [Num])).
 
 add_fake_sites([Node|_], Listeners) ->
     [add_site(Node, {IP, Port, fake_site(Port)})
      || {IP, Port, _} <- Listeners].
 
 add_site(Node, {IP, Port, Name}) ->
-    ?LOG_INFO("Add site ~0p ~0p:~0p at node ~0p", [Name, IP, Port, Node]),
+    ?LOG_INFO("Add site ~0p ~0p:~b at node ~0p", [Name, IP, Port, Node]),
     Args = [IP, integer_to_list(Port), Name],
     Res = rpc:call(Node, riak_repl_console, add_site, [Args]),
     ?assertEqual(ok, Res),
@@ -457,7 +456,7 @@ del_site([Node|_]=Nodes, Name) ->
     timer:sleep(timer:seconds(5)).
 
 fake_site(Port) ->
-    lists:flatten(io_lib:format("fake_site_~0p", [Port])).
+    lists:flatten(io_lib:format("fake_site_~b", [Port])).
 
 verify_listeners(Listeners) ->
     Strs = [IP ++ ":" ++ integer_to_list(Port) || {IP, Port, _} <- Listeners],
@@ -482,7 +481,7 @@ add_listeners(Nodes=[FirstNode|_]) ->
     PN.
 
 add_listener(N, Node, IP, Port) ->
-    ?LOG_INFO("Adding repl listener to ~0p ~s:~0p", [Node, IP, Port]),
+    ?LOG_INFO("Adding repl listener to ~0p ~s:~b", [Node, IP, Port]),
     Args = [[atom_to_list(Node), IP, integer_to_list(Port)]],
     Res = rpc:call(N, riak_repl_console, add_listener, Args),
     ?assertEqual(ok, Res).
@@ -606,8 +605,7 @@ get_leader(Status) ->
         undefined ->
             false;
         L ->
-            %%?LOG_INFO("Leader for ~0p is ~0p",
-            %%[N,L]),
+            ?LOG_DEBUG("Leader is ~0p", [L]),
             L
     end.
 
@@ -682,7 +680,7 @@ do_write(Node, Start, End, Bucket, W) ->
         [] ->
             [];
         Errors ->
-            ?LOG_WARNING("~0p errors while writing: ~0p",
+            ?LOG_WARNING("~b errors while writing: ~0p",
                 [length(Errors), Errors]),
             timer:sleep(1000),
             lists:flatten([rt:systest_write(Node, S, S, Bucket, W) ||

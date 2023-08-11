@@ -25,6 +25,7 @@
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -define(TEST_BUCKET, <<"repl-aae-fullsync-systest_a">>).
@@ -132,7 +133,7 @@ update_cluster(
     RingSize, NVal, RemoteNVal, Protocol,
     LocalQueue, RemoteQueue) ->
 
-    lager:info("Setup automatic replication between clusters"),
+    ?LOG_INFO("Setup automatic replication between clusters"),
     {Protocol, {IP1, Port1}} = lists:keyfind(Protocol, 1, rt:connection_info(Peer1)),
     {Protocol, {IP2, Port2}} = lists:keyfind(Protocol, 1, rt:connection_info(Peer2)),
     {Protocol, {IP3, Port3}} = lists:keyfind(Protocol, 1, rt:connection_info(Peer3)),
@@ -170,7 +171,7 @@ update_cluster(
             LocalQueue,
             RemoteQueue)),
     timer:sleep(60 * 1000),
-    lager:info("Paused for real-time replication to start"),
+    ?LOG_INFO("Paused for real-time replication to start"),
     ok.
 
 
@@ -185,7 +186,7 @@ setup_clusters() ->
 
     wait_for_convergence(ClusterA, ClusterB),
 
-    lager:info("Ready for test"),
+    ?LOG_INFO("Ready for test"),
     [ClusterA, ClusterB].
 
 
@@ -194,14 +195,14 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
     NodeA = hd(ClusterA),
     NodeB = hd(ClusterB),
 
-    lager:info("Check empty clusters will compare"),
+    ?LOG_INFO("Check empty clusters will compare"),
 
     {root_compare, 0} =
         rpc:call(NodeA, riak_client, ttaaefs_fullsync, [auto_check]),
     {root_compare, 0} =
         rpc:call(NodeB, riak_client, ttaaefs_fullsync, [auto_check]),
 
-    lager:info("Test 100 key difference and resolve"),
+    ?LOG_INFO("Test 100 key difference and resolve"),
     % Write keys to cluster A, verify B and C have them.
     write_to_cluster(NodeA, 1, 100),
     timer:sleep(?REPL_WAIT),
@@ -209,13 +210,13 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
     rt:wait_until(
         fun() ->
             E = read_from_cluster(NodeB, 1, 100),
-            lager:info("Errors of E=~w", [E]),
+            ?LOG_INFO("Errors of E=~w", [E]),
             E == 0
         end,
         6,
         10 * 1000),
 
-    lager:info("Check clusters with common data will compare"),
+    ?LOG_INFO("Check clusters with common data will compare"),
 
     {root_compare, 0} =
         rpc:call(NodeA, riak_client, ttaaefs_fullsync, [auto_check]),
@@ -235,7 +236,7 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
             end
         end,
 
-    lager:info("Creating delta whilst queue suspended"),
+    ?LOG_INFO("Creating delta whilst queue suspended"),
 
     lists:foreach(SuspendFun(cluster_b), ClusterA),
     write_to_cluster(NodeA, 101, 200),
@@ -244,7 +245,7 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
     ?assertMatch(0, read_from_cluster(NodeA, 101, 200)),
     ?assertMatch(100, read_from_cluster(NodeB, 101, 200)),
 
-    lager:info("Resolving delta by full-sync A-> B"),
+    ?LOG_INFO("Resolving delta by full-sync A-> B"),
 
     {clock_compare, 100} =
         rpc:call(NodeA, riak_client, ttaaefs_fullsync, [auto_check]),
@@ -252,13 +253,13 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
         rt:wait_until(
             fun() ->
                 E = read_from_cluster(NodeB, 101, 200),
-                lager:info("Errors of E=~w", [E]),
+                ?LOG_INFO("Errors of E=~w", [E]),
                 E == 0
             end,
             6,
             10 * 1000),
 
-    lager:info("Creating new delta whilst queue suspended"),
+    ?LOG_INFO("Creating new delta whilst queue suspended"),
 
     lists:foreach(SuspendFun(cluster_b), ClusterA),
     write_to_cluster(NodeA, 201, 300),
@@ -267,7 +268,7 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
     ?assertMatch(0, read_from_cluster(NodeA, 201, 300)),
     ?assertMatch(100, read_from_cluster(NodeB, 201, 300)),
 
-    lager:info("Resolving delta by full-sync B -> A"),
+    ?LOG_INFO("Resolving delta by full-sync B -> A"),
 
     {clock_compare, 100} =
         rpc:call(NodeB, riak_client, ttaaefs_fullsync, [auto_check]),
@@ -275,7 +276,7 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
         rt:wait_until(
             fun() ->
                 E = read_from_cluster(NodeB, 201, 300),
-                lager:info("Errors of E=~w", [E]),
+                ?LOG_INFO("Errors of E=~w", [E]),
                 E == 0
             end,
             6,
@@ -284,7 +285,7 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
     {root_compare, 0} =
         rpc:call(NodeA, riak_client, ttaaefs_fullsync, [auto_check]),
 
-    lager:info(
+    ?LOG_INFO(
         "Creating new delta in opposite direction - changes protocol used"),
     lists:foreach(SuspendFun(cluster_a), ClusterB),
     write_to_cluster(NodeB, 301, 400),
@@ -293,15 +294,15 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
     ?assertMatch(0, read_from_cluster(NodeB, 301, 400)),
     ?assertMatch(100, read_from_cluster(NodeA, 301, 400)),
 
-    lager:info("Resolving delta by full-sync A -> B"),
-    lager:info("Works as last check was success, so range reset"),
+    ?LOG_INFO("Resolving delta by full-sync A -> B"),
+    ?LOG_INFO("Works as last check was success, so range reset"),
     {clock_compare, 100} =
         rpc:call(NodeA, riak_client, ttaaefs_fullsync, [auto_check]),
     ok =
         rt:wait_until(
             fun() ->
                 E = read_from_cluster(NodeA, 301, 400),
-                lager:info("Errors of E=~w", [E]),
+                ?LOG_INFO("Errors of E=~w", [E]),
                 E == 0
             end,
             6,
@@ -310,9 +311,9 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
     {root_compare, 0} =
         rpc:call(NodeA, riak_client, ttaaefs_fullsync, [auto_check]),
 
-    lager:info(
+    ?LOG_INFO(
         "Creating new delta through deletion - this will create false delta"),
-    lager:info(
+    ?LOG_INFO(
         "Where the last modified date is less recent (due to non-rep of del)"),
 
     lists:foreach(SuspendFun(cluster_b), ClusterA),
@@ -320,13 +321,13 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
     timer:sleep(?REPL_WAIT),
     lists:foreach(ResumeFun(cluster_b), ClusterA),
 
-    lager:info(
+    ?LOG_INFO(
         "Next auto_check will be a range_check, but all out of lmd window"),
     {clock_compare, 0} =
         rpc:call(NodeA, riak_client, ttaaefs_fullsync, [auto_check]),
-    lager:info(
+    ?LOG_INFO(
         "Next auto_check will be an all_check, but max_results found"),
-    lager:info(
+    ?LOG_INFO(
         "Will repair from B back to A"),
     {clock_compare, 32} =
         rpc:call(NodeA, riak_client, ttaaefs_fullsync, [auto_check]),
@@ -335,29 +336,29 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
         rt:wait_until(
             fun() ->
                 E = read_from_cluster(NodeA, 1, 100),
-                lager:info("Errors of E=~w", [E]),
+                ?LOG_INFO("Errors of E=~w", [E]),
                 E == 68
             end,
             6,
             10 * 1000),
 
-    lager:info("32 objects resurrected - all will have key amnesia as N=1"),
-    lager:info("So 68 unreplicated, and 32 to replicate back"),
-    lager:info("Range should be detected, and range_check used, 100 found"),
+    ?LOG_INFO("32 objects resurrected - all will have key amnesia as N=1"),
+    ?LOG_INFO("So 68 unreplicated, and 32 to replicate back"),
+    ?LOG_INFO("Range should be detected, and range_check used, 100 found"),
     {clock_compare, 100} =
         rpc:call(NodeA, riak_client, ttaaefs_fullsync, [auto_check]),
     ok =
         rt:wait_until(
             fun() ->
                 E = read_from_cluster(NodeA, 1, 100),
-                lager:info("Errors of E=~w", [E]),
+                ?LOG_INFO("Errors of E=~w", [E]),
                 E == 0
             end,
             6,
             10 * 1000),
-    lager:info("The last sync sent 32 back, and received the remaining 68"),
-    lager:info("The 68 received will have key amnesia and a clock update"),
-    lager:info("So they must be replicated one more time"),
+    ?LOG_INFO("The last sync sent 32 back, and received the remaining 68"),
+    ?LOG_INFO("The 68 received will have key amnesia and a clock update"),
+    ?LOG_INFO("So they must be replicated one more time"),
     {clock_compare, 68} =
         rpc:call(NodeA, riak_client, ttaaefs_fullsync, [auto_check]),
     timer:sleep(?REPL_WAIT),
@@ -369,7 +370,7 @@ test_repl_between_clusters(ClusterA, ClusterB) ->
     pass.
 
 wait_for_convergence(ClusterA, ClusterB) ->
-    lager:info("Waiting for convergence."),
+    ?LOG_INFO("Waiting for convergence."),
     rt:wait_until_ring_converged(ClusterA),
     rt:wait_until_ring_converged(ClusterB),
     lists:foreach(
@@ -383,8 +384,8 @@ write_to_cluster(Node, Start, End) ->
     write_to_cluster(Node, Start, End, ?TEST_BUCKET, true, CommonValBin).
 
 write_to_cluster(Node, Start, End, Bucket, NewObj, CVB) ->
-    lager:info("Writing ~p keys to node ~p.", [End - Start + 1, Node]),
-    lager:warning("Note that only utf-8 keys are used"),
+    ?LOG_INFO("Writing ~b keys to node ~0p.", [End - Start + 1, Node]),
+    ?LOG_WARNING("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F =
         fun(N, Acc) ->
@@ -411,7 +412,7 @@ write_to_cluster(Node, Start, End, Bucket, NewObj, CVB) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    lager:warning("~p errors while writing: ~p", [length(Errors), Errors]),
+    ?LOG_WARNING("~b errors while writing: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 
@@ -422,7 +423,7 @@ read_from_cluster(Node, Start, End) ->
     read_from_cluster(Node, Start, End, ?TEST_BUCKET, CommonValBin).
 
 read_from_cluster(Node, Start, End, Bucket, CommonValBin) ->
-    lager:info("Reading ~p keys from node ~p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Reading ~b keys from node ~0p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
     F =
         fun(N, Acc) ->
@@ -449,7 +450,7 @@ delete_from_cluster(Node, Start, End) ->
     delete_from_cluster(Node, Start, End, ?TEST_BUCKET).
 
 delete_from_cluster(Node, Start, End, Bucket) ->
-    lager:info("Deleting ~p keys from node ~p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Deleting ~b keys from node ~0p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
     F =
         fun(N, Acc) ->
@@ -465,11 +466,11 @@ delete_from_cluster(Node, Start, End, Bucket) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    lager:warning("~p errors while deleting: ~p", [length(Errors), Errors]),
+    ?LOG_WARNING("~b errors while deleting: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 % get_stats(Node) ->
-%     lager:info("Fetching stats from ~w", [Node]),
+%     ?LOG_INFO("Fetching stats from ~w", [Node]),
 %     S = rt:get_stats(Node, ?STATS_WAIT),
 %     {_, ACT} = lists:keyfind(<<"ttaaefs_allcheck_total">>, 1, S),
 %     {_, DCT} = lists:keyfind(<<"ttaaefs_daycheck_total">>, 1, S),
@@ -481,13 +482,13 @@ delete_from_cluster(Node, Start, End, Bucket) ->
 %     {_, SnkAT} = lists:keyfind(<<"ttaaefs_snk_ahead_total">>, 1, S),
 %     {_, STimeMax} = lists:keyfind(<<"ttaaefs_sync_time_100">>, 1, S),
 %     {_, NSTimeMax} = lists:keyfind(<<"ttaaefs_nosync_time_100">>, 1, S),
-%     lager:info(
+%     ?LOG_INFO(
 %         "Stats all_check=~w day_check=~w hour_check=~w range_check=~w",
 %         [ACT, DCT, HCT, RCT]),
-%     lager:info(
+%     ?LOG_INFO(
 %         "Stats sync=~w nosync=~w src_ahead=~w snk_ahead=~w",
 %         [SST, NST, SrcAT, SnkAT]),
-%     lager:info(
+%     ?LOG_INFO(
 %         "Stats max_sync_time=~w ms max_nosync_time=~w ms",
 %         [STimeMax div 1000, NSTimeMax div 1000]),
 %     {ACT, DCT, HCT, RCT, SST, NST, SrcAT, SnkAT}.

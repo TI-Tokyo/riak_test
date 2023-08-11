@@ -28,6 +28,7 @@
     convert_to_string/1,
     find_atom_or_string/2,
     find_atom_or_string_dict/2,
+    parse_term/1,
     random_boolean/0,
     random_element/1,
     shuffle/1
@@ -95,6 +96,63 @@ convert_to_atom_list(Values) when is_list(Values) ->
             [list_to_atom(X) || X <- string:tokens(Values, ", ")];
         _ ->
             [list_to_atom(Values)]
+    end.
+
+%% @doc Given a string (or binary) containing the text representation of a
+%% single constant term, returns the represented term or an error if it
+%% cannot be parsed.
+-spec parse_term(String :: nonempty_string() | binary())
+        -> {ok, term()} | rtt:std_error().
+parse_term([_|_] = Str) ->
+    case io_lib:char_list(Str) of
+        true ->
+            parse_term_str(Str);
+        _ ->
+            case io_lib:deep_char_list(Str) of
+                true ->
+                    parse_term_str(lists:flatten(Str));
+                _ ->
+                    {error, {badarg, [Str]}}
+            end
+    end;
+parse_term(Bin) when erlang:is_binary(Bin) andalso erlang:size(Bin) > 0 ->
+    Str = erlang:binary_to_list(Bin),
+    case io_lib:char_list(Str) of
+        true ->
+            parse_term_str(Str);
+        _ ->
+            {error, {badarg, [Bin]}}
+    end;
+parse_term(Arg) ->
+    {error, {badarg, [Arg]}}.
+
+%% @hidden
+-spec parse_term_str(String :: nonempty_string())
+        -> {ok, term()} | rtt:std_error().
+parse_term_str(Str) ->
+    case string:trim(Str) of
+        [] ->
+            {error, {badarg, [Str]}};
+        "." ->
+            {error, {badarg, [Str]}};
+        Trimmed ->
+            TermStr = case string:find(Trimmed, ".", trailing) of
+                "." ->
+                    Trimmed;
+                _ ->
+                    Trimmed ++ "."
+            end,
+            case erl_scan:string(TermStr) of
+                {ok, Toks, _} ->
+                    case erl_parse:parse_term(Toks) of
+                        {ok, _Term} = Result ->
+                            Result;
+                        ParseErr ->
+                            ParseErr
+                    end;
+                {error, ScanInfo, ScanLoc} ->
+                    {error, {ScanInfo, ScanLoc}}
+            end
     end.
 
 %% @doc Return elements of a list shuffled randomly.

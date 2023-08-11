@@ -75,12 +75,12 @@ main(Paths) ->
                 erlang:halt(0);
             {Result, Stats} ->
                 io:format(standard_error,
-                    "FAILED ~p with ~0p~n", [Result, Stats])
+                    "FAILED ~0p with ~0p~n", [Result, Stats])
         end
     catch
         Class:Reason:Stack ->
             io:format(standard_error,
-                "~p : ~p :~n~p~n", [Class, Reason, Stack])
+                "~0p : ~0p :~n~p~n", [Class, Reason, Stack])
     end,
     erlang:halt(1).
 
@@ -104,12 +104,12 @@ connect_and_put(Rec, Stats) ->
         {ok, Pid} ->
             case riakc_pb_socket:put(Pid, Rec) of
                 ok ->
-                    io:format("Done PUT ~p:~p => ~p~n", [
+                    io:format("Done PUT ~0p:~0p => ~0p~n", [
                         riakc_obj:bucket(Rec), riakc_obj:key(Rec),
                         riakc_obj:get_update_value(Rec)]),
                     case riakc_pb_socket:get(Pid, ?B, ?K) of
                         {ok, Out} ->
-                            io:format("Done GET ~p:~p => ~p~n", [
+                            io:format("Done GET ~0p:~0p => ~0p~n", [
                                 riakc_obj:bucket(Out), riakc_obj:key(Out),
                                 riakc_obj:get_value(Out)]),
                             {ok, Stats};
@@ -125,7 +125,7 @@ connect_and_put(Rec, Stats) ->
             connect_and_put(Rec, Stats, Unknown)
     catch
         Class:Reason ->
-            io:format(standard_error, "~b: ~p : ~p~n", [?LINE, Class, Reason]),
+            io:format(standard_error, "~b: ~0p : ~0p~n", [?LINE, Class, Reason]),
             connect_and_put(Rec, Stats, except)
     end.
 

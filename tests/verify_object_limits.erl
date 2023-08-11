@@ -140,7 +140,7 @@ verify_readrepair_ignore_max_size(C, Node1) ->
     Intercept = {riak_kv_vnode, [{{put, 6}, put_as_readrepair},{{coord_put,6}, coord_put_as_readrepair}]},
     ok = rt_intercept:add(Node1, Intercept),
     % Do put with value greater than max size and confirm warning
-    ?LOG_INFO("Checking readrepair put of size ~0p, expecting ok result and log warning", [?MAX_SIZE*2]),
+    ?LOG_INFO("Checking readrepair put of size ~b, expecting ok result and log warning", [?MAX_SIZE*2]),
     K = <<"rrsizetest">>,
     V = <<0:(?MAX_SIZE*2)/integer-unit:8>>,
     O = riakc_obj:new(?BUCKET, K, V),
@@ -151,7 +151,7 @@ verify_readrepair_ignore_max_size(C, Node1) ->
     ok.
 
 verify_readrepair_ignore_max_sib(C, Node1) ->
-    ?LOG_INFO("Checking sibling warning on readrepair above max siblings=~0p", [?MAX_SIBLINGS]),
+    ?LOG_INFO("Checking sibling warning on readrepair above max siblings=~b", [?MAX_SIBLINGS]),
     K = <<"rrsibtest">>,
     V = <<"sibtest">>,
     O = riakc_obj:new(?BUCKET, K, V),

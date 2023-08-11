@@ -121,8 +121,8 @@ calc_stuff(AllNodes, NumNodes, NumRounds) ->
     ResultsList = lists:reverse(orddict:to_list(ResultsDict)),
     ResultsFileName = io_lib:format("results-~0p.csv", [NumNodes]),
     {ok, ResultsFile} = file:open(ResultsFileName, [write]),
-    ?LOG_INFO(ResultsFile, "round,broadcastrmr,gossiprmr,broadcastldh,gossipldh~n", []),
-    [?LOG_INFO(ResultsFile, "~0p,~0p,~0p,~0p,~0p~n", [abs(Round - NumRounds), BRMR, GRMR, BLDH, GLDH])
+    io:format(ResultsFile, "round,broadcastrmr,gossiprmr,broadcastldh,gossipldh~n", []),
+    [io:format(ResultsFile, "~0p,~0p,~0p,~0p,~0p~n", [abs(Round - NumRounds), BRMR, GRMR, BLDH, GLDH])
      || {{round, Round}, {{BRMR, GRMR}, {BLDH, GLDH}}} <- ResultsList],
     ?LOG_INFO("NumNodes: ~0p NumRounds: ~0p RESULTS: ~0p", [NumNodes, NumRounds, ResultsList]).
 

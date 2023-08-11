@@ -47,13 +47,10 @@
 
 confirm() ->
     Items    = 10000, %% How many test items in each group to write/verify?
-    run_test(Items, 4),
-
-    ?LOG_INFO("Test verify_2i_handoff passed."),
-    pass.
+    run_test(Items, 4).
 
 run_test(Items, NTestNodes) ->
-    ?LOG_INFO("Testing handoff (items ~0p, nodes: ~0p)", [Items, NTestNodes]),
+    ?LOG_INFO("Testing handoff (items ~b, nodes: ~b)", [Items, NTestNodes]),
 
     ?LOG_INFO("Spinning up test nodes"),
     [RootNode, FirstJoin, SecondJoin, LastJoin] = Nodes =
@@ -164,15 +161,14 @@ run_test(Items, NTestNodes) ->
 
     riakc_pb_socket:stop(RootClient),
 
-    %% Prepare for the next call to our test (we aren't polite about it, it's faster that way):
-    ?LOG_INFO("Bringing down test nodes"),
-    lists:foreach(fun(N) -> rt:brutal_kill(N) end, Nodes),
     pass.
 
 %% Check the PB result against our expectations
 %% and the non-streamed HTTP
 assertEqual(PB, Expected, B, Query, Opts, ResultKey) ->
-    {ok, PBRes} = stream_pb(PB, B, Query, Opts),
+    Result = stream_pb(PB, B, Query, Opts),
+    ?assertMatch({ok, [_|_]}, Result),
+    {_, PBRes} = Result,
     PBKeys = proplists:get_value(ResultKey, PBRes, []),
     ?assertEqual(Expected, length(PBKeys)).
 
@@ -181,9 +177,9 @@ reportIfEqual(PB, Expected, B, Query, Opts, ResultKey) ->
     PBKeys = proplists:get_value(ResultKey, PBRes, []),
     case length(PBKeys) of
         Expected ->
-            ?LOG_INFO("Expected keys found ~0p", [Expected]);
+            ?LOG_INFO("Expected keys found ~b", [Expected]);
         N ->
-            ?LOG_INFO("Expected keys ~0p but only ~0p keys found",
+            ?LOG_INFO("Expected keys ~b but only ~b keys found",
                         [Expected, N])
     end.
 
@@ -199,6 +195,8 @@ set_handoff_encoding(Encoding, Nodes) ->
          assert_using(Node, {riak_kv, handoff_data_encoding}, Encoding)
      end || Node <- Nodes].
 
+%% ToDo: This is known not to work - should be riak_kv - see verify_handoff
+%% Not fixing it now - it's not used in this test and should be refactored
 override_data(Encoding) ->
     [
      { riak_core,
@@ -239,29 +237,7 @@ put_an_object(HTTPc, B, Key, Data, Indexes) when is_list(Indexes) ->
 
 stream_pb(Pid, B, {F, S, E}, Opts) ->
     riakc_pb_socket:get_index_range(Pid, B, F, S, E, [stream|Opts]),
-    stream_loop().
-
-stream_loop() ->
-    stream_loop(orddict:new()).
-
-stream_loop(Acc) ->
-    receive
-        {_Ref, {done, undefined}} ->
-            {ok, orddict:to_list(Acc)};
-        {_Ref, {done, Continuation}} ->
-            {ok, orddict:store(continuation, Continuation, Acc)};
-        {_Ref, ?INDEX_STREAM_RESULT{terms=undefined, keys=Keys}} ->
-            Acc2 = orddict:update(keys, fun(Existing) -> Existing++Keys end, Keys, Acc),
-            stream_loop(Acc2);
-        {_Ref, ?INDEX_STREAM_RESULT{terms=Results}} ->
-            Acc2 = orddict:update(results, fun(Existing) -> Existing++Results end, Results, Acc),
-            stream_loop(Acc2);
-        {_Ref, {error, <<"{error,timeout}">>}} ->
-            {error, timeout};
-        {_Ref, Wat} ->
-            ?LOG_INFO("got a wat ~0p", [Wat]),
-            stream_loop(Acc)
-    end.
+    secondary_index_tests:stream_loop().
 
 repeatedly_test_query(_Client, _Items, _Bucket, 0, _Report) ->
     ok;
@@ -273,7 +249,7 @@ repeatedly_test_query(Client, Items, Bucket, N, assert) ->
                 {<<"field2_int">>, 1, Items},
                 ?Q_OPTS, results),
     timer:sleep(?Q_PAUSE),
-    ?LOG_INFO("2i test loop complete - ~0p items found~n", [Items]),
+    ?LOG_INFO("2i test loop complete - ~w items found", [Items]),
     repeatedly_test_query(Client, Items, Bucket, N - 1, assert);
 repeatedly_test_query(Client, Items, Bucket, N, report) ->
     reportIfEqual(Client, Items, Bucket,

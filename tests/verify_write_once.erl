@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2015 Basho Technologies, Inc.
+%% Copyright (c) 2015-2016 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -54,7 +54,7 @@ confirm() ->
     %%
     %% Select a random node, and use it to create an immutable bucket
     %%
-    Node = lists:nth(rand:uniform(length((Cluster1))), Cluster1),
+    Node = rt_util:random_element(Cluster1),
     rt:create_and_activate_bucket_type(Node, ?BUCKET_TYPE, [{write_once, true}]),
     rt:wait_until_bucket_type_status(?BUCKET_TYPE, active, Cluster1),
     rt:wait_until_bucket_type_visible(Cluster1, ?BUCKET_TYPE),
@@ -153,7 +153,7 @@ confirm_rww(Nodes) ->
     PartitonInfo = rt:partition(P1, P2),
     NumFastMerges = num_fast_merges(Nodes),
     %%
-    %% put different values into each partiton
+    %% put different values into each partition
     %%
     [Node1 | _Rest1] = P1,
     verify_put(Node1, ?BUCKET, <<"confirm_rww_key">>, <<"confirm_rww_value1">>),
@@ -331,9 +331,9 @@ num_fast_merges(Nodes) ->
                 case N > 0 of
                     true ->
                         ?LOG_INFO(
-                            "write_once_merge non-zero ~0p on ~0p",
+                            "write_once_merge non-zero ~w on ~0p",
                             [N, Node]);
-                    false ->
+                    _ ->
                         ok
                 end,
                 Acc + N
@@ -341,7 +341,7 @@ num_fast_merges(Nodes) ->
             0, Nodes
         ),
     ?LOG_INFO(
-        "write_once_merge total across Nodes ~0p in stats is ~0p",
+        "write_once_merge total across Nodes ~0p in stats is ~w",
         [Nodes, NumMerges]),
     NumMerges.
 
@@ -351,9 +351,7 @@ get(Node, Bucket, Key) ->
         {ok, Val} ->
             riakc_obj:get_value(Val);
         {error, notfound} ->
-            ?LOG_INFO(
-                "Unexpected notfound on Node ~0p",
-                [Node]),
+            ?LOG_INFO("Unexpected notfound on Node ~0p", [Node]),
             notfound
     end.
 

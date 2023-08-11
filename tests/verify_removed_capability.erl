@@ -20,8 +20,10 @@
 %% -------------------------------------------------------------------
 -module(verify_removed_capability).
 -behavior(riak_test).
+
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("stdlib/include/assert.hrl").
 
 %% Start 3 nodes, create a capability and join them into a cluster
 %%

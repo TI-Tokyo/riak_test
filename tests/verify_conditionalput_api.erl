@@ -28,23 +28,21 @@
 -define(FRESH_KEY, <<"new_key">>).
 -define(FRESHER_KEY, <<"another_key">>).
 
--define(CONF,
-        [{riak_kv,
-          [
-            {anti_entropy, {off, []}},
-            {delete_mode, keep},
-            {tictacaae_active, active},
-            {tictacaae_parallelstore, leveled_ko},
-            {tictacaae_storeheads, true},
-            {tictacaae_rebuildtick, 3600000}, % don't tick for an hour!
-            {tictacaae_suspend, true}
-          ]},
-         {riak_core,
-          [
-            {ring_creation_size, ?DEFAULT_RING_SIZE},
-            {default_bucket_props, [{allow_mult, true}]}
-          ]}]
-       ).
+-define(CONF, [
+    {riak_kv, [
+        {anti_entropy, {off, []}},
+        {delete_mode, keep},
+        {tictacaae_active, active},
+        {tictacaae_parallelstore, leveled_ko},
+        {tictacaae_storeheads, true},
+        {tictacaae_rebuildtick, 3600000}, % don't tick for an hour!
+        {tictacaae_suspend, true}
+    ]},
+    {riak_core, [
+        {ring_creation_size, ?DEFAULT_RING_SIZE},
+        {default_bucket_props, [{allow_mult, true}]}
+    ]}
+]).
 
 confirm() ->
     ?LOG_INFO(
@@ -326,5 +324,5 @@ check_current_match_conflict(rhc, MatchError) ->
 
 log_tombs(ClientMod, Client, Bucket) ->
     {ok, {keys, L}} = ClientMod:aae_find_tombs(Client, Bucket, all, all, all),
-    ?LOG_INFO("Found ~0p tombs", [length(L)]),
+    ?LOG_INFO("Found ~b tombs", [length(L)]),
     L.

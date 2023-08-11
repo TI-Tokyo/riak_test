@@ -24,6 +24,7 @@
 -export([confirm/0]).
 -export([fullsync_check/4, simple_testsync/4]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -define(TEST_BUCKET, <<"repl-aae-fullsync-systest_a">>).
@@ -105,27 +106,27 @@ confirm() ->
                     stand_alone),
 
     {ClusterA, ClusterB, ClusterC} = setup_cluster(CertDir, "site4.basho.com"),
-    lager:info("Creating a certificate-authenticated user"),
+    ?LOG_INFO("Creating a certificate-authenticated user"),
     change_user(add_user, "site4.basho.com", ClusterA, ClusterB, ClusterC),
     add_source("site4.basho.com", ClusterA, ClusterB, ClusterC),
     change_user(add_user, "site5.basho.com", ClusterA, ClusterB, ClusterC),
     add_source("site5.basho.com", ClusterA, ClusterB, ClusterC),
 
-    lager:info("Ready for test."),
+    ?LOG_INFO("Ready for test."),
     test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC, CertDir),
 
-    lager:info("site5.basho.com has a revoked certificate - sync failure"),
+    ?LOG_INFO("site5.basho.com has a revoked certificate - sync failure"),
     {error, timeout} =
         simple_testsync("site5.basho.com", CertDir, ClusterA, ClusterB),
 
-    lager:info("Remove site4.basho.com as a user - sync failure"),
+    ?LOG_INFO("Remove site4.basho.com as a user - sync failure"),
     change_user(del_user, "site4.basho.com", ClusterA, ClusterB, ClusterC),
     {error, timeout} =
         simple_testsync("site4.basho.com", CertDir, ClusterA, ClusterB),
 
-    lager:info("Reimplement site4.basho.com as user - sync works"),
+    ?LOG_INFO("Reimplement site4.basho.com as user - sync works"),
     change_user(add_user, "site4.basho.com", ClusterA, ClusterB, ClusterC),
-    lager:info("Source is removed when user removed so re-add"),
+    ?LOG_INFO("Source is removed when user removed so re-add"),
     add_source("site4.basho.com", ClusterA, ClusterB, ClusterC),
     {root_compare, 0} =
         wait_for_outcome(?MODULE,
@@ -134,18 +135,18 @@ confirm() ->
                             {root_compare, 0},
                             ?WAIT_LOOPS),
 
-    lager:info("Rebuild cluster with site5 for real-time repl"),
+    ?LOG_INFO("Rebuild cluster with site5 for real-time repl"),
     rt:clean_cluster(ClusterA),
     rt:clean_cluster(ClusterB),
     rt:clean_cluster(ClusterC),
     {ClusterA, ClusterB, ClusterC} = setup_cluster(CertDir, "site5.basho.com"),
-    lager:info("Creating a certificate-authenticated user"),
+    ?LOG_INFO("Creating a certificate-authenticated user"),
     change_user(add_user, "site4.basho.com", ClusterA, ClusterB, ClusterC),
     add_source("site4.basho.com", ClusterA, ClusterB, ClusterC),
     change_user(add_user, "site5.basho.com", ClusterA, ClusterB, ClusterC),
     add_source("site5.basho.com", ClusterA, ClusterB, ClusterC),
 
-    lager:info("Ready for test."),
+    ?LOG_INFO("Ready for test."),
     true = test_basic_repl_failure(hd(ClusterA), hd(ClusterB), hd(ClusterC)),
 
     pass.
@@ -162,7 +163,7 @@ setup_cluster(CertDir, User) ->
     rt:join_cluster(ClusterB),
     rt:join_cluster(ClusterC),
 
-    lager:info("Waiting for convergence."),
+    ?LOG_INFO("Waiting for convergence."),
     rt:wait_until_ring_converged(ClusterA),
     rt:wait_until_ring_converged(ClusterB),
     rt:wait_until_ring_converged(ClusterC),
@@ -215,7 +216,7 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC, CertDir) ->
     ?assertEqual(pong, riakc_pb_socket:ping(SecurityTestPB)),
     riakc_pb_socket:stop(SecurityTestPB),
 
-    lager:info("Setup queues for test"),
+    ?LOG_INFO("Setup queues for test"),
     setup_srcreplqueues(ClusterA, [cluster_b, cluster_c], any),
     setup_srcreplqueues(ClusterB, [cluster_a, cluster_c], any),
     setup_srcreplqueues(ClusterC, [cluster_a, cluster_b], any),
@@ -223,9 +224,9 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC, CertDir) ->
     setup_snkreplworkers(ClusterA ++ ClusterC, ClusterB, cluster_b),
     setup_snkreplworkers(ClusterA ++ ClusterB, ClusterC, cluster_c),
 
-    lager:info("Test empty clusters don't show any differences"),
+    ?LOG_INFO("Test empty clusters don't show any differences"),
 
-    lager:info("Cluster A ~s ~w Cluster B ~s ~w Cluster C ~s ~w",
+    ?LOG_INFO("Cluster A ~s ~w Cluster B ~s ~w Cluster C ~s ~w",
                 [IPA, PortA, IPB, PortB, IPC, PortC]),
 
     true = check_all_insync({NodeA, IPA, PortA},
@@ -233,7 +234,7 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC, CertDir) ->
                             {NodeC, IPC, PortC},
                             SSLCredentials),
 
-    lager:info("Test 1000 key difference and resolve"),
+    ?LOG_INFO("Test 1000 key difference and resolve"),
     % Write keys to cluster A, verify B and C do have them.
     write_to_cluster(NodeA, 1, 1000, new_obj),
     timer:sleep(?REPL_SLEEP),
@@ -244,7 +245,7 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC, CertDir) ->
                             {NodeC, IPC, PortC},
                             SSLCredentials),
 
-    lager:info("Test replicating tombstones"),
+    ?LOG_INFO("Test replicating tombstones"),
     delete_from_cluster(NodeA, 901, 1000),
     timer:sleep(?REPL_SLEEP),
     read_from_cluster(NodeA, 901, 1000, ?COMMMON_VAL_INIT, 100),
@@ -255,7 +256,7 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC, CertDir) ->
                             {NodeC, IPC, PortC},
                             SSLCredentials),
 
-    lager:info("Test replicating modified objects"),
+    ?LOG_INFO("Test replicating modified objects"),
     write_to_cluster(NodeB, 1, 100, ?COMMMON_VAL_MOD),
     timer:sleep(?REPL_SLEEP),
     read_from_cluster(NodeA, 1, 100, ?COMMMON_VAL_MOD, 0),
@@ -269,16 +270,16 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC, CertDir) ->
                             {NodeC, IPC, PortC},
                             SSLCredentials),
 
-    lager:info("Suspend a queue at source and confirm replication stops ..."),
-    lager:info("... but continues from unsuspended queues"),
+    ?LOG_INFO("Suspend a queue at source and confirm replication stops ..."),
+    ?LOG_INFO("... but continues from unsuspended queues"),
     ok = action_on_srcqueue(ClusterC, cluster_a, suspend_rtq),
     write_to_cluster(NodeC, 1001, 2000, new_obj),
     timer:sleep(?REPL_SLEEP),
     read_from_cluster(NodeB, 1001, 2000, ?COMMMON_VAL_INIT, 0),
     read_from_cluster(NodeA, 1001, 2000, ?COMMMON_VAL_INIT, 1000),
     ok = action_on_srcqueue(ClusterC, cluster_a, resume_rtq),
-    lager:info("Resuming the queue changes nothing ..."),
-    lager:info("... But new PUTs will now replicate"),
+    ?LOG_INFO("Resuming the queue changes nothing ..."),
+    ?LOG_INFO("... But new PUTs will now replicate"),
     timer:sleep(?REPL_SLEEP),
     read_from_cluster(NodeB, 1001, 2000, ?COMMMON_VAL_INIT, 0),
     read_from_cluster(NodeA, 1001, 2000, ?COMMMON_VAL_INIT, 1000),
@@ -287,7 +288,7 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC, CertDir) ->
     read_from_cluster(NodeA, 1001, 1100, ?COMMMON_VAL_INIT, 100),
     read_from_cluster(NodeA, 1101, 2000, ?COMMMON_VAL_MOD, 0),
         % errors down to 100
-    lager:info("Full sync from another cluster will resolve"),
+    ?LOG_INFO("Full sync from another cluster will resolve"),
     {clock_compare, 100} =
         fullsync_check({NodeB, IPB, PortB, ?B_NVAL},
                         {NodeA, IPA, PortA, ?A_NVAL},
@@ -301,8 +302,8 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC, CertDir) ->
                             {NodeC, IPC, PortC},
                             SSLCredentials),
 
-    lager:info("Suspend working on a queue from sink and confirm ..."),
-    lager:info("... replication stops but continues from unsuspended sinks"),
+    ?LOG_INFO("Suspend working on a queue from sink and confirm ..."),
+    ?LOG_INFO("... replication stops but continues from unsuspended sinks"),
     ok = action_on_snkqueue(ClusterA, cluster_a, suspend_snkqueue),
     timer:sleep(?REPL_SLEEP),
         % Sleep here as there may be established workers looping on an empty
@@ -312,15 +313,15 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC, CertDir) ->
     read_from_cluster(NodeB, 2001, 3000, ?COMMMON_VAL_INIT, 0),
     read_from_cluster(NodeA, 2001, 3000, ?COMMMON_VAL_INIT, 1000),
     ok = action_on_snkqueue(ClusterA, cluster_a, resume_snkqueue),
-    lager:info("Resuming the queue prompts recovery ..."),
+    ?LOG_INFO("Resuming the queue prompts recovery ..."),
     timer:sleep(?REPL_SLEEP),
     read_from_cluster(NodeB, 2001, 3000, ?COMMMON_VAL_INIT, 0),
     read_from_cluster(NodeA, 2001, 3000, ?COMMMON_VAL_INIT, 0),
 
-    lager:info("Stop a node in source - and repl OK"),
+    ?LOG_INFO("Stop a node in source - and repl OK"),
     NodeA0 = hd(tl(ClusterA)),
     rt:stop_and_wait(NodeA0),
-    lager:info("Node stopped"),
+    ?LOG_INFO("Node stopped"),
     write_to_cluster(NodeA, 3001, 4000, new_obj),
     read_from_cluster(NodeA, 3001, 4000, ?COMMMON_VAL_INIT, 0),
     {root_compare, 0} =
@@ -336,7 +337,7 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC, CertDir) ->
     read_from_cluster(NodeB, 3001, 4000, ?COMMMON_VAL_INIT, 0),
     read_from_cluster(NodeC, 3001, 4000, ?COMMMON_VAL_INIT, 0),
 
-    lager:info("Node restarting"),
+    ?LOG_INFO("Node restarting"),
     rt:start_and_wait(NodeA0),
     rt:wait_for_service(NodeA0, riak_kv),
 
@@ -350,9 +351,9 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC, CertDir) ->
                             {root_compare, 0},
                             ?WAIT_LOOPS),
 
-    lager:info("Stop a node in sink - and repl OK"),
+    ?LOG_INFO("Stop a node in sink - and repl OK"),
     rt:stop_and_wait(NodeA0),
-    lager:info("Node stopped"),
+    ?LOG_INFO("Node stopped"),
     write_to_cluster(NodeB, 4001, 5000, new_obj),
     {root_compare, 0} =
         wait_for_outcome(?MODULE,
@@ -366,14 +367,14 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC, CertDir) ->
 
     read_from_cluster(NodeA, 4001, 5000, ?COMMMON_VAL_INIT, 0),
     read_from_cluster(NodeC, 4001, 5000, ?COMMMON_VAL_INIT, 0),
-    lager:info("Node restarting"),
+    ?LOG_INFO("Node restarting"),
     rt:start_and_wait(NodeA0),
     rt:wait_for_service(NodeA0, riak_kv),
 
 
-    lager:info("Kill a node in source - and repl OK"),
+    ?LOG_INFO("Kill a node in source - and repl OK"),
     rt:brutal_kill(NodeA0),
-    lager:info("Node killed"),
+    ?LOG_INFO("Node killed"),
     timer:sleep(2000), % Cluster may settle after kill
     write_to_cluster(NodeA, 5001, 8000, new_obj),
     {root_compare, 0} =
@@ -389,8 +390,8 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC, CertDir) ->
     read_from_cluster(NodeB, 5001, 8000, ?COMMMON_VAL_INIT, 0),
     read_from_cluster(NodeC, 5001, 8000, ?COMMMON_VAL_INIT, 0),
 
-    lager:info("Confirm replication from cache-less cluster ..."),
-    lager:info(".. with node still killed in cluster A"),
+    ?LOG_INFO("Confirm replication from cache-less cluster ..."),
+    ?LOG_INFO(".. with node still killed in cluster A"),
     write_to_cluster(NodeC, 8001, 10000, new_obj),
     {root_compare, 0} =
         wait_for_outcome(?MODULE,
@@ -502,15 +503,15 @@ fullsync_check({SrcNode, _SrcIP, _SrcPort, SrcNVal},
     ok = rpc:call(SrcNode, ModRef, set_allsync, [SrcNVal, SinkNVal]),
     AAEResult = rpc:call(SrcNode, riak_client, ttaaefs_fullsync, [all_check, 60]),
 
-    % lager:info("Sleeping to await queue drain."),
+    % ?LOG_INFO("Sleeping to await queue drain."),
     % timer:sleep(2000),
 
     AAEResult.
 
 %% @doc Write a series of keys and ensure they are all written.
 write_to_cluster(Node, Start, End, CommonValBin) ->
-    lager:info("Writing ~p keys to node ~p.", [End - Start + 1, Node]),
-    lager:warning("Note that only utf-8 keys are used"),
+    ?LOG_INFO("Writing ~b keys to node ~0p.", [End - Start + 1, Node]),
+    ?LOG_WARNING("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F =
         fun(N, Acc) ->
@@ -538,12 +539,12 @@ write_to_cluster(Node, Start, End, CommonValBin) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    lager:warning("~p errors while writing: ~p", [length(Errors), Errors]),
+    ?LOG_WARNING("~b errors while writing: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 delete_from_cluster(Node, Start, End) ->
-    lager:info("Deleting ~p keys from node ~p.", [End - Start + 1, Node]),
-    lager:warning("Note that only utf-8 keys are used"),
+    ?LOG_INFO("Deleting ~b keys from node ~0p.", [End - Start + 1, Node]),
+    ?LOG_WARNING("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F =
         fun(N, Acc) ->
@@ -559,7 +560,7 @@ delete_from_cluster(Node, Start, End) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    lager:warning("~p errors while deleting: ~p", [length(Errors), Errors]),
+    ?LOG_WARNING("~b errors while deleting: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 
@@ -569,7 +570,7 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors) ->
     read_from_cluster(Node, Start, End, CommonValBin, Errors, false).
 
 read_from_cluster(Node, Start, End, CommonValBin, Errors, LogErrors) ->
-    lager:info("Reading ~p keys from node ~p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Reading ~b keys from node ~0p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
     F =
         fun(N, Acc) ->
@@ -590,14 +591,14 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors, LogErrors) ->
     ErrorsFound = lists:foldl(F, [], lists:seq(Start, End)),
     case Errors of
         undefined ->
-            lager:info("Errors Found in read_from_cluster ~w",
+            ?LOG_INFO("Errors Found in read_from_cluster ~b",
                         [length(ErrorsFound)]);
         _ ->
             case LogErrors of
                 true ->
                     LogFun =
                         fun(Error) ->
-                            lager:info("Read error ~w", [Error])
+                            ?LOG_INFO("Read error ~0p", [Error])
                         end,
                     lists:foreach(LogFun, ErrorsFound);
                 false ->
@@ -607,7 +608,10 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors, LogErrors) ->
                 Errors ->
                     ok;
                 _ ->
-                    lists:foreach(fun(E) -> lager:warning("Read error ~w", [E]) end, ErrorsFound)
+                    lists:foreach(
+                        fun(E) ->
+                            ?LOG_WARNING("Read error ~0p", [E])
+                        end, ErrorsFound)
             end,
             ?assertEqual(Errors, length(ErrorsFound))
     end.
@@ -623,7 +627,7 @@ wait_for_outcome(Module, Func, Args, ExpOutcome, LoopCount, MaxLoops) ->
         ExpOutcome ->
             ExpOutcome;
         NotRightYet ->
-            lager:info("~w not yet ~w ~w", [Func, ExpOutcome, NotRightYet]),
+            ?LOG_INFO("~w not yet ~w ~w", [Func, ExpOutcome, NotRightYet]),
             timer:sleep(LoopCount * 2000),
             wait_for_outcome(Module, Func, Args, ExpOutcome,
                                 LoopCount + 1, MaxLoops)

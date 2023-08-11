@@ -59,19 +59,15 @@
     cmd_token/0
 ]).
 
+-include_lib("kernel/include/file.hrl").
+-include_lib("kernel/include/logger.hrl").
+
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
-%% By default eunit throws away stdout output from passing tests.
--define(LOG_TO_STDIO, true).
-%% This gets pretty noisy, use at your own risk - nothing is filtered out.
-% -define(LOG_TO_IODEV, user).
 %% Some timeouts so we don't need to rely on 'rt_config' in eunit.
 -define(TEST_EXEC_TIMEOUT,  25000).
 -define(TEST_CONF_TIMEOUT,  (?TEST_EXEC_TIMEOUT + 5000)).
 -endif. % TEST
-
--include_lib("kernel/include/file.hrl").
--include("logging.hrl").
 
 %% `exe' and `args' are included for error reporting
 -record(rt_exec_token, {
@@ -273,7 +269,7 @@ cmd(Cmd, Dir, Args, Env, Form) ->
 %%          Output is returned as a list of lines in the order that the
 %%          command output them, including blank lines, without their
 %%          terminating newline.</dd>
-%%      <dt>`stream'</dt><dd>
+%%      <dt>`string'</dt><dd>
 %%          Output is returned in a single string, possibly with embedded
 %%          newlines. This output format can be convenient when the output is
 %%          to be used in regular expression matching/filtering.<br/>
@@ -1548,11 +1544,10 @@ resolve_exe_detail(AbsPath) ->
                     %% This check is flawed, as it's only testing whether ANY
                     %% execute bit is set, which may not be applicable to the
                     %% current user, but we're not going to resolve all that.
-                    case (Mode band 8#111) of
-                        0 ->
-                            {error, eacces};
-                        _ ->
-                            AbsPath
+                    if (Mode band 8#111) =/= 0 ->
+                        AbsPath;
+                    true ->
+                        {error, eacces}
                     end;
                 directory ->
                     {error, eisdir};
@@ -1749,7 +1744,7 @@ interact_send_after_exit_test_() ->
 
 test_interact_send_after_exit() ->
     Ops = [
-        {expect, "abort with ^G"},
+        {expect, {re, "abort with \\^G|press Ctrl+G to abort"}},
         {send, "q().\n"},
         {pause, 5000},
         {send, "halt(5).\n"}
@@ -1758,8 +1753,14 @@ test_interact_send_after_exit() ->
         interact("erl", cwd, [], [], Ops, default_timeout())).
 
 interact_match_test() ->
+    Prompt = case string:to_integer(erlang:system_info(otp_release)) of
+        {Rel, _} when Rel > 25 ->
+            "press Ctrl+G to abort";
+        _ ->
+            "abort with ^G"
+    end,
     Ops = [
-        {expect, "abort with ^G"},
+        {expect, Prompt},
         {send, "q().\n"},
         {expect, exit}
     ],
@@ -1768,7 +1769,7 @@ interact_match_test() ->
 
 interact_regex_test() ->
     Ops = [
-        {expect, {re, "abort with \\^G"}},
+        {expect, {re, "abort with \\^G|press Ctrl+G to abort"}},
         {send, "q().\n"},
         {expect, exit}
     ],

@@ -23,6 +23,7 @@
 %% are printed to the test.log
 %%
 %% -------------------------------------------------------------------
+%%
 %% @doc Operations for tests to use `redbug' tracing.
 %%
 %% Unless tracing the local node itself, the local `redbug' process acts as a
@@ -41,6 +42,7 @@
 %% @todo {@link set_tracing_applied/1} alters the global configuration!
 %% Instead, it should ONLY alter the currently-running test's context.
 %%
+%% @end
 -module(rt_redbug).
 
 %% Public API
@@ -83,8 +85,8 @@
 -type rtps() :: nonempty_list(rtp()).
 %% A list of {@link rtp()}s
 
--include("logging.hrl").
--include_lib("eunit/include/eunit.hrl").
+-include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(ENABLED_KEY,    apply_traces).
 -define(TRACING_KEY,    rt_redbug_tracing).
@@ -192,7 +194,7 @@ default_trace_options() ->
 stop() ->
     Node = take_target_node(),
     Stop = redbug:stop(Node),
-    ?LOG_DEBUG("redbug:stop(~s) -> ~p", [Node, Stop]),
+    ?LOG_DEBUG("redbug:stop(~s) -> ~0p", [Node, Stop]),
     case Stop of
         not_started ->
             ok;
@@ -205,7 +207,7 @@ stop() ->
                 ok ->
                     ?LOG_INFO("Redbug stopped", []);
                 R ->
-                    ?LOG_ERROR("Redbug failed to stop: ~p", [R]),
+                    ?LOG_ERROR("Redbug failed to stop: ~0p", [R]),
                     {error, timeout}
             end
     end.
@@ -245,11 +247,11 @@ set_tracing_applied(OldValue, NewValue) when erlang:is_boolean(OldValue) ->
     NewValue orelse ?assertMatch(ok, stop()),
     OldValue;
 set_tracing_applied({error, Reason}, _NewValue) ->
-    ?LOG_ERROR("Unable to retrieve test metadata: ~p", [Reason]),
+    ?LOG_ERROR("Unable to retrieve test metadata: ~0p", [Reason]),
     erlang:error(Reason);
 set_tracing_applied(BadValue, _NewValue) ->
     ?LOG_ERROR("Internal riak_test programming error,"
-        " '~s' should never be ~p", [?ENABLED_KEY, BadValue]),
+        " '~s' should never be ~0p", [?ENABLED_KEY, BadValue]),
     erlang:error(bug, [?ENABLED_KEY, BadValue]).
 
 -spec store_target_node(Node :: node()) -> ok | rtt:std_error().

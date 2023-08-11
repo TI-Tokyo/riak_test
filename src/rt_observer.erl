@@ -17,9 +17,9 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
-
+%%
 %% @deprecated Previously only used by perf, which is no longer with us.
-%%  - Does it have any other value?
+%% Does it have any other value?
 -module(rt_observer).
 -deprecated(module).
 
@@ -48,6 +48,8 @@
         {pmap, 2}
     ]}
 ]).
+
+-include_lib("kernel/include/logger.hrl").
 
 -record(history, {
     network,
@@ -115,7 +117,7 @@ lloop(Master, LSock) ->
 watcher_loop(W=#watcher{probes=Probes,
         acceptor={Acceptor,LSock}, collector={_,_,Dir}}) ->
     Missing = [Node || {Node, undefined} <- Probes],
-    %% io:format("Missing: ~p~n", [Missing]),
+    ?LOG_DEBUG("Missing: ~0p", [Missing]),
     W2 = install_probes(Missing, W),
     Probes2 = W2#watcher.probes,
     receive
@@ -123,10 +125,10 @@ watcher_loop(W=#watcher{probes=Probes,
             case lists:keyfind(MRef, 2, Probes2) of
                 false ->
                     %% master died, exit
-                    io:format("watcher exiting~n"),
+                    ?LOG_INFO("watcher exiting"),
                     ok;
                 {Node, MRef} ->
-                    io:format("Probe exit. ~p: ~p~n", [Node, Reason]),
+                    ?LOG_INFO("Probe exit. ~0p: ~0p", [Node, Reason]),
                     Probes3 = lists:keyreplace(Node, 1, Probes2, {Node, undefined}),
                     W3 = W2#watcher{probes=Probes3},
                     watcher_loop(W3)
@@ -176,12 +178,12 @@ install_probes(Nodes,
     W#watcher{probes=Probes3}.
 
 start(Master, Rate, Collector, Nodes, Fun) ->
-    lager:info("In start: ~p~n", [node()]),
+    ?LOG_INFO("In start: ~0p", [node()]),
     Pid = spawn(?MODULE, init, [Master, Rate, Collector, Nodes, Fun]),
     {node(), Pid}.
 
 init(Master, Rate, {Host, Port, _Dir}, Nodes, Fun) ->
-    lager:info("In init: ~p ~p~n", [node(), Host]),
+    ?LOG_INFO("In init: ~0p ~0p", [node(), Host]),
     {ok, Sock} = gen_tcp:connect(
         Host, Port, [binary, {packet, 2}, {send_timeout, 500}]),
     case application:get_env(riak_kv, storage_backend) of
@@ -202,11 +204,11 @@ init(Master, Rate, {Host, Port, _Dir}, Nodes, Fun) ->
     loop(Fun, Rate, H).
 
 loop(Fun, Rate, H) ->
-    %% io:format("loop: ~p~n", [node()]),
+    ?LOG_DEBUG("loop: ~0p", [node()]),
     NewH = ?MODULE:Fun(H),
     receive
         {'DOWN', _, process, _, _} ->
-            %%io:format("shutting: ~p~n", [node()]),
+            ?LOG_DEBUG("shutting: ~0p", [node()]),
             ok
     after
         Rate ->

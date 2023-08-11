@@ -30,6 +30,7 @@
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -define(TYPE1, <<"bob">>).
@@ -70,7 +71,7 @@ add_one_four_config(Node) ->
 
 -spec copy(file:filename(), file:filename()) -> ok.
 copy(File, DestDir) ->
-    lager:info("Copying ~p to ~p~n", [File, DestDir]),
+    ?LOG_INFO("Copying ~0p to ~0p", [File, DestDir]),
     {ok, _} = file:copy(File, DestDir),
     ok.
 

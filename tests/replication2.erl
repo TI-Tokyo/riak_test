@@ -41,7 +41,7 @@ confirm() ->
     NumNodes = rt_config:get(num_nodes, 6),
     ClusterASize = rt_config:get(cluster_a_size, 3),
 
-    ?LOG_INFO("Deploy ~0p nodes", [NumNodes]),
+    ?LOG_INFO("Deploy ~b nodes", [NumNodes]),
     Conf = [
             {riak_kv,
                 [
@@ -137,7 +137,7 @@ real_time_replication_test([AFirst|_] = ANodes, [BFirst|_] = BNodes, Connected) 
 
             {ok, {_IP, BFirstPort}} = rpc:call(BFirst, application, get_env, [riak_core, cluster_mgr]),
 
-            ?LOG_INFO("connect cluster A:~0p to B on port ~0p", [LeaderA, BFirstPort]),
+            ?LOG_INFO("connect cluster A:~0p to B on port ~b", [LeaderA, BFirstPort]),
             repl_util:connect_cluster(LeaderA, "127.0.0.1", BFirstPort),
             ?assertEqual(ok, repl_util:wait_for_connection(LeaderA, "B")),
 
@@ -162,7 +162,7 @@ real_time_replication_test([AFirst|_] = ANodes, [BFirst|_] = BNodes, Connected) 
             ?LOG_INFO("Leader on cluster A is ~0p", [LeaderA]),
             ?LOG_INFO("BFirst on cluster B is ~0p", [BFirst]),
             {ok, {_IP, BFirstPort}} = rpc:call(BFirst, application, get_env, [riak_core, cluster_mgr]),
-            ?LOG_INFO("B is ~0p with port ~0p", [BFirst, BFirstPort])
+            ?LOG_INFO("B is ~0p with port ~b", [BFirst, BFirstPort])
     end,
 
     log_to_nodes(ANodes++BNodes, "Write data to Cluster A, verify replication to Cluster B via realtime"),
@@ -579,7 +579,7 @@ pb_write_during_shutdown([AFirst|_] = ANodes, [BFirst|_] = BNodes) ->
 
     ConnInfo = proplists:get_value(Target, rt:connection_info([Target])),
     {IP, Port} = proplists:get_value(pb, ConnInfo),
-    ?LOG_INFO("Connecting to pb socket ~0p:~0p on ~0p", [IP, Port, Target]),
+    ?LOG_INFO("Connecting to pb socket ~0p:~b on ~0p", [IP, Port, Target]),
     PBSock = rt:pbc(Target),
 
     %% do the stop in the background while we're writing keys
@@ -599,11 +599,11 @@ pb_write_during_shutdown([AFirst|_] = ANodes, [BFirst|_] = BNodes) ->
           ?LOG_INFO("Shutdown timeout caught"),
           []
       end,
-    ?LOG_INFO("Received ~0p write failures", [length(WriteErrors)]),
+    ?LOG_INFO("Received ~b write failures", [length(WriteErrors)]),
     timer:sleep(3000),
     ?LOG_INFO("Checking number of read failures on secondary cluster"),
     ReadErrors = rt:systest_read(BFirst, 1000, 11000, TestBucket, 2),
-    ?LOG_INFO("Received ~0p read failures", [length(ReadErrors)]),
+    ?LOG_INFO("Received ~b read failures", [length(ReadErrors)]),
 
     %% Ensure node is down before we try to start it up again.
     ?LOG_INFO("pb_write_during_shutdown: Ensure node ~0p is down before restart", [Target]),
@@ -613,12 +613,12 @@ pb_write_during_shutdown([AFirst|_] = ANodes, [BFirst|_] = BNodes) ->
     rt:wait_until_pingable(Target),
     rt:wait_for_service(Target, riak_repl),
     ReadErrors2 = rt:systest_read(Target, 1000, 11000, TestBucket, 2),
-    ?LOG_INFO("Received ~0p read failures on ~0p", [length(ReadErrors2), Target]),
+    ?LOG_INFO("Received ~b read failures on ~0p", [length(ReadErrors2), Target]),
     case length(WriteErrors) >= length(ReadErrors) of
         true ->
             ok;
         false ->
-            ?LOG_ERROR("Received more read errors on ~0p: ~0p than write errors on ~0p: ~0p",
+            ?LOG_ERROR("Received more read errors on ~0p: ~b than write errors on ~0p: ~b",
             [BFirst, length(ReadErrors), Target, length(WriteErrors)]),
             FailedKeys = lists:foldl(
                 fun({Key, _}, Acc) ->
@@ -632,7 +632,7 @@ pb_write_during_shutdown([AFirst|_] = ANodes, [BFirst|_] = BNodes) ->
             ?LOG_INFO("Failed keys ~0p", [FailedKeys]),
             ?LOG_INFO("Validate number of read failures on secondary cluster"),
             ReadErrors3 = rt:systest_read(BFirst, 1000, 11000, TestBucket, 2),
-            ?LOG_INFO("Received ~0p read failures", [length(ReadErrors3)]),
+            ?LOG_INFO("Received ~b read failures", [length(ReadErrors3)]),
             case length(WriteErrors) >= length(ReadErrors3) of
                 true ->
                     ?LOG_INFO(
@@ -665,7 +665,7 @@ http_write_during_shutdown([AFirst|_] = ANodes, [BFirst|_] = BNodes) ->
 
     ConnInfo = proplists:get_value(Target, rt:connection_info([Target])),
     {IP, Port} = proplists:get_value(http, ConnInfo),
-    ?LOG_INFO("Connecting to http socket ~0p:~0p on ~0p", [IP, Port, Target]),
+    ?LOG_INFO("Connecting to http socket ~0p:~b on ~0p", [IP, Port, Target]),
     C = rt:httpc(Target),
 
     %% do the stop in the background while we're writing keys
@@ -685,13 +685,13 @@ http_write_during_shutdown([AFirst|_] = ANodes, [BFirst|_] = BNodes) ->
                 ?LOG_INFO("Shutdown timeout caught"),
                 []
         end,
-    ?LOG_INFO("got ~0p write failures to ~0p", [length(WriteErrors), Target]),
+    ?LOG_INFO("got ~b write failures to ~0p", [length(WriteErrors), Target]),
     timer:sleep(3000),
     ?LOG_INFO("Checking number of read failures on secondary cluster node, ~0p", [BFirst]),
     [{_, {IP, Port2}},_] = rt:connection_info(BFirst),
     C2 = rhc:create("127.0.0.1", Port2, "riak", []),
     ReadErrors = http_read(C2, 12000, 22000, TestBucket, 2),
-    ?LOG_INFO("Received ~0p read failures from ~0p", [length(ReadErrors), BFirst]),
+    ?LOG_INFO("Received ~b read failures from ~0p", [length(ReadErrors), BFirst]),
 
     %% Ensure node is down before we try to start it up again.
     ?LOG_INFO("HTTP: write_during_shutdown: Ensure node ~0p is down before restart", [Target]),
@@ -701,12 +701,12 @@ http_write_during_shutdown([AFirst|_] = ANodes, [BFirst|_] = BNodes) ->
     rt:wait_until_pingable(Target),
     rt:wait_for_service(Target, riak_repl),
     ReadErrors2 = http_read(C, 12000, 22000, TestBucket, 2),
-    ?LOG_INFO("Received ~0p read failures on ~0p", [length(ReadErrors2), Target]),
+    ?LOG_INFO("Received ~b read failures on ~0p", [length(ReadErrors2), Target]),
     case length(WriteErrors) >= length(ReadErrors) of
         true ->
             ok;
         false ->
-            ?LOG_ERROR("Received more read errors on ~0p: ~0p than write errors on ~0p: ~0p",
+            ?LOG_ERROR("Received more read errors on ~0p: ~b than write errors on ~0p: ~b",
             [BFirst, length(ReadErrors), Target, length(WriteErrors)]),
             FailedKeys = lists:foldl(fun({Key, _}, Acc) ->
                 case lists:keyfind(Key, 1, WriteErrors) of

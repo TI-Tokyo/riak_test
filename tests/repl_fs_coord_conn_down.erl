@@ -29,15 +29,18 @@
 -module(repl_fs_coord_conn_down).
 -behavior(riak_test).
 
--include_lib("eunit/include/eunit.hrl").
--define(TEST_BUCKET, <<"repl_fs_stat_caching">>).
 -compile({parse_transform, rt_intercept_pt}).
 -export([confirm/0]).
+
+-include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
+
+-define(TEST_BUCKET, <<"repl_fs_stat_caching">>).
 
 coord_status(Node) ->
     StatusResult = rpc:block_call(
         Node, riak_repl2_fscoordinator, status, []),
-    % lager:info("COORD STATUS ~p ~p", [Node, StatusResult]),
+    % ?LOG_INFO("COORD STATUS ~0p ~0p", [Node, StatusResult]),
     StatusResult.
 
 coord_sink_connected_node(SourceNode, SinkCluster) ->
@@ -76,13 +79,13 @@ confirm() ->
     start_fullsync(SrcLeader),
     rt:wait_until(
         fun() ->
-            lager:info("Waiting for fullsync to complete using source leader ~p", [SrcLeader]),
+            ?LOG_INFO("Waiting for fullsync to complete using source leader ~0p", [SrcLeader]),
             fullsyncs_completed_status(SrcLeader) > 0
         end
     ),
     SinkReplNode = retry_fun(50, 500, fun() -> coord_sink_connected_node(SrcLeader, _SinkCluster) end),
-    lager:info("Coordinator connected to sink node ~w",[SinkReplNode]),
-    lager:info("Source cluster leader is ~w",[SrcLeader]),
+    ?LOG_INFO("Coordinator connected to sink node ~0p",[SinkReplNode]),
+    ?LOG_INFO("Source cluster leader is ~0p",[SrcLeader]),
 
     put_objects(SrcLeader),
 
@@ -110,7 +113,7 @@ get_objects(Node1) ->
             riakc_pb_socket:get(Client, Bucket, integer_to_binary(N))
         end,
     Result = [to_char_result(GetFn(N)) || N <- lists:seq(1,200)],
-    lager:info(Result,[]),
+    ?LOG_INFO("~s", [Result]),
     ?assertNot(lists:member($x, Result)).
 
 to_char_result({ok,_}) -> $.;
@@ -128,15 +131,15 @@ setup() ->
     rt:set_conf(all, [{"buckets.default.allow_mult", "false"}]),
     NodeCount = rt_config:get(num_nodes, 6),
 
-    lager:info("Deploy ~p nodes", [NodeCount]),
+    ?LOG_INFO("Deploy ~b nodes", [NodeCount]),
     Nodes = rt:deploy_nodes(NodeCount, cluster_conf(), [riak_kv, riak_repl]),
     SplitSize = NodeCount div 2,
     {SourceNodes, SinkNodes} = lists:split(SplitSize, Nodes),
 
-    lager:info("making cluster Source from ~p", [SourceNodes]),
+    ?LOG_INFO("making cluster Source from ~0p", [SourceNodes]),
     repl_util:make_cluster(SourceNodes),
 
-    lager:info("making cluster Sink from ~p", [SinkNodes]),
+    ?LOG_INFO("making cluster Sink from ~0p", [SinkNodes]),
     repl_util:make_cluster(SinkNodes),
 
     SrcHead = hd(SourceNodes),

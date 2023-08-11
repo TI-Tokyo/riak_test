@@ -187,7 +187,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             {ts_epoch(SW0A), ts_epoch(SW0B)},
                             count}),
-    ?LOG_INFO("Counted ~b active keys on A1 from first time range", [K0]),
+    ?LOG_INFO("Counted ~w active keys on A1 from first time range", [K0]),
     {ok, K1} = aae_fold(NodeA1,
                         Protocol,
                         {erase_keys,
@@ -195,7 +195,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             {ts_epoch(SW1A), ts_epoch(SW1B)},
                             count}),
-    ?LOG_INFO("Counted ~b active keys on A1 from second time range", [K1]),
+    ?LOG_INFO("Counted ~w active keys on A1 from second time range", [K1]),
     {ok, KA} = aae_fold(NodeA1,
                         Protocol,
                         {erase_keys,
@@ -203,7 +203,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             all,
                             count}),
-    ?LOG_INFO("Counted ~b active keys on A1 all time", [KA]),
+    ?LOG_INFO("Counted ~w active keys on A1 all time", [KA]),
     {ok, T0} = aae_fold(NodeA1,
                         Protocol,
                         {reap_tombs,
@@ -211,7 +211,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             {ts_epoch(SW0A), ts_epoch(SW0B)},
                             count}),
-    ?LOG_INFO("Counted ~b tombs on A1 from first time range", [T0]),
+    ?LOG_INFO("Counted ~w tombs on A1 from first time range", [T0]),
     {ok, T1} = aae_fold(NodeA1,
                         Protocol,
                         {reap_tombs,
@@ -219,7 +219,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             {ts_epoch(SW1A), ts_epoch(SW1B)},
                             count}),
-    ?LOG_INFO("Counted ~b tombs on A1 from second time range", [T1]),
+    ?LOG_INFO("Counted ~w tombs on A1 from second time range", [T1]),
     {ok, TA} = aae_fold(NodeA1,
                         Protocol,
                         {reap_tombs,
@@ -227,7 +227,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             all,
                             count}),
-    ?LOG_INFO("Counted ~0p tombs on A1 all time", [TA]),
+    ?LOG_INFO("Counted ~w tombs on A1 all time", [TA]),
     {ok, KB} = aae_fold(NodeB1,
                         Protocol,
                         {erase_keys,
@@ -235,7 +235,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             all,
                             count}),
-    ?LOG_INFO("Counted ~0p active keys on B1 all time", [KB]),
+    ?LOG_INFO("Counted ~w active keys on B1 all time", [KB]),
     {ok, {keys, TBL}} = aae_fold(NodeB1,
                         Protocol,
                         {find_tombs,
@@ -243,28 +243,28 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             all,
                             all}),
     TB = length(TBL),
-    ?LOG_INFO("Counted ~0p tombs on B1 all time", [TB]),
+    ?LOG_INFO("Counted ~w tombs on B1 all time", [TB]),
     {ok, {keys, SKLA0}} = aae_fold(NodeA1,
                                     Protocol,
                                     {find_keys,
                                         ?TEST_BUCKET, all,
                                         {ts_epoch(SW0A), ts_epoch(SW0B)},
                                         {sibling_count, 1}}),
-    ?LOG_INFO("Counted ~0p siblings on A1 - first timerange", [length(SKLA0)]),
+    ?LOG_INFO("Counted ~b siblings on A1 - first timerange", [length(SKLA0)]),
     {ok, {keys, SKLA1}} = aae_fold(NodeA1,
                                     Protocol,
                                     {find_keys,
                                         ?TEST_BUCKET, all,
                                         {ts_epoch(SW1A), ts_epoch(SW1B)},
                                         {sibling_count, 1}}),
-    ?LOG_INFO("Counted ~0p siblings on A1 - second timerange", [length(SKLA1)]),
+    ?LOG_INFO("Counted ~b siblings on A1 - second timerange", [length(SKLA1)]),
     {ok, {keys, SKLB}} = aae_fold(NodeB1,
                                     Protocol,
                                     {find_keys,
                                         ?TEST_BUCKET, all,
                                         all,
                                         {sibling_count, 1}}),
-    ?LOG_INFO("Counted ~0p siblings on B1", [length(SKLB)]),
+    ?LOG_INFO("Counted ~b siblings on B1", [length(SKLB)]),
     KeyCount0 = 2 * ?UPDATE_COUNT, %% 2 lots of updates in each time period
     TombCount0 = ?KEY_COUNT - KeyCount0,
 
@@ -344,12 +344,12 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                         ?TEST_BUCKET, all, all,
                         {ts_epoch(SW1A), ts_epoch(SW1B)},
                         local}),
-    ?LOG_INFO("Reaped ~0p tombs from first time range", [TombCount0]),
-    ?LOG_INFO("Reaped ~0p tombs from second time range", [TombCount1]),
+    ?LOG_INFO("Reaped ~w tombs from first time range", [TombCount0]),
+    ?LOG_INFO("Reaped ~w tombs from second time range", [TombCount1]),
 
     ExpectedEC = EraseCount0 + EraseCount1,
     ?LOG_INFO(
-        "EraseCount0 ~0p EraseCount1 ~0p expected tombs ~0p",
+        "EraseCount0 ~w EraseCount1 ~w expected tombs ~w",
         [EraseCount0, EraseCount1, ExpectedEC]),
     {ok, ExpectedEC} =
         wait_for_outcome(?MODULE,
@@ -381,7 +381,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                     {erase_keys,
                         ?TEST_BUCKET, all, all, all,
                         count}),
-    ?LOG_INFO("Cluster A has ~0p keys and ~0p tombs at Phase 1 exit",
+    ?LOG_INFO("Cluster A has ~w keys and ~w tombs at Phase 1 exit",
                     [Phase1KeyCount, ExpectedEC]),
 
     rt:stop_and_wait(NodeA5),
@@ -429,7 +429,7 @@ test_repl(Protocol, [ClusterA, ClusterB]) ->
                             undefined,
                             ?LOOP_COUNT),
 
-    ?LOG_INFO("After reap/erase during fail - tombs ~0p keys ~0p",
+    ?LOG_INFO("After reap/erase during fail - tombs ~w keys ~w",
                 [Phase2TombCountS2, Phase2KeyCountS2]),
     ?assertMatch(true, Phase2TombCountS2 > 0),
     ?assertMatch(true, Phase2KeyCountS2 == 0),
@@ -513,7 +513,7 @@ aae_fold(Node, Protocol, Query) ->
 
 %% @doc Write a series of keys and ensure they are all written.
 write_to_cluster(Node, Start, End, CommonValBin) ->
-    ?LOG_INFO("Writing ~0p keys to node ~0p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Writing ~b keys to node ~0p.", [End - Start + 1, Node]),
     ?LOG_WARNING("Note that only utf-8 keys are used"),
     PB = rt:pbc(Node),
     B = ?TEST_BUCKET,
@@ -549,11 +549,11 @@ write_to_cluster(Node, Start, End, CommonValBin) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    ?LOG_WARNING("~0p errors while writing: ~0p", [length(Errors), Errors]),
+    ?LOG_WARNING("~b errors while writing: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 delete_from_cluster(Node, Start, End) ->
-    ?LOG_INFO("Deleting ~0p keys from node ~0p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Deleting ~b keys from node ~0p.", [End - Start + 1, Node]),
     ?LOG_WARNING("Note that only utf-8 keys are used"),
     {ok, C} = riak:client_connect(Node),
     F =
@@ -570,11 +570,11 @@ delete_from_cluster(Node, Start, End) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    ?LOG_WARNING("~0p errors while deleting: ~0p", [length(Errors), Errors]),
+    ?LOG_WARNING("~b errors while deleting: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 read_from_cluster(Node, Start, End, CommonValBin, Errors) ->
-    ?LOG_INFO("Reading ~0p keys from node ~0p.", [End - Start + 1, Node]),
+    ?LOG_INFO("Reading ~b keys from node ~0p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
     F =
         fun(N, Acc) ->
@@ -595,7 +595,7 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors) ->
     ErrorsFound = lists:foldl(F, [], lists:seq(Start, End)),
     case Errors of
         undefined ->
-            ?LOG_INFO("Errors Found in read_from_cluster ~0p",
+            ?LOG_INFO("Errors Found in read_from_cluster ~b",
                         [length(ErrorsFound)]),
             length(ErrorsFound);
         _ ->
@@ -612,7 +612,7 @@ wait_for_outcome(Module, Func, Args, ExpOutcome, LoopCount, MaxLoops) ->
         ExpOutcome ->
             ExpOutcome;
         NotRightYet ->
-            ?LOG_INFO("~0p not yet ~0p ~0p", [Func, ExpOutcome, NotRightYet]),
+            ?LOG_INFO("~w not yet ~w ~w", [Func, ExpOutcome, NotRightYet]),
             timer:sleep(LoopCount * 2000),
             wait_for_outcome(Module, Func, Args, ExpOutcome,
                                 LoopCount + 1, MaxLoops)
@@ -630,7 +630,7 @@ wait_until_stable(Module, Func, Args, LastResult, LoopCount) ->
     end.
 
 write_then_delete(NodeA1, NodeB1, Start, End) ->
-    ?LOG_INFO("Write ~0p objects into A and read from B and C",
+    ?LOG_INFO("Write ~b objects into A and read from B and C",
                 [End - Start + 1]),
     write_to_cluster(NodeA1, Start, End, new_obj),
     ?LOG_INFO("Waiting to read sample"),
@@ -649,7 +649,7 @@ write_then_delete(NodeA1, NodeB1, Start, End) ->
                             0,
                             ?LOOP_COUNT),
 
-    ?LOG_INFO("Deleting ~0p objects from B and read not_found from A",
+    ?LOG_INFO("Deleting ~b objects from B and read not_found from A",
                 [?KEY_COUNT]),
     delete_from_cluster(NodeB1, Start, End),
     ?LOG_INFO("Waiting for missing sample"),
@@ -667,12 +667,12 @@ write_then_delete(NodeA1, NodeB1, Start, End) ->
                         [NodeA1, Start, End, ?COMMMON_VAL_INIT, undefined],
                         ?KEY_COUNT,
                         ?LOOP_COUNT),
-    ?LOG_INFO("Add ~0p updates to A",
+    ?LOG_INFO("Add ~b updates to A",
                 [?UPDATE_COUNT]),
     write_to_cluster(NodeA1,
                         1 + End - (2 * ?UPDATE_COUNT), End - ?UPDATE_COUNT,
                         ?COMMMON_VAL_MOD),
-    ?LOG_INFO("Add ~0p updates to B - should generate siblings on A",
+    ?LOG_INFO("Add ~b updates to B - should generate siblings on A",
                 [?UPDATE_COUNT]),
     write_to_cluster(NodeB1,
                         End + 1 - ?UPDATE_COUNT, End,

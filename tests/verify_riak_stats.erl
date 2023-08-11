@@ -856,8 +856,6 @@ common_stats() ->
         <<"riak_repl_version">>,
         <<"riak_sysmon_version">>,
         <<"riakc_version">>,
-        <<"riakhttpc_version">>,
-        <<"riaknostic_version">>,
         <<"ring_creation_size">>,
         <<"ring_members">>,
         <<"ring_num_partitions">>,

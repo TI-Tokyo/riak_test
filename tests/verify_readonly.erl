@@ -22,6 +22,7 @@
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -define(BUCKET, <<"B0">>).
@@ -45,7 +46,7 @@
 confirm() ->
     NTestItems = ?ITEMS,   %% How many test items to write/verify?
     NTestNodes = 4,      %% How many nodes to spin up for tests?
-    lager:info("Spinning up test nodes"),
+    ?LOG_INFO("Spinning up test nodes"),
     Config = [{riak_core, [{ring_creation_size, 8}]},
                 {riak_kv, [{anti_entropy, {off, []}}]},
                 {bitcask, [{max_file_size, 1000000},
@@ -58,49 +59,39 @@ confirm() ->
     rt:wait_for_service(FailNode, riak_kv),
     Path = filename:join(rt:get_node_path(FailNode), "data"),
 
-    % When running the test we cannot let it crash on failure - as then the
-    % write permissions will not be restored (and any subsequent test in a test
-    % run will fail)
-    R =
-        try run_test(NTestItems, RootNode, FailNode) of
-            pass -> pass
-        catch
-            Class:Reason:StackTrace ->
-                lager:error("Test failure caught ~p: ~p~n~0p",
-                    [Class, Reason, StackTrace]),
-                error
-        end,
-
-    set_write_perm(Path, true),
-
-    R.
+    %% Ensure that write permission is restored before leaving
+    try
+        run_test(NTestItems, RootNode, FailNode)
+    after
+        set_write_perm(Path, true)
+    end.
 
 run_test(NTestItems, RootNode, FailNode) ->
-    lager:info("Populating cluster with writes."),
+    ?LOG_INFO("Populating cluster with writes."),
     [] = rt:systest_write(RootNode, 1, NTestItems, ?BUCKET, 2),
-    lager:info("Write complete - removing write permisions on data path"),
+    ?LOG_INFO("Write complete - removing write permisions on data path"),
     %% write one object with a bucket type
 
     Path = filename:join(rt:get_node_path(FailNode), "data"),
     set_write_perm(Path, false),
 
-    pong = net_adm:ping(FailNode),
+    ?assertMatch(pong, net_adm:ping(FailNode)),
 
     WriteAttempts = NTestItems * (?POST_MULT - 1),
-    lager:info("Beginning large set of new writes ~w", [WriteAttempts]),
+    ?LOG_INFO("Beginning large set of new writes ~w", [WriteAttempts]),
     PostErrors =
         rt:systest_write(RootNode,
                             NTestItems, NTestItems * ?POST_MULT, ?BUCKET,
                             2),
-    lager:info("Write complete - validating"),
+    ?LOG_INFO("Write complete - validating"),
 
-    lager:info("Errors on write count of ~w out of ~w",
+    ?LOG_INFO("Errors on write count of ~w out of ~w",
                 [length(PostErrors), WriteAttempts]),
-    true = length(PostErrors) < (WriteAttempts div 10000),
-    lager:info("Less than 0.01% of writes errored due to failure"),
+    ?assert(length(PostErrors) < (WriteAttempts div 10000)),
+    ?LOG_INFO("Less than 0.01% of writes errored due to failure"),
 
-    lager:info("Confirm the node did crash as it couldn't write"),
-    pang = net_adm:ping(FailNode),
+    ?LOG_INFO("Confirm the node did crash as it couldn't write"),
+    ?assertMatch(pang, net_adm:ping(FailNode)),
 
     pass.
 
@@ -112,7 +103,7 @@ set_write_perm(Path, Writeable) when erlang:is_boolean(Writeable) ->
             {"OFF", "u-w"}
     end,
     [Exe | Args] = CmdList = ["/bin/chmod", "-R", Opt, Path],
-    lager:info(
+    ?LOG_INFO(
         "Setting write permission ~s with ~s",
         [OnOff, rt_exec:cmd_line(CmdList)]),
     ?assertMatch({0, _}, rt:cmd(Exe, Args)).

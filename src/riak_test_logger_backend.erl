@@ -1,6 +1,8 @@
+%% -*- mode: erlang; erlang-indent-level: 4; indent-tabs-mode: nil -*-
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2012 Basho Technologies, Inc.
+%% Copyright (c) 2012-2013 Basho Technologies, Inc.
+%% Copyright (c) 2023 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -17,213 +19,203 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+%%
+%% @doc This logger handler keeps a retrievable buffer of logs in memory.
+%%
+%% You may be tempted to think the gen_server part could be implemented as
+%% a facade over `rt_logger', but that would make things ever so much more
+%% complicated.
+%%
+-module(riak_test_logger_backend).
+-behavior(gen_server).
 
-%% @doc This lager backend keeps a buffer of logs in memory and returns them all
-%% when the handler terminates.
+%% riak_test API
+-export([
+    get_logs/0,
 
--module(riak_test_lager_backend).
+    %% application-ish interface
+    start/3,
+    stop/0
+]).
 
--behavior(gen_event).
+%% gen_server callbacks
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2
+]).
 
-%% gen_event callbacks
--export([init/1,
-         handle_call/2,
-         handle_event/2,
-         handle_info/2,
-         terminate/2,
-         code_change/3]).
--export([get_logs/0]).
+% Logger handler
+-export([
+    log/2
+]).
 
-%% holds the log messages for retreival on terminate
--record(state, {level, verbose, log = []}).
-
+-include_lib("kernel/include/logger.hrl").
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
--include_lib("kernel/include/logger.hrl").
+-ifdef(HIDE_FROM_EDOC).
+-type state() :: rtt:log_lines().
+-endif. % HIDE_FROM_EDOC
 
--spec get_logs() -> [iolist()] | {error, term()}.
+-define(SERVER,     ?MODULE).
+-define(GS_HANDLER, riak_test_mem_logger).
+-define(FS_HANDLER, riak_test_file_logger).
+
+%% ===================================================================
+%% riak_test API
+%% ===================================================================
+
+-spec get_logs() -> rtt:log_lines() | rtt:std_error().
 get_logs() ->
-    gen_event:call(lager_event, ?MODULE, get_logs, infinity).
+    gen_server:call(?SERVER, get_logs).
 
-
--spec(init(integer()|atom()|[term()]) -> {ok, #state{}} | {error, atom()}).
+-spec start(
+    Verbose :: boolean(), Level :: logger:level(), LogFile :: rtt:fs_path())
+        -> ok | rtt:std_error().
 %% @private
-%% @doc Initializes the event handler
-init(Level) when is_atom(Level) ->
-    init([Level, false]);
-init([Level, Verbose]) ->
-    try parse_level(Level) of
-        Lvl ->
-            {ok, #state{level=Lvl, verbose=Verbose}}
-    catch
-        _:_ ->
-            {error, bad_log_level}
+start(Verbose, Level, LogFile) ->
+    case gen_server:start({local, ?SERVER}, ?MODULE, [], []) of
+        {ok, _Pid} ->
+            start_handlers(Verbose, Level, LogFile);
+        Error ->
+            Error
     end.
 
--spec(handle_event(tuple(), #state{}) -> {ok, #state{}}).
+-spec stop() -> ok.
 %% @private
-%% @doc handles the event, adding the log message to the gen_event's state.
-%%      this function attempts to handle logging events in both the simple tuple
-%%      and new record (introduced after lager 1.2.1) formats.
-handle_event({log, Dest, Level, {Date, Time}, [LevelStr, Location, Message]}, %% lager 1.2.1
-    #state{level=L, verbose=Verbose, log = Logs} = State) when Level > L ->
-    case lists:member(riak_test_lager_backend, Dest) of
-        true ->
-            Log = case Verbose of
-                true ->
-                    [Date, " ", Time, " ", LevelStr, Location, Message];
-                _ ->
-                    [Time, " ", LevelStr, Message]
-            end,
-            {ok, State#state{log=[Log|Logs]}};
-        false ->
-            {ok, State}
-    end;
-handle_event({log, Level, {Date, Time}, [LevelStr, Location, Message]}, %% lager 1.2.1
-  #state{level=LogLevel, verbose=Verbose, log = Logs} = State) when Level =< LogLevel ->
-    Log = case Verbose of
-        true ->
-            [Date, " ", Time, " ", LevelStr, Location, Message];
-        _ ->
-            [Time, " ", LevelStr, Message]
-        end,
-    {ok, State#state{log=[Log|Logs]}};
-handle_event({log, Msg},
-  #state{level=Level, verbose=Verbose, log = Logs} = State) -> %% lager 2.0.0
-    case lager_util:is_loggable(Msg, Level, ?MODULE) of
-        true ->
-            Format = log_format(Verbose),
-            Log = lager_default_formatter:format(Msg, Format),
-            {ok, State#state{log=[Log|Logs]}};
-        false ->
-            {ok, State}
-    end;
-handle_event(Event, State) ->
-    {ok, State#state{log = [Event|State#state.log]}}.
-
--spec(handle_call(any(), #state{}) -> {ok, any(), #state{}}).
-%% @private
-%% @doc gets and sets loglevel. This is part of the lager backend api.
-handle_call(get_loglevel, #state{level=Level} = State) ->
-    {ok, Level, State};
-handle_call({set_loglevel, Level}, State) ->
-    try parse_level(Level) of
-        Lvl ->
-            {ok, ok, State#state{level=Lvl}}
-    catch
-        _:_ ->
-            {ok, {error, bad_log_level}, State}
-    end;
-handle_call(get_logs, #state{log = Logs} = State) ->
-    {ok, Logs, State};
-handle_call(_, State) ->
-    {ok, ok, State}.
-
--spec(handle_info(any(), #state{}) -> {ok, #state{}}).
-%% @private
-%% @doc gen_event callback, does nothing.
-handle_info(_, State) ->
-    {ok, State}.
-
--spec(code_change(any(), #state{}, any()) -> {ok, #state{}}).
-%% @private
-%% @doc gen_event callback, does nothing.
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
--spec(terminate(any(), #state{}) -> {ok, list()}).
-%% @doc gen_event callback, does nothing.
-terminate(_Reason, #state{log=Logs}) ->
-    {ok, lists:reverse(Logs)}.
-
-parse_level(Level) ->
-    try lager_util:config_to_mask(Level) of
-        Res ->
-            Res
-    catch
-        error:undef ->
-            %% must be lager < 2.0
-            lager_util:level_to_num(Level)
+stop() ->
+    _ = stop_handlers(),
+    case erlang:whereis(?SERVER) of
+        undefined ->
+            ok;
+        _Pid ->
+            gen_server:stop(?SERVER)
     end.
 
-log_format(true) ->
-    [date, " " , time, " [", severity, "] ",
-     {pid, ""},
-     {module, [
-               module,
-               {function, [":", function], ""},
-               {line, [":", line], ""},
-               " "], ""},
-     message, "\r\n"];
-log_format(false) ->
-    [time, " [", severity, "] ", message, "\r\n"].
+%% ===================================================================
+%% gen_server callbacks
+%% ===================================================================
+
+-spec init(State :: []) -> {ok, state()}.
+%% @private
+init([] = State) ->
+    {ok, State}.
+
+-spec handle_call(Msg :: term(), From :: {pid(), term()}, State :: state())
+        -> {reply, term(), state()}.
+%% @private
+handle_call(get_logs, _From, [] = State) ->
+    {reply, State, State};
+handle_call(get_logs, _From, State) ->
+    {reply, lists:reverse(State), State};
+handle_call(Msg, From, State) ->
+    ?LOG_NOTICE("Ignoring ~0p from ~0p", [Msg, From]),
+    {reply, not_implemented, State}.
+
+-spec handle_cast(Msg :: term(), State :: state()) -> {noreply, state()}.
+%% @private
+handle_cast({log, LogLine}, State) ->
+    {noreply, [LogLine | State]};
+handle_cast(Msg, State) ->
+    ?LOG_NOTICE("Ignoring ~0p", [Msg]),
+    {noreply, State}.
+
+%% ===================================================================
+%% Logger handler callback
+%% ===================================================================
+
+-spec log(Event :: logger:log_event(), Config :: logger:handler_config())
+        -> ok.
+%% @private
+log(Event, #{formatter := {FModule, FConfig}}) ->
+    gen_server:cast(?SERVER, {log, FModule:format(Event, FConfig)}).
+
+%% ===================================================================
+%% Internal
+%% ===================================================================
+
+-spec start_handlers(
+    Verbose :: boolean(), Level :: logger:level(), LogFile :: rtt:fs_path())
+        -> ok | rtt:std_error().
+start_handlers(Verbose, Level, LogFile) ->
+    HFilters = rt_config:logger_filters(all),
+    FSHConfig = #{
+        config => #{type => file, file => LogFile,
+            file_check => 100, filesync_repeat_interval => 1000},
+        level => Level, filters => HFilters,
+        formatter => rt_config:logger_formatter(true, true, false)
+    },
+    GSHConfig = #{
+        config => default, level => Level, filters => HFilters,
+        %% Include trailing newlines for when riak_test_runner combines
+        %% them into a single binary.
+        formatter => rt_config:logger_formatter(Verbose, true, false)
+    },
+    case filelib:ensure_dir(LogFile) of
+        ok ->
+            case logger:add_handler(?FS_HANDLER, logger_std_h, FSHConfig) of
+                ok ->
+                    logger:add_handler(?GS_HANDLER, ?MODULE, GSHConfig);
+                HError ->
+                    HError
+            end;
+        {error, DirErr} ->
+            {error, {DirErr, LogFile}}
+    end.
+
+-spec stop_handlers() -> ok.
+stop_handlers() ->
+    %% Ignore failures, we're closing it all down anyway, and the result is
+    %% deliberately ignored.
+    %% If you find yourself debugging, these should all be returning 'ok'.
+    logger_std_h:filesync(?FS_HANDLER),
+    logger:remove_handler(?FS_HANDLER),
+    logger:remove_handler(?GS_HANDLER).
 
 
 -ifdef(TEST).
 
-log_test_() ->
-    {foreach,
-        fun() ->
-                error_logger:tty(false),
-                application:load(lager),
-                application:set_env(lager, handlers, [{riak_test_lager_backend, debug}]),
-                application:set_env(lager, error_logger_redirect, false),
-                lager:start()
-        end,
-        fun(_) ->
-                application:stop(lager),
-                error_logger:tty(true)
-        end,
-        [
-            {"Test logging",
-                fun() ->
-                        lager:info("Here's a message"),
-                        lager:debug("Here's another message"),
-                        {ok, Logs} = gen_event:delete_handler(lager_event, riak_test_lager_backend, []),
-                        ?assertEqual(2, length(Logs)),
-                        ?assertMatch( {match,_} ,
-                                re:run( lists:nth(1, Logs), "Here's a message")),
-                        ?assertMatch( {match,_} ,
-                                re:run( lists:nth(2, Logs), "Here's another message"))
-                end
-            }
-        ]
-    }.
+log_test() ->
+    IMsg = "this is an info message",
+    NMsg = "this is a notice message",
+    WMsg = "this is a warning message",
+    File = filename:join(["/tmp", eunit, ?MODULE, ?FUNCTION_NAME]) ++ ".log",
 
+    %% Disable the default handler so our messages don't clutter the terminal.
+    %% We'll re-enable it later with the same configuration.
+    {ok, HDefault} = logger:get_handler_config(default),
 
-set_loglevel_test_() ->
-    {foreach,
-        fun() ->
-                error_logger:tty(false),
-                application:load(lager),
-                application:set_env(lager, handlers, [{riak_test_lager_backend, info}]),
-                application:set_env(lager, error_logger_redirect, false),
-                lager:start()
-        end,
-        fun(_) ->
-                application:stop(lager),
-                error_logger:tty(true)
-        end,
-        [
-            {"Get/set loglevel test",
-                fun() ->
-                        ?assertEqual(info, lager:get_loglevel(riak_test_lager_backend)),
-                        lager:set_loglevel(riak_test_lager_backend, debug),
-                        ?assertEqual(debug, lager:get_loglevel(riak_test_lager_backend))
-                end
-            },
-            {"Get/set invalid loglevel test",
-                fun() ->
-                        ?assertEqual(info, lager:get_loglevel(riak_test_lager_backend)),
-                        ?assertEqual({error, bad_log_level},
-                            lager:set_loglevel(riak_test_lager_backend, fatfinger)),
-                        ?assertEqual(info, lager:get_loglevel(riak_test_lager_backend))
-                end
-            }
+    application:load(riak_test),
+    %% Start ours *before* removing the default, in case something goes wrong.
+    ?assertMatch(ok, start(false, notice, File)),
+    ?assertMatch(ok, logger:remove_handler(default)),
 
-        ]
-    }.
+    % io:format(standard_error,
+    %     "~nlogger config:~n~p~n", [logger:get_config()]),
 
--endif.
+    %% Log some messages - 'info' shouldn't be logged because of start level
+    ?LOG_NOTICE(NMsg),
+    ?LOG_INFO(IMsg),
+    ?LOG_WARNING(WMsg),
+
+    %% Reset the default handler
+    ?assertMatch(ok,
+        logger:add_handler(default, maps:get(module, HDefault), HDefault)),
+
+    %% Get the logs *before* stopping
+    Logs = get_logs(),
+    ?assertMatch(ok, stop()),
+
+    ?assert(erlang:is_list(Logs)),
+    ?assertEqual(2, erlang:length(Logs)),
+    %% Note that these are likely to be deep lists, so flat string search
+    %% won't cut it.
+    [Log1, Log2] = Logs,
+
+    ReOpts = [{capture, none}],
+    ?assertMatch(match, re:run(Log1, NMsg, ReOpts)),
+    ?assertMatch(match, re:run(Log2, WMsg, ReOpts)).
+
+-endif. % TEST

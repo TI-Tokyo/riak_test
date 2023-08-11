@@ -342,8 +342,8 @@ verify_data(Node, KeyValues, Bucket) ->
             Num = length(KeyValues),
             case Num == NumGood of
                 true -> true;
-                false ->
-                    ?LOG_INFO("Data not yet correct: ~0p mismatches",
+                _ ->
+                    ?LOG_INFO("Data not yet correct: ~b mismatches",
                                [Num-NumGood]),
                     false
             end
@@ -380,34 +380,34 @@ verify_replicas(Node, B, K, V, N) ->
 
 test_single_partition_loss(Node, Partition, KeyValues)
   when is_atom(Node), is_integer(Partition) ->
-    ?LOG_INFO("Verify recovery from the loss of partition ~0p", [Partition]),
+    ?LOG_INFO("Verify recovery from the loss of partition ~b", [Partition]),
     wipe_out_partition(Node, Partition),
     restart_vnode(Node, riak_kv, Partition),
     verify_data(Node, KeyValues).
 
 test_aae_partition_loss(Node, Partition, KeyValues)
   when is_atom(Node), is_integer(Partition) ->
-    ?LOG_INFO("Verify recovery from the loss of AAE data for partition ~0p", [Partition]),
+    ?LOG_INFO("Verify recovery from the loss of AAE data for partition ~b", [Partition]),
     wipe_out_aae_data(Node, Partition),
     restart_vnode(Node, riak_kv, Partition),
     verify_data(Node, KeyValues).
 
 test_total_partition_loss(Node, Partition, KeyValues)
   when is_atom(Node), is_integer(Partition) ->
-    ?LOG_INFO("Verify recovery from the loss of AAE and KV data for partition ~0p", [Partition]),
+    ?LOG_INFO("Verify recovery from the loss of AAE and KV data for partition ~b", [Partition]),
     wipe_out_partition(Node, Partition),
     wipe_out_aae_data(Node, Partition),
     restart_vnode(Node, riak_kv, Partition),
     verify_data(Node, KeyValues).
 
 test_less_than_n_writes(Node, KeyValues) ->
-    ?LOG_INFO("Writing ~0p objects with N=1, AAE should ensure they end up"
-               " with ~0p replicas", [length(KeyValues), ?N_VAL]),
+    ?LOG_INFO("Writing ~b objects with N=1, AAE should ensure they end up"
+               " with ~b replicas", [length(KeyValues), ?N_VAL]),
     write_data(Node, KeyValues, [{n_val, 1}]),
     verify_data(Node, KeyValues).
 
 test_less_than_n_mods(Node, KeyValues) ->
-    ?LOG_INFO("Modifying only one replica for ~0p objects. AAE should ensure"
+    ?LOG_INFO("Modifying only one replica for ~b objects. AAE should ensure"
                " all replicas end up modified", [length(KeyValues)]),
     write_data(Node, KeyValues, [{n_val, 1}]),
     verify_data(Node, KeyValues).

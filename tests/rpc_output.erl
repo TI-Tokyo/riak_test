@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2012 Basho Technologies, Inc.
+%% Copyright (c) 2012-2014 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -18,11 +18,13 @@
 %%
 %% -------------------------------------------------------------------
 -module(rpc_output).
--behavior(riak_test).
+-deprecated(module).
 -behavior(gen_event).
+-behavior(riak_test).
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 %% gen_event callbacks
@@ -37,8 +39,8 @@ confirm() ->
     gen_event:add_handler(lager_event, ?MODULE, []),
     io:put_chars("This is an io:put_chars/1 call"),
     io:format("This is an io:format/1 call"),
-    io:format("This is an io:format/~0p call", [2]),
-    lager:info("This is a lager message"),
+    io:format("This is an io:format/~w call", [2]),
+    ?LOG_INFO("This is a lager message"),
     {ok, {LogId, Failures}} = gen_event:delete_handler(lager_event, ?MODULE, []),
     ?assertEqual(5, LogId),
     ?assertEqual([], Failures),

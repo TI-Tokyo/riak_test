@@ -30,6 +30,7 @@
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -define(BUCKET, <<"b">>).
@@ -48,7 +49,7 @@ confirm() ->
                        {storage_backend, riak_kv_eleveldb_backend}]},
             {riak_core, [ {ring_creation_size, 8},
                           {vnode_management_timer, 1000}]}],
-    lager:info("Deploy a node"),
+    ?LOG_INFO("Deploy a node"),
     [NodeInit] = rt:deploy_nodes(1, Conf),
     Path = data_path(NodeInit),
     rt:clean_cluster([NodeInit]),
@@ -58,15 +59,15 @@ confirm() ->
     [Node] = rt:deploy_nodes(1, ?ELEVELDB_CONF(Path) ++ Conf),
 
     Client = rt:pbc(Node, [{auto_reconnect, true}, {queue_if_disconnected, true}]),
-    lager:info("write value"),
+    ?LOG_INFO("write value"),
     ok = rt:pbc_write(Client, ?BUCKET, ?KEY, ?VALUE),
-    lager:info("read it back"),
+    ?LOG_INFO("read it back"),
     assertObjectValueEqual(?VALUE, rt:pbc_read(Client, ?BUCKET, ?KEY)),
-    lager:info("Stop the node"),
+    ?LOG_INFO("Stop the node"),
     rt:stop_and_wait(Node),
-    lager:info("Start the node"),
+    ?LOG_INFO("Start the node"),
     rt:start_and_wait(Node),
-    lager:info("read the value"),
+    ?LOG_INFO("read the value"),
     assertObjectValueEqual(?VALUE, rt:pbc_read(Client, ?BUCKET, ?KEY)),
     pass.
 

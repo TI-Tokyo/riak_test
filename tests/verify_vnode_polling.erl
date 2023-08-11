@@ -33,18 +33,22 @@
 
 -define(RING_SIZE, 8).
 
--define(CONF(MBoxCheck),
-        [{riak_kv,
-                [{anti_entropy, {off, []}},
-                    {mbox_check_enabled, MBoxCheck}]},
-            {riak_core,
-                [{default_bucket_props,
-                    [{allow_mult, true},
-                        {dvv_enabled, true},
-                        {ring_creation_size, ?RING_SIZE},
-                        {vnode_management_timer, 1000},
-                        {handoff_concurrency, 100},
-                        {vnode_inactivity_timeout, 1000}]}]}]).
+-define(CONF(MBoxCheck), [
+    {riak_kv, [
+        {anti_entropy, {off, []}},
+        {mbox_check_enabled, MBoxCheck}
+    ]},
+    {riak_core, [
+        {default_bucket_props, [
+            {allow_mult, true},
+            {dvv_enabled, true},
+            {ring_creation_size, ?RING_SIZE},
+            {vnode_management_timer, 1000},
+            {handoff_concurrency, 100},
+            {vnode_inactivity_timeout, 1000}
+        ]}
+    ]}
+]).
 
 confirm() ->
     Nodes = rt:build_cluster(5, ?CONF(true)),
@@ -52,7 +56,7 @@ confirm() ->
 
     Preflist = rt:get_preflist(Node1, ?BUCKET, ?KEY),
 
-    ?LOG_INFO("Preflist ~0p~n", [Preflist]),
+    ?LOG_INFO("Preflist ~0p", [Preflist]),
 
     %% NOTE: The order of these tests IS IMPORTANT, as there is no
     %% facility currently to unload/disable intercepts once loaded.

@@ -35,8 +35,11 @@
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 % -include_lib("stdlib/include/assert.hrl").
--include("logging.hrl").
+
+%% Macros set to false trigger "never called" warnings
+-dialyzer(no_unused).
 
 -define(SHOW_METADATA,      false).
 -define(SHOW_REDBUG_DFLT,   false).
@@ -60,7 +63,7 @@ show_redbug_defaults() ->
     show_props("Redbug Default Opts", rt_redbug:default_trace_options()).
 
 do_redbug_on_off() ->
-    ?LOG_INFO("Starting redbug state: ~p", [rt_redbug:is_tracing_applied()]),
+    ?LOG_INFO("Starting redbug state: ~0p", [rt_redbug:is_tracing_applied()]),
     rt_redbug:set_tracing_applied(false),
     ThisNode = erlang:node(),
     RTP = "rt_redbug:is_tracing_applied/0",

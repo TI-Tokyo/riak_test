@@ -28,24 +28,24 @@
 -define(EXCHANGE_TICK, 10 * 1000). % Must be > inactivity timeout
 
 -define(CFG(SuspendAAE), [
-    {riak_core,
-        [{ring_creation_size, 16},
+    {riak_core, [
+        {ring_creation_size, 16},
         {vnode_inactivity_timeout, 5 * 1000},
         {handoff_timeout, 30 * 1000},
         {handoff_receive_timeout, 30 * 1000},
         {handoff_acklog_threshold, 4},
         {handoff_batch_threshold_count, 500}]},
-    {riak_kv,
-        [{anti_entropy, {off, []}},
+    {riak_kv, [
+        {anti_entropy, {off, []}},
         {tictacaae_active, active},
         {tictacaae_parallelstore, leveled_ko},
-                % if backend not leveled will use parallel key-ordered
-                % store
+        % if backend not leveled will use parallel key-ordered store
         {tictacaae_exchangetick, ?EXCHANGE_TICK},
         {tictacaae_suspend, SuspendAAE},
         {tictacaae_rebuildtick, 3600000}, % don't tick for an hour!
-        {tictacaae_primaryonly, true}]
-    }]).
+        {tictacaae_primaryonly, true}
+    ]}
+]).
 
 confirm() ->
     %% Bring up a 3-node cluster for the test
@@ -56,7 +56,7 @@ confirm() ->
     Nodes = rt:build_cluster(4, ?CFG(false)),
     [Node1, Node2, Node3, Node4] = Nodes,
 
-    ?LOG_INFO("Writing ~0p items", [?TEST_ITEM_COUNT]),
+    ?LOG_INFO("Writing ~b items", [?TEST_ITEM_COUNT]),
     [] = rt:systest_write(Node1, 1, ?TEST_ITEM_COUNT, ?B, 2),
 
     ?LOG_INFO("Have node2 leave and continue to write"),
@@ -222,7 +222,7 @@ confirm() ->
 
     {RRT1C, RRFNF1C, RRPNF1C} = repair_stats(Node1),
     {RRT2C, RRFNF2C, RRPNF2C} = repair_stats(Node2),
-    ?LOG_INFO("Read repair count on Node 2 ~0p after reads", [RRT2C]),
+    ?LOG_INFO("Read repair count on Node 2 ~w after reads", [RRT2C]),
     true = RRT1C > RRT1B,
     true = RRFNF1C == <<"undefined">>,
     true = RRT2C == RRT2B,
@@ -315,7 +315,7 @@ repair_stats(Node) ->
         lists:keyfind(
             <<"read_repairs_primary_notfound_count">>, 1, NodeStats),
     ?LOG_INFO(
-        "For Node ~0p read_repairs_total=~0p"
+        "For Node ~0p read_repairs_total=~w"
         " fallback_notfound=~0p primary_notfound=~0p",
         [Node, RRT, RRFNF, RRPNF]),
     {RRT, RRFNF, RRPNF}.
@@ -358,8 +358,7 @@ wait_until_repair_complete(_Node, Wait, _Count) when Wait =< 0 ->
     ?LOG_INFO("Repair never completed"),
     not_completed;
 wait_until_repair_complete(_Node, Wait, 0) ->
-    ?LOG_INFO("Repair appears to have completed ~0p ms remaining", [Wait]),
-    ok;
+    ?LOG_INFO("Repair appears to have completed ~w ms remaining", [Wait]);
 wait_until_repair_complete(Node, TimeToWait, false) ->
     {TransfersPerNode, _NodesDown} =
         rpc:call(Node, riak_core_status, all_active_transfers, []),
@@ -381,13 +380,12 @@ wait_until_repair_complete(Node, TimeToWait, CountDown) ->
     case Transfers of
         [] ->
             ?LOG_INFO(
-                "Repair maybe complete - validating count ~0p", [CountDown]),
+                "Repair maybe complete - validating count ~w", [CountDown]),
             timer:sleep(?REPAIR_SLEEP),
             wait_until_repair_complete(
                 Node, TimeToWait - ?REPAIR_SLEEP, CountDown - 1);
         Transfers ->
-            ?LOG_INFO(
-                "Repair ongoing ~0p", [Transfers]),
+            ?LOG_INFO("Repair ongoing ~w", [Transfers]),
             timer:sleep(?REPAIR_SLEEP),
             wait_until_repair_complete(
                 Node, TimeToWait - ?REPAIR_SLEEP, ?VERIFY_COUNT)

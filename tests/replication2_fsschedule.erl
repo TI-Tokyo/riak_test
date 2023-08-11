@@ -33,7 +33,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 setup_repl_clusters(Conf, InterceptSetup) ->
     NumNodes = 6,
-    ?LOG_INFO("Deploy ~0p nodes", [NumNodes]),
+    ?LOG_INFO("Deploy ~b nodes", [NumNodes]),
 
     Nodes = rt:deploy_nodes(NumNodes, Conf, [riak_kv, riak_repl]),
     InterceptSetup(Nodes),

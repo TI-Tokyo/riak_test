@@ -1,7 +1,7 @@
 %% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2015 Basho Technologies, Inc.
-%% Copyright (c) 2018-2022 Workday, Inc.
+%% Copyright (c) 2018-2023 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -21,7 +21,10 @@
 
 -module(riak_kv_worker_intercepts).
 -compile([export_all, nowarn_export_all]).
+
+-include_lib("kernel/include/logger.hrl").
 -include("intercept.hrl").
+
 -define(M, riak_kv_worker_orig).
 
 %
@@ -57,10 +60,10 @@ handle_work_handoff_intercept({fold, FoldFun, FinishFun}, Sender, State) ->
         Ref = erlang:make_ref(),
         catch global:send(rt_kv_worker_proc, {work_started, {node(), Ref}, self()}),
         receive
-            {Ref, ok} -> 
+            {Ref, ok} ->
                 ok
             after 1000 ->
-                lager:warning("Timed out waiting for ok from rt_kv_worker_proc during start"),
+                ?LOG_WARNING("Timed out waiting for ok from rt_kv_worker_proc during start"),
                 timeout
         end,
         FoldFun()
@@ -71,7 +74,7 @@ handle_work_handoff_intercept({fold, FoldFun, FinishFun}, Sender, State) ->
         receive
             {Ref, ok} -> ok
         after 1000 ->
-            lager:warning("Timed out waiting for ok from rt_kv_worker_proc during complete"),
+            ?LOG_WARNING("Timed out waiting for ok from rt_kv_worker_proc during complete"),
             timeout
         end,
         FinishFun(X)

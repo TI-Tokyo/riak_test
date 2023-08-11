@@ -66,7 +66,7 @@ confirm() ->
     C2Incr = get_counter(C2, Key),
     ?LOG_INFO("Validate counter after increment applied"),
     ?LOG_INFO(
-        "Initial value on increment side ~0p ~0p",
+        "Initial value on increment side ~w ~w",
         [C1Incr, C2Incr]),
 
     case {C1Incr, C2Incr} of

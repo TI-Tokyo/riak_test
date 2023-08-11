@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 Basho Technologies, Inc.
+%% Copyright (c) 2013-2014 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -22,14 +22,15 @@
 %% legacy/deprecated product) and yokozuna (solr.) riak_search was
 %% finally removed for riak-2.2.5, but this test remains, purely to
 %% test mapreduce with yz input.
+%% @deprecated Neither RS nor YZ are supported in current Riak.
 -module(mapred_search_switch).
 -behavior(riak_test).
--export([
-         %% riak_test api
-         confirm/0
-        ]).
--compile([export_all, nowarn_export_all]). %% because we run tests as ?MODULE:T(Nodes)
--include_lib("eunit/include/eunit.hrl").
+-deprecated(module).
+
+-export([confirm/0]).
+
+-include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
 -include_lib("riakc/include/riakc.hrl").
 
 %% name of the riak_kv appenv specifying which search provider to use
@@ -63,7 +64,7 @@ setup_test_env() ->
 
     {YZBucket, YZKeyAndUniques, YZCommon} = generate_test_data(<<"yz">>),
     YZIndex = generate_string(),
-    lager:info("yz index: ~s", [YZIndex]),
+    ?LOG_INFO("yz index: ~s", [YZIndex]),
 
     setup_yz_index(Nodes, YZIndex),
     setup_yz_bucket(Nodes, YZBucket, YZIndex),
@@ -71,7 +72,7 @@ setup_test_env() ->
 
     %% give yokozuna time to auto-commit
     YZSleep_ms = 1000,
-    lager:info("Giving Yokozuna ~bms to auto-commit", [YZSleep_ms]),
+    ?LOG_INFO("Giving Yokozuna ~bms to auto-commit", [YZSleep_ms]),
     timer:sleep(YZSleep_ms),
 
     #env{ nodes=Nodes,
@@ -100,12 +101,12 @@ confirm_config(#env{nodes=Nodes,
                     yz_keyuqs=YZKeyAndUniques,
                     yz_index=YZIndex}=Env,
                     Config) ->
-    lager:info("Running Config: ~p", [Config]),
+    ?LOG_INFO("Running Config: ~0p", [Config]),
     set_config(Env, Config),
 
     YZBResults = run_bucket_mr(Nodes, YZIndex, <<"*:*">>),
 
-    lager:info("YZ Bucket Results: ~p", [YZBResults]),
+    ?LOG_INFO("YZ Bucket Results: ~0p", [YZBResults]),
 
     ?assertEqual(expected_yokozuna(Config),
                  got_yokozuna(YZBResults, YZBucket, YZKeyAndUniques)),
@@ -117,15 +118,15 @@ confirm_config(#env{nodes=Nodes,
 %% put it in the test log so we know where to poke when things fail
 generate_test_data(System) ->
     Bucket = generate_bucket_name(System),
-    lager:info("~s bucket: ~s", [System, Bucket]),
+    ?LOG_INFO("~s bucket: ~s", [System, Bucket]),
 
     Common = generate_string(),
-    lager:info("~s common: ~s", [System, Common]),
+    ?LOG_INFO("~s common: ~s", [System, Common]),
 
     KeyAndUniques = [ {generate_string(), generate_string()},
                       {generate_string(), generate_string()},
                       {generate_string(), generate_string()} ],
-    [ lager:info("~s key/uq: ~s / ~s", [System, Key, Unique])
+    [ ?LOG_INFO("~s key/uq: ~s / ~s", [System, Key, Unique])
       || {Key, Unique} <- KeyAndUniques ],
 
     {Bucket, KeyAndUniques, Common}.
@@ -153,7 +154,7 @@ index_path(Index) ->
 wait_for_index(Cluster, Index) ->
     IsIndexUp =
         fun(Node) ->
-                lager:info("Waiting for index ~s on node ~p", [Index, Node]),
+                ?LOG_INFO("Waiting for index ~s on node ~0p", [Index, Node]),
                 IUrl = iburl(Node, index_path(Index)),
                 case ibrowse:send_req(IUrl, [], get) of
                     {ok, "200", _, _} -> true;
@@ -169,7 +170,7 @@ iburl(Node, Path) ->
 %% Create a set of keys, all of which have a common term in their
 %% value, and each of which has a unique term in its value
 load_test_data([Node|_], Bucket, KeyAndUniques, Common) ->
-    lager:info("Loading test data"),
+    ?LOG_INFO("Loading test data"),
     C = rt:httpc(Node),
     [ begin
           Value = list_to_binary([Common, " ", Unique]),
@@ -187,11 +188,11 @@ expected_error(Config) ->
 is_enabled(Config, App) ->
     true == kvc:path([App, enabled], Config).
 
-provider(Config) ->
-    case kvc:path([riak_kv, ?PROVIDER_KEY], Config) of
-        [] -> undefined;
-        Provider -> Provider
-    end.
+%%provider(Config) ->
+%%    case kvc:path([riak_kv, ?PROVIDER_KEY], Config) of
+%%        [] -> undefined;
+%%        Provider -> Provider
+%%    end.
 
 %% similar to got_riak_search - just check that we got at least one
 %% result, and that all results are in the expected YZ format - this
@@ -204,7 +205,7 @@ got_yokozuna(Results, Bucket, KeyAndUniques) ->
                       (_) ->
                            false
                    end,
-            lager:info("got_yokozuna: ~p ... ~p", [Matches, KeyAndUniques]),
+            ?LOG_INFO("got_yokozuna: ~0p ... ~0p", [Matches, KeyAndUniques]),
             lists:all(IsYZ, Matches);
         _ ->
             false

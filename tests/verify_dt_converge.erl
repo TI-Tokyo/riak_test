@@ -26,6 +26,9 @@
 
 -export([confirm/0]).
 
+%% Shared to tests
+-export([check_value/6, create_bucket_types/2]).
+
 -include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
@@ -416,7 +419,7 @@ check_value(Client, CMod, Bucket, Key, DTMod, Expected, Options) ->
                           try
                               Result = CMod:fetch_type(Client, Bucket, Key,
                                                        Options),
-                              ?LOG_INFO("Expected ~0p~n got ~0p~n", [Expected,
+                              ?LOG_INFO("Expected ~0p got ~0p", [Expected,
                                                                     Result]),
                               ?assertMatch({ok, _}, Result),
                               {ok, C} = Result,

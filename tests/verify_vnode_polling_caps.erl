@@ -1,7 +1,7 @@
 %% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2018 Russell Brown.
-%% Copyright (c) 2022 Workday, Inc.
+%% Copyright (c) 2022-2023 Workday, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -23,17 +23,20 @@
 %%% "soft-limits" via riak_core_vnode_proxy message queues in a mixed
 %%% cluster
 %%% @end
-
 -module(verify_vnode_polling_caps).
 -behavior(riak_test).
+
 -export([confirm/0]).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(BUCKET, <<"test-bucket">>).
 -define(KEY, <<"key">>).
 -define(VALUE, <<"value">>).
+
+%% First Riak version with soft limits.
 -define(MIN_SL_VSN, [2,9,0]).
--define(VSN_STR(V), lists:join(".", [erlang:integer_to_list(N) || N <- V])).
 
 confirm() ->
     %% Create a mixed cluster of current and previous
@@ -43,71 +46,59 @@ confirm() ->
     %% Do some PUTs and check that stats have changed to indicate
     %% soft-limit use
 
-    %% Soft limits were introduced in riak 2.9 - if we don't have a version
-    %% prior to that, there won't be a discrepancy in capabilities so the
-    %% mixed cluster test will fail.
-    [{current, CurVsn} | OldVsns] = lists:foldl(
-        fun(Key, Result) ->
-            try
-                Bin = rt:get_version(Key),
-                Str = erlang:binary_to_list(Bin),
-                Toks = string:lexemes(Str, ".- \n\r\t"),
-                Vsn = lists:reverse(lists:foldl(
-                    fun(Tok, Acc) ->
-                        case string:to_integer(Tok) of
-                            {error, _} ->
-                                Acc;
-                            {Seg, _} ->
-                                [Seg | Acc]
-                        end
-                    end, [], Toks)),
-                lager:info("~s version = ~s", [Key, ?VSN_STR(Vsn)]),
-                [{Key, Vsn} | Result]
-            catch
-                _:_:_ ->
-                    Result
-            end  % input list will be reversed
-        end, [], [legacy, previous, current]),
+    MinSLVsn = rt_vsn:new_version(?MIN_SL_VSN),
+    [{_HdTag, HdVsn} | _] = CfgVersions = rt_vsn:configured_versions(),
+    %% Confirm that we have a version new enough for the test
+    ?assert(rt_vsn:compare_versions(HdVsn, MinSLVsn) >= 0),
+    %% NewTag == 'current' if 'current' meets the criteria
+    {NewTag, NewVsn} = rt_vsn:find_version_at_least(MinSLVsn, CfgVersions),
+    NewStr = rt_vsn:version_to_string(NewVsn),
 
-    %% 'current' will be at the head of the list - make sure it does support
-    %% soft limits - not much point in continuing if it doesn't
-    ?assert(CurVsn >= ?MIN_SL_VSN),
-
-    %% We'll only run the mixed cluster tests if we found an old enough version.
-    %% At the end of this case, return Nodes as a suitable cluster for the next
-    %% applicable test phase.
-    {OldEnough, Nodes} =
-        case lists:dropwhile(fun({_, Vsn}) -> Vsn >= ?MIN_SL_VSN end, OldVsns) of
-        [] ->
-            lager:info("No version found not supporting soft limits"),
-            {false, rt:build_cluster(4)};
-        [{Key, Vsn} | _] ->
-            lager:info("Version ~w (~s) found not supporting soft limits", [Vsn, Key]),
-            {true, rt:build_cluster([Key, Key, current, current])}
+    %% We'll only run the mixed cluster tests if we found an old enough
+    %% version. At the end of this case, return Nodes as a suitable cluster
+    %% for the next applicable test phase.
+    {OldEnough, Nodes} = case
+        rt_vsn:find_version_before(MinSLVsn, CfgVersions) of
+        {OldTag, OldVsn} ->
+            OldStr = rt_vsn:version_to_string(OldVsn),
+            ?LOG_INFO(
+                "Version ~s (~s) found not supporting soft limits",
+                [OldStr, OldTag]),
+            ?LOG_INFO(
+                "Building mixed cluster of version ~s (~s) and ~s (~s) nodes",
+                [OldStr, OldTag, NewStr, NewTag]),
+            {true, rt:build_cluster([OldTag, OldTag, NewTag, NewTag])};
+        _ ->
+            ?LOG_INFO("No version found not supporting soft limits"),
+            ?LOG_INFO(
+                "Building cluster of version ~s (~s) nodes",
+                [NewStr, NewTag]),
+            {false, rt:build_cluster(lists:duplicate(4, NewTag))}
     end,
+
     [Node1, Node2 | _] = Nodes,
 
     Preflist = rt:get_preflist(Node1, ?BUCKET, ?KEY),
-    lager:info("Preflist ~p~n", [Preflist]),
+    ?LOG_INFO("Preflist ~0p", [Preflist]),
 
     %% If we found an old enough version, the first two nodes of the cluster
     %% don't support soft limits so we can run the mixed cluster test.
     %% Either way, at the end of this 'if' Nodes is a fully soft-limit-enabled
     %% 4-node cluster suitable for the following test.
-    ExpectedStatAcc = case OldEnough of
-        true ->
+    ExpectedStatAcc = if
+        OldEnough ->
             ExpectedStatAcc1 = lists:foldl(
                 fun(Node, Acc) ->
                     test_no_mbox_check(Nodes, Preflist, Node, Acc)
                 end,
                 new_expected_stat_acc(),
                 Nodes),
-            lager:info("upgrade all to current"),
-            ?assertMatch(ok, rt:upgrade(Node1, current)),
-            ?assertMatch(ok, rt:upgrade(Node2, current)),
+            ?LOG_INFO("upgrade all to ~s (~s)", [NewStr, NewTag]),
+            ?assertMatch(ok, rt:upgrade(Node1, NewTag)),
+            ?assertMatch(ok, rt:upgrade(Node2, NewTag)),
             %% upgrade restarts, and restarts clear stats
             clear_stats(Node2, clear_stats(Node1, ExpectedStatAcc1));
-        _ ->
+        true ->
             new_expected_stat_acc()
     end,
 
@@ -126,7 +117,7 @@ confirm() ->
 
 %% @doc in a mixed cluster state, there should be no soft-limits
 test_no_mbox_check(Nodes, Preflist, TargetNode, ExpectedStatAcc0) ->
-    lager:info("test_no_mbox_check ~p", [TargetNode]),
+    ?LOG_INFO("test_no_mbox_check ~0p", [TargetNode]),
 
     {ok, Client} = riak:client_connect(TargetNode),
     ?assertMatch(ok, client_write(Client, ?BUCKET, ?KEY, ?VALUE)),
@@ -159,7 +150,7 @@ test_no_mbox_check(Nodes, Preflist, TargetNode, ExpectedStatAcc0) ->
 %% @doc when all nodes are upgraded they should agree on the
 %% capability, and soft-limits should be used
 test_mbox_check(Nodes, Preflist, TargetNode, ExpectedStatAcc0) ->
-    lager:info("test_mbox_check ~p", [TargetNode]),
+    ?LOG_INFO("test_mbox_check ~0p", [TargetNode]),
 
     {ok, Client} = riak:client_connect(TargetNode),
     ?assertMatch(ok, client_write(Client, ?BUCKET, ?KEY, ?VALUE)),

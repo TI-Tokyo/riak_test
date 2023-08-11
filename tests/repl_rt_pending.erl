@@ -147,25 +147,25 @@ write_n_keys(Source, Destination, M, N) ->
     Last = N,
 
     %% Write some objects to the source cluster (A),
-    ?LOG_INFO("Writing ~0p keys to ~0p, which should RT repl to ~0p",
+    ?LOG_INFO("Writing ~b keys to ~0p, which should RT repl to ~0p",
                [Last-First+1, Source, Destination]),
     ?assertEqual([], repl_util:do_write(Source, First, Last, TestBucket, 2)),
 
     %% verify data is replicated to B
-    ?LOG_INFO("Reading ~0p keys written from ~0p", [Last-First+1, Destination]),
+    ?LOG_INFO("Reading ~b keys written from ~0p", [Last-First+1, Destination]),
     ?assertEqual(0, repl_util:wait_for_reads(Destination, First, Last, TestBucket, 2)).
 
 %% @doc Connect two clusters for replication using their respective leader nodes.
 connect_clusters(LeaderA, LeaderB) ->
     {ok, {_IPB, PortB}} = rpc:call(LeaderB, application, get_env,
                                  [riak_core, cluster_mgr]),
-    ?LOG_INFO("connect cluster A:~0p to B on port ~0p", [LeaderA, PortB]),
+    ?LOG_INFO("connect cluster A:~0p to B on port ~b", [LeaderA, PortB]),
     repl_util:connect_cluster(LeaderA, "127.0.0.1", PortB),
     ?assertEqual(ok, repl_util:wait_for_connection(LeaderA, "B")),
 
     {ok, {_IPA, PortA}} = rpc:call(LeaderA, application, get_env,
                                  [riak_core, cluster_mgr]),
-    ?LOG_INFO("connect cluster B:~0p to A on port ~0p", [LeaderB, PortA]),
+    ?LOG_INFO("connect cluster B:~0p to A on port ~b", [LeaderB, PortA]),
     repl_util:connect_cluster(LeaderB, "127.0.0.1", PortA),
     ?assertEqual(ok, repl_util:wait_for_connection(LeaderB, "A")).
 
@@ -177,7 +177,7 @@ make_connected_clusters() ->
     NumNodes = rt_config:get(num_nodes, 6),
     ClusterASize = rt_config:get(cluster_a_size, 3),
 
-    ?LOG_INFO("Deploy ~0p nodes", [NumNodes]),
+    ?LOG_INFO("Deploy ~b nodes", [NumNodes]),
     Conf = [
             {riak_repl,
              [

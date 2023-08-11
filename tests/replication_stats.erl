@@ -22,6 +22,7 @@
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -define(FULL_NUM_KEYS, 5000).
@@ -99,12 +100,12 @@ fullsync_enabled_and_started() ->
                 {FullTime, _} = timer:tc(repl_util,
                                          start_and_wait_until_fullsync_complete,
                                          [LeaderA, undefined, Me]),
-                lager:info("Fullsync completed in ~p", [FullTime])
+                ?LOG_INFO("Fullsync completed in ~0p", [FullTime])
         end),
 
     Result = receive
         fullsync_started ->
-            lager:info("Fullsync started!"),
+            ?LOG_INFO("Fullsync started!"),
 
             case rpc:call(LeaderA, riak_repl_console, fs_remotes_status,
                           []) of

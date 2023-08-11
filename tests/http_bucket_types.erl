@@ -19,8 +19,8 @@
 %%
 %% -------------------------------------------------------------------
 -module(http_bucket_types).
-
 -behavior(riak_test).
+
 -export([confirm/0]).
 
 %% MFA callbacks

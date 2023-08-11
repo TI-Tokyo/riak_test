@@ -64,7 +64,7 @@ deploy_node(_, mixed) ->
 deploy_node(Type) ->
     NumNodes = rt_config:get(num_nodes, 1),
 
-    ?LOG_INFO("Deploy ~0p node", [NumNodes]),
+    ?LOG_INFO("Deploy ~b node", [NumNodes]),
     Node = deploy_node(NumNodes, Type),
     ?LOG_INFO("Node: ~0p", [Node]),
     hd(Node).

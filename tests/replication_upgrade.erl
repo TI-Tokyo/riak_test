@@ -22,20 +22,21 @@
 
 -export([confirm/0]).
 
-% -include_lib("stdlib/include/assert.hrl").
+-include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 confirm() ->
     TestMetaData = riak_test_runner:metadata(),
     FromVersion = proplists:get_value(upgrade_version, TestMetaData, previous),
 
-    lager:info("Doing rolling replication upgrade test from ~p to ~p",
+    ?LOG_INFO("Doing rolling replication upgrade test from ~0p to ~0p",
         [FromVersion, "current"]),
 
     NumNodes = rt_config:get(num_nodes, 6),
 
     UpgradeOrder = rt_config:get(repl_upgrade_order, "forwards"),
 
-    lager:info("Deploy ~p nodes", [NumNodes]),
+    ?LOG_INFO("Deploy ~b nodes", [NumNodes]),
     Conf = [
             {riak_repl,
              [
@@ -61,32 +62,32 @@ confirm() ->
             %% halfass randomization
             lists:sort(fun(_, _) -> rand:uniform(100) < 50 end, Nodes);
         Other ->
-            lager:error("Invalid upgrade ordering ~p", [Other]),
+            ?LOG_ERROR("Invalid upgrade ordering ~0p", [Other]),
             erlang:error(case_clause, [Other])
     end,
 
     ClusterASize = rt_config:get(cluster_a_size, 3),
     {ANodes, BNodes} = lists:split(ClusterASize, Nodes),
-    lager:info("ANodes: ~p", [ANodes]),
-    lager:info("BNodes: ~p", [BNodes]),
+    ?LOG_INFO("ANodes: ~0p", [ANodes]),
+    ?LOG_INFO("BNodes: ~0p", [BNodes]),
 
-    lager:info("Build cluster A"),
+    ?LOG_INFO("Build cluster A"),
     repl_util:make_cluster(ANodes),
 
-    lager:info("Build cluster B"),
+    ?LOG_INFO("Build cluster B"),
     repl_util:make_cluster(BNodes),
 
-    lager:info("Replication First pass...homogenous cluster"),
+    ?LOG_INFO("Replication First pass...homogenous cluster"),
 
     %% initial replication run, homogeneous cluster
     replication:replication(ANodes, BNodes, false),
 
-    lager:info("Upgrading nodes in order: ~p", [NodeUpgrades]),
-    rt:log_to_nodes(Nodes, "Upgrading nodes in order: ~p", [NodeUpgrades]),
+    ?LOG_INFO("Upgrading nodes in order: ~0p", [NodeUpgrades]),
+    rt:log_to_nodes(Nodes, "Upgrading nodes in order: ~0p", [NodeUpgrades]),
     %% upgrade the nodes, one at a time
     ok = lists:foreach(fun(Node) ->
-                               lager:info("Upgrade node: ~p", [Node]),
-                               rt:log_to_nodes(Nodes, "Upgrade node: ~p", [Node]),
+                               ?LOG_INFO("Upgrade node: ~0p", [Node]),
+                               rt:log_to_nodes(Nodes, "Upgrade node: ~0p", [Node]),
                                rt:upgrade(Node, current),
                                rt:wait_until_pingable(Node),
                                rt:wait_for_service(Node, [riak_kv, riak_pipe, riak_repl]),
@@ -110,8 +111,8 @@ confirm() ->
                                    false ->
                                        ok
                                end,
-                               lager:info("Replication with upgraded node: ~p", [Node]),
-                               rt:log_to_nodes(Nodes, "Replication with upgraded node: ~p", [Node]),
+                               ?LOG_INFO("Replication with upgraded node: ~0p", [Node]),
+                               rt:log_to_nodes(Nodes, "Replication with upgraded node: ~0p", [Node]),
                                replication:replication(ANodes, BNodes, true)
                        end, NodeUpgrades),
     pass.

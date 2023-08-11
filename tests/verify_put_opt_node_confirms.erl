@@ -17,13 +17,13 @@
 %%% node_confirms value that cannot be met will be rejected.
 %%%
 %%% @end
-
 -module(verify_put_opt_node_confirms).
 -behavior(riak_test).
--compile([export_all, nowarn_export_all]).
+
 -export([confirm/0]).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -define(BUCKET, <<"bucket">>).
 -define(KEY, <<"key">>).
@@ -54,21 +54,21 @@ confirm() ->
                                                      <<"old_counter">>
                                                     ]),
 
-    lager:info("Got preflist"),
-    lager:info("Preflist ~p~n", [PL]),
+    ?LOG_INFO("Got preflist"),
+    ?LOG_INFO("Preflist ~0p", [PL]),
     [FirstNode | OtherPrimaries] = [Node || {{_Idx, Node}, Type} <- PL,
                                             Type == primary],
-    lager:info("Other Primaries ~p~n", [OtherPrimaries]),
+    ?LOG_INFO("Other Primaries ~0p", [OtherPrimaries]),
 
     [rt:stop_and_wait(N) || N <- OtherPrimaries],
-    lager:info("Killed 2 primaries"),
+    ?LOG_INFO("Killed 2 primaries"),
     %% Wait for prelist to change to 1 primary, 2 fallbacks
     wait_for_new_preflist(FirstNode, hd(BucketTypes), 1, 2),
 
     HttpClient = rt:httpc(FirstNode),
     PBClient = rt:pbc(FirstNode),
 
-    lager:info("Attempting to write key"),
+    ?LOG_INFO("Attempting to write key"),
 
     %% Write key and confirm error pw=2 unsatisfied
     write_http(HttpClient, BucketTypes, {error, "503", <<"PW-value unsatisfied: 1/2\n">>}, [{pw, 2}]),
@@ -76,7 +76,7 @@ confirm() ->
 
     %% Now write test for pw=0, node_confirms=2. Should pass, as three physical nodes available
     %% Write key
-    lager:info("Attempting to write key"),
+    ?LOG_INFO("Attempting to write key"),
     %% write key and confirm success
     write_http(HttpClient, BucketTypes, ok, [{node_confirms, 2}]),
     write_pb(PBClient, BucketTypes, ok, [{node_confirms, 2}]),
@@ -84,7 +84,7 @@ confirm() ->
     %% Negative tests
 
     %% Write key
-    lager:info("Attempting to write key"),
+    ?LOG_INFO("Attempting to write key"),
     %% Write key and confirm error invalid pw/node_confirms
     write_http(HttpClient, BucketTypes,
                {error, "400", <<"Specified w/dw/pw/node_confirms values invalid for bucket n value of 3\n">>},
@@ -94,16 +94,16 @@ confirm() ->
 
     %% Now stop another node and write test for pw=0, node_confirms=3. Should fail, as only two physical nodes available
     PL2 = rt:get_preflist(FirstNode, ?BUCKET, ?KEY),
-    lager:info("Got preflist"),
-    lager:info("Preflist ~p~n", [PL2]),
+    ?LOG_INFO("Got preflist"),
+    ?LOG_INFO("Preflist ~0p", [PL2]),
 
     Others = [Node || {{_Idx, Node}, _Type} <- PL2, Node /= FirstNode],
     rt:stop_and_wait(lists:last(Others)),
     wait_for_new_preflist(FirstNode, hd(BucketTypes), PL2),
     PL3 = rt:get_preflist(FirstNode, ?BUCKET, ?KEY),
-    lager:info("Preflist ~p~n", [PL3]),
+    ?LOG_INFO("Preflist ~0p", [PL3]),
 
-    lager:info("Attempting to write key"),
+    ?LOG_INFO("Attempting to write key"),
     %% Write key and confirm error node_confirms=3 unsatisfied
     write_http(HttpClient, BucketTypes, {error, "503", <<"node_confirms-value unsatisfied: 2/3\n">>},
                [{node_confirms, 3}]),
@@ -129,7 +129,7 @@ partition_compare(OldPL, NewPL) ->
 wait_for_new_preflist(FirstNode, BT, Primaries, Fallbacks) ->
     rt:wait_until(fun() ->
                           NewPL = rt:get_preflist(FirstNode, BT, ?KEY),
-                          lager:info("new pl ~p", [NewPL]),
+                          ?LOG_INFO("new pl ~0p", [NewPL]),
                           primary_and_fallback_counts(NewPL) == {Primaries, Fallbacks}
     end).
 
@@ -142,7 +142,7 @@ wait_for_new_preflist(FirstNode, BT, OldPL) ->
 write_http(_Client, [], _, _) ->
     ok;
 write_http(Client, [BT | Rest], Expected, Options) ->
-    lager:info("http checking ~p", [BT]),
+    ?LOG_INFO("http checking ~0p", [BT]),
     write_http2(Client, BT, Expected,  Options),
     write_http(Client, Rest, Expected, Options).
 
@@ -172,7 +172,7 @@ get_http_dt_expected({error, _Code, Msg}) ->
 write_pb(_Client, [], _Expected, _Options) ->
     ok;
 write_pb(Client, [BT | Rest], Expected, Options) ->
-    lager:info("pbc checking ~p", [BT]),
+    ?LOG_INFO("pbc checking ~0p", [BT]),
     Res = write_pb2(Client, BT, Options),
     assert_match(Expected, Res),
     write_pb(Client, Rest, Expected, Options).

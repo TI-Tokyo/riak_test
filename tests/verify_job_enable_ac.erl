@@ -23,7 +23,7 @@
 
 -export([confirm/0]).
 
-%% Called indirectly by name
+%% invoked by name
 -export([
     verify_list_buckets_disabled_http/1,
     verify_list_buckets_disabled_pb/1,
@@ -43,6 +43,7 @@
     verify_secondary_index_enabled_pb/1
 ]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 -include("job_enable_common.hrl").
 
@@ -55,14 +56,14 @@
     [Class || {Class, Enabled} <- ?JOB_CLASS_DEFAULTS, Enabled]).
 
 confirm() ->
-    lager:info("Deploying 1 node"),
+    ?LOG_INFO("Deploying 1 node"),
     rt:set_backend(eleveldb),
     [Node] = rt:build_cluster(1, ?CFG),
 
     HttpClient = rt:httpc(Node),
     PbClient = rt:pbc(Node),
 
-    lager:info("Writing test data via protocol buffers"),
+    ?LOG_INFO("Writing test data via protocol buffers"),
     write_test_data(PbClient),
 
     run_tests(HttpClient, [verify_list_buckets_disabled_http,
@@ -74,7 +75,7 @@ confirm() ->
                          verify_secondary_index_disabled_pb,
                          verify_mapred_disabled_pb]),
 
-    lager:info("Enabling all job classes"),
+    ?LOG_INFO("Enabling all job classes"),
     ok = rpc:call(Node, application, set_env,
         [riak_core, ?APP_CONFIG_KEY, ?JOB_CLASSES]),
 
@@ -110,7 +111,7 @@ run_tests(Client, TestList) ->
     lists:foreach(fun(Test) -> run_test(Client, Test) end, TestList).
 
 run_test(Client, Test) ->
-    lager:info("Running test ~p", [Test]),
+    ?LOG_INFO("Running test ~0p", [Test]),
     ?MODULE:Test(Client).
 
 verify_list_buckets_disabled_pb(Client) ->

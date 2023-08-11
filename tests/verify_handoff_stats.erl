@@ -23,6 +23,7 @@
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 %%
@@ -69,9 +70,9 @@ confirm() ->
 
 %% @private
 run_test(Config, NumNodes, NObjs) ->
-    lager:info("Testing handoff (NObjs=~p)", [NObjs]),
+    ?LOG_INFO("Testing handoff (NObjs=~b)", [NObjs]),
 
-    lager:info("Spinning up ~b test nodes", [NumNodes]),
+    ?LOG_INFO("Spinning up ~b test nodes"),
     [RootNode | TestNodes] = Nodes = rt:deploy_nodes(NumNodes, Config),
 
     rt:wait_for_service(RootNode, riak_kv),
@@ -81,7 +82,7 @@ run_test(Config, NumNodes, NObjs) ->
     %% completed throughout the cluster.
     rt_kv_worker_proc:add_intercept(Nodes),
 
-    lager:info("Populating root node."),
+    ?LOG_INFO("Populating root node."),
     rt:systest_write(RootNode, NObjs),
 
     %% write one object with a bucket type, why not
@@ -89,7 +90,7 @@ run_test(Config, NumNodes, NObjs) ->
     rt:systest_write(RootNode, 1, 2, {<<"type">>, <<"bucket">>}, 2),
 
     %% Test ownership handoff on each node:
-    lager:info("Testing ownership handoff for cluster."),
+    ?LOG_INFO("Testing ownership handoff for cluster."),
     Cluster = lists:foldl(
         fun(TestNode, CurrentNodes) ->
             ok = test_ownership_handoff(RootNode, TestNode, CurrentNodes, NObjs),
@@ -112,16 +113,16 @@ run_test(Config, NumNodes, NObjs) ->
 
 %% @private
 test_ownership_handoff(RootNode, NewNode, CurrentNodes, _NObjs) ->
-    lager:info("Testing ownership handoff by adding node ~p to ~p ...", [NewNode, CurrentNodes]),
+    ?LOG_INFO("Testing ownership handoff by adding node ~0p to ~0p ...", [NewNode, CurrentNodes]),
 
-    lager:info("Waiting for service on new node."),
+    ?LOG_INFO("Waiting for service on new node."),
     rt:wait_for_service(NewNode, riak_kv),
 
     BeforeHandoffStats = get_handoff_stats(ownership, CurrentNodes),
 
     start_kv_worker_proc(ownership),
 
-    lager:info("Joining new node with cluster."),
+    ?LOG_INFO("Joining new node with cluster."),
     rt:join(NewNode, RootNode),
     NewCluster = [NewNode | CurrentNodes],
     ?assertEqual(ok, rt:wait_until_nodes_ready(NewCluster)),
@@ -140,7 +141,7 @@ test_ownership_handoff(RootNode, NewNode, CurrentNodes, _NObjs) ->
 
 %% @private
 test_hinted_handoff([RootNode | OtherNodes] = Nodes, NObjs) ->
-    lager:info("Testing hinted handoff by stopping ~p, doing some writes, and restarting ...", [
+    ?LOG_INFO("Testing hinted handoff by stopping ~0p, doing some writes, and restarting ...", [
         RootNode
     ]),
 
@@ -151,7 +152,7 @@ test_hinted_handoff([RootNode | OtherNodes] = Nodes, NObjs) ->
     rt:stop(RootNode),
 
     AnotherNode = rt_util:random_element(OtherNodes),
-    lager:info("Writing ~p objects to ~p ...", [NObjs, AnotherNode]),
+    ?LOG_INFO("Writing ~b objects to ~0p ...", [NObjs, AnotherNode]),
     rt:systest_write(AnotherNode, NObjs),
     Results = rt:systest_read(AnotherNode, NObjs),
     ?assertEqual(0, length(Results)),
@@ -179,15 +180,15 @@ test_repair_handoff(Nodes) ->
         [_|_] = BackendDir ->
             test_repair_handoff(Nodes, BackendDir);
         _ ->
-            lager:info(
-                "Skipping handoff repair test for unsupported backend: ~p",
+            ?LOG_INFO(
+                "Skipping handoff repair test for unsupported backend: ~0p",
                 [Backend])
     end.
 
 %% @private
 test_repair_handoff([RootNode | OtherNodes] = Nodes, BackendDir) ->
-    lager:info(
-        "Testing repair handoff by stopping ~p, deleting data,"
+    ?LOG_INFO(
+        "Testing repair handoff by stopping ~0p, deleting data,"
         " and issuing a repair ...", [RootNode]),
 
     BeforeHandoffStats = get_handoff_stats(repair, OtherNodes),
@@ -218,10 +219,10 @@ test_repair_handoff([RootNode | OtherNodes] = Nodes, BackendDir) ->
 
 %% @private
 issue_repair(Node) ->
-    lager:info("Issuing repairs on node ~p", [Node]),
+    ?LOG_INFO("Issuing repairs on node ~0p", [Node]),
     rpc:call(Node, riak_client, repair_node, []),
     %% give handoff a few seconds to kick off xfers...
-    lager:info("Sleeping 5secs ..."),
+    ?LOG_INFO("Sleeping 5secs ..."),
     timer:sleep(5000).
 
 %% @private
@@ -251,7 +252,7 @@ get_handoff_stats(Type, Node) when is_atom(Node) ->
     Stats = rt:get_stats(Node),
     BytesSentStatName = stat_name(Type, bytes_sent),
     ObjectsSentStatName = stat_name(Type, objects_sent),
-    lager:info("Stats: ~p ~p", [BytesSentStatName, ObjectsSentStatName]),
+    ?LOG_DEBUG("Stats: ~0p ~0p", [BytesSentStatName, ObjectsSentStatName]),
     [
         {BytesSentStatName, rt:get_stat(Stats, BytesSentStatName)},
         {ObjectsSentStatName, rt:get_stat(Stats, ObjectsSentStatName)}
@@ -266,7 +267,7 @@ stat_name(Type, Moniker) ->
 %% @private
 check_any_node_stats_increased(BeforeHandoffStats, AfterHandoffStats, Type, Stat) ->
     StatName = stat_name(Type, Stat),
-    lager:info("Verifying ~p stat increased...", [StatName]),
+    ?LOG_INFO("Verifying ~0p stat increased...", [StatName]),
     ?assert(
         lists:any(
             fun({Node, BeforeStats}) ->
@@ -285,15 +286,15 @@ check_any_node_stats_increased(BeforeHandoffStats, AfterHandoffStats, Type, Stat
 
 %% @private
 work_started({Node, Pid}, {TotalTransfers, Accum}, Type) ->
-    lager:info(
-        "Started ~p handoff on node ~p pid ~p TotalTransfers=~p",
+    ?LOG_INFO(
+        "Started ~0p handoff on node ~0p pid ~0p TotalTransfers=~0p",
         [Type, Node, Pid, TotalTransfers]),
     {TotalTransfers + 1, increment_counter(Accum, Node)}.
 
 %% @private
 work_completed({Node, Pid}, {TotalTransfers, Accum}, Type) ->
-    lager:info(
-        "Completed ~p handoff on node ~p pid ~p TotalTransfers=~p",
+    ?LOG_INFO(
+        "Completed ~0p handoff on node ~0p pid ~0p TotalTransfers=~0p",
         [Type, Node, Pid, TotalTransfers]),
     {ok, {TotalTransfers, decrement_counter(Accum, Node)}}.
 

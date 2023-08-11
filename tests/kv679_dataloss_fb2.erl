@@ -123,19 +123,19 @@ confirm() ->
     ?assert(length(Fallbacks) == 3),
 
     ?LOG_INFO(
-        "fallbacks ~0p, primaries ~0p~n",
+        "fallbacks ~0p, primaries ~0p",
         [Fallbacks, [CoordNode] ++ OtherPrimaries]),
 
     %% Partition the other primary and one non-preflist node
     {_, _, _P1, P2} = PartInfo =
         rt:partition([CoordNode] ++ tl(Fallbacks), OtherPrimaries ++ [hd(Fallbacks)]),
-    ?LOG_INFO("Partitioned ~0p~n", [PartInfo]),
+    ?LOG_INFO("Partitioned ~0p", [PartInfo]),
     ?LOG_INFO("During partition - alternate state may have been created"),
     ?LOG_INFO("Waiting for settled partioned state"),
     timer:sleep(1000),
 
     FBPL = get_preflist(CoordNode),
-    ?LOG_INFO("Got a preflist with coord and 1 fb ~0p~n", [FBPL]),
+    ?LOG_INFO("Got a preflist with coord and 1 fb ~0p", [FBPL]),
 
     %% Write key once at coordinating primary
     kv679_tombstone:write_key(CoordClient, [<<"alice">>]),
@@ -150,7 +150,7 @@ confirm() ->
 
     %% get a new preflist with a different fallback
     FBPL2 = get_preflist(CoordNode),
-    ?LOG_INFO("Got a preflist with coord and 1 fb ~0p~n", [FBPL2]),
+    ?LOG_INFO("Got a preflist with coord and 1 fb ~0p", [FBPL2]),
     ?assert(FBPL2 /= FBPL),
 
     %% do two more writes so that there exists out there a clock of
@@ -214,7 +214,7 @@ confirm() ->
     rt:stop_and_wait(P2FB),
     rt:wait_until(fun() ->
                           NewPL = kv679_tombstone:get_preflist(CoordNode, ?NVAL),
-                          ?LOG_INFO("new PL ~0p~n", [NewPL]),
+                          ?LOG_INFO("new PL ~0p", [NewPL]),
                           primary_and_fallback_counts(NewPL) == {1, 1} andalso
                               different_nodes(NewPL)
                   end),
@@ -229,7 +229,7 @@ confirm() ->
     %% get a primary PL
     rt:wait_until(fun() ->
                           NewPL = kv679_tombstone:get_preflist(CoordNode, ?NVAL),
-                          ?LOG_INFO("new PL ~0p~n", [NewPL]),
+                          ?LOG_INFO("new PL ~0p", [NewPL]),
                           primary_and_fallback_counts(NewPL) == {2, 0} andalso
                               different_nodes(NewPL)
                   end),
@@ -263,7 +263,7 @@ confirm() ->
     %% A nice riak would have somehow managed to make a sibling of the
     %% last acked write, even with all the craziness
     ?assertEqual([<<"charlie">>, <<"emma">>], lists:sort(riakc_obj:get_values(O))),
-    ?LOG_INFO("Final Object ~0p~n", [O]),
+    ?LOG_INFO("Final Object ~0p", [O]),
     pass.
 
 different_nodes(PL) ->
@@ -306,7 +306,7 @@ get_preflist(CoordNode) ->
     rt:wait_until(
         fun() ->
             NewPL = kv679_tombstone:get_preflist(CoordNode, ?NVAL),
-            ?LOG_INFO("new PL ~0p~n", [NewPL]),
+            ?LOG_INFO("new PL ~0p", [NewPL]),
             CoCount = coordinater_count(NewPL, CoordNode),
             primary_and_fallback_counts(NewPL) == {1, ?NVAL - 1} andalso
             CoCount < length(NewPL)

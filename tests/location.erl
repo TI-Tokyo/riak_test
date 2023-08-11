@@ -19,7 +19,17 @@
 -behavior(riak_test).
 
 -export([confirm/0]).
--export([setup_location/2]).
+
+%% Shared
+-export([
+    algorithm_supported/1,
+    assert_no_location_violation/3,
+    assert_no_ownership_change/4,
+    assert_ring_satisfy_n_val/1,
+    plan_and_wait/2,
+    setup_algorithm_cache/0,
+    setup_location/2
+]).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
@@ -34,37 +44,51 @@
 -define(RACK_E, "rack_e").
 -define(RACK_F, "rack_f").
 
+-define(EXP_CACHE_KEY, riak_core_claim_exports).
+
 confirm() ->
-  % Test takes a long time, so testing other ring sizes is expensive
-  % The Ring size of 64 is a distinct scenario to ring size of 32 or
-  % 128 (because it does not create a tail violation).
-  pass = run_test(64, choose_claim_v2),
-  pass = run_test(128, choose_claim_v2),
-  pass = run_test(64, choose_claim_v4),
-  pass = run_test(256, choose_claim_v4),
-  pass = run_test(512, choose_claim_v4),
-  pass.
+    setup_algorithm_cache(),
+
+    % Test takes a long time, so testing other ring sizes is expensive
+    % The Ring size of 64 is a distinct scenario to ring size of 32 or
+    % 128 (because it does not create a tail violation).
+
+    pass = run_test(64, choose_claim_v2),
+    pass = run_test(128, choose_claim_v2),
+
+    Algo4 = choose_claim_v4,
+    case algorithm_supported(Algo4) of
+        true ->
+            pass = run_test(64, Algo4),
+            pass = run_test(256, Algo4),
+            pass = run_test(512, Algo4);
+        _ ->
+            ?LOG_INFO("*************************"),
+            ?LOG_INFO("Skipping unsupported algorithm ~w", [Algo4]),
+            ?LOG_INFO("*************************")
+    end,
+
+    pass.
 
 run_test(RingSize, ClaimAlgorithm) ->
-    Conf =
-        [
-        {riak_kv, [{anti_entropy, {off, []}}]},
-        {riak_core,
-            [
-              {ring_creation_size, RingSize},
-              {claimant_tick, ?CLAIMANT_TICK},
-              {vnode_management_timer, 2000},
-              {vnode_inactivity_timeout, 4000},
-              {handoff_concurrency, 16},
-              {choose_claim_fun, ClaimAlgorithm},
-              {default_bucket_props,
-                [{allow_mult, true}, {dvv_enabled, true}]}
-              ]}
-            ],
+    Conf = [
+        {riak_kv, [
+            {anti_entropy, {off, []}}
+        ]},
+        {riak_core, [
+            {ring_creation_size,    RingSize},
+            {choose_claim_fun,      {riak_core_claim, ClaimAlgorithm}},
+            {claimant_tick,         ?CLAIMANT_TICK},
+            {default_bucket_props,  [{allow_mult, true}, {dvv_enabled, true}]},
+            {handoff_concurrency,   100},
+            {vnode_inactivity_timeout, 4000},
+            {vnode_management_timer, 2000}
+        ]}
+    ],
 
     ?LOG_INFO("*************************"),
     ?LOG_INFO("Testing with ring-size ~b", [RingSize]),
-    ?LOG_INFO("Testing with claim algorithm ~0p", [ClaimAlgorithm]),
+    ?LOG_INFO("Testing with claim algorithm ~w", [ClaimAlgorithm]),
     ?LOG_INFO("*************************"),
 
     AllNodes = rt:deploy_nodes(6, Conf),
@@ -181,13 +205,10 @@ run_test(RingSize, ClaimAlgorithm) ->
       N ->
         ?LOG_INFO(
           "Test skipped for ring size ~b =/= 64 - as will fail "
-          "for unsolveable tail violations",
-          [N]),
-        ok
-
+          "for unsolveable tail violations", [N])
     end,
 
-    ?LOG_INFO("Test verify location settings with ring size ~0p: Passed",
+    ?LOG_INFO("Test verify location settings with ring size ~b: Passed",
                 [RingSize]),
 
     rt:clean_cluster(AllNodes),
@@ -215,17 +236,11 @@ plan_and_wait(Claimant, Nodes) ->
     rt:wait_until_ring_converged(Nodes),
     rt:plan_and_commit(Claimant),
     rt:wait_until_ring_converged(Nodes),
-    lists:foreach(fun(N) -> rt:wait_until_ready(N) end, Nodes),
+    lists:foreach(fun rt:wait_until_ready/1, Nodes),
     ?LOG_INFO("Sleeping claimant_tick before checking transfer progress"),
     timer:sleep(?CLAIMANT_TICK),
     ok = rt:wait_until_transfers_complete(Nodes),
-    lists:foreach(
-      fun(N) -> rt:wait_until_node_handoffs_complete(N) end,
-      Nodes),
-    ?LOG_INFO(
-      "Sleeping claimant_tick  + 1s before confirming transfers complete"),
-    timer:sleep(?CLAIMANT_TICK + 1000),
-    ok = rt:wait_until_transfers_complete(Nodes),
+    lists:foreach(fun rt:wait_until_node_handoffs_complete/1, Nodes),
     ?LOG_INFO(
       "Sleeping claimant_tick  + 1s before confirming transfers complete"),
     timer:sleep(?CLAIMANT_TICK + 1000),
@@ -249,7 +264,7 @@ assert_no_ownership_change(RingA, RingB, choose_claim_v4, true) ->
   DiffOwners = lists:subtract(OwnersA, OwnersB),
   ?LOG_INFO(
     "choose_claim_v4 does not guarrantee no ownership change on "
-    "change of location name - ~0p changes out of ~0p",
+    "change of location name - ~b changes out of ~b",
     [length(DiffOwners), length(OwnersA)]),
   ok.
 
@@ -264,6 +279,33 @@ assert_no_location_violation(Ring, NVal, MinNumberOfDistinctLocation) ->
 log_assert_no_location_violation(Nval, Nval) ->
   ?LOG_INFO("Ensure that every preflists have uniq locations");
 log_assert_no_location_violation(NVal, MinNumberOfDistinctLocation) ->
-  ?LOG_INFO("Ensure that every preflists (n_val: ~0p) have at leaset ~0p distinct locations",
+  ?LOG_INFO("Ensure that every preflists (n_val: ~b) have at leaset ~b distinct locations",
              [NVal, MinNumberOfDistinctLocation]).
 
+-spec algorithm_supported(ClaimAlgorithm :: atom()) -> boolean() | no_return().
+algorithm_supported(ClaimAlgorithm) ->
+    Exports = erlang:get(?EXP_CACHE_KEY),
+    ?assertMatch([_|_], Exports,
+        "Cache not initialized with setup_algorithm_cache/0"),
+    ArityMember = fun(Arity) ->
+        lists:member({ClaimAlgorithm, Arity}, Exports)
+    end,
+    lists:all(ArityMember, [1, 2, 3]).
+
+-spec setup_algorithm_cache() -> ok.
+%% This is kinda sleazy, but rt in general makes the assumption that 'current'
+%% Riak is on the code path, so we roll with it.
+%% If you insist on doing it The Right Way, that implementation is below.
+setup_algorithm_cache() ->
+    Exports = riak_core_claim:module_info(exports),
+    erlang:put(?EXP_CACHE_KEY, Exports).
+
+%%-spec setup_algorithm_cache() -> ok | no_return().
+%%%% Start one node so we can get riak_core_claim exports.
+%%setup_algorithm_cache() ->
+%%    [Node] = Nodes = rt:deploy_nodes(1),
+%%    Exports = rpc:call(Node, riak_core_claim, module_info, [exports]),
+%%    ?assertMatch(ok, rt:clean_cluster(Nodes)),
+%%    ?assertMatch([_|_], Exports,
+%%        "RPC failed to riak_core_claim:module_info(exports)"),
+%%    erlang:put(?EXP_CACHE_KEY, Exports).

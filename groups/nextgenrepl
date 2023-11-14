@@ -4,12 +4,14 @@ nextgenrepl_deletemodes
 nextgenrepl_deletewithfailure
 nextgenrepl_external_reconcile
 nextgenrepl_rangerepltomb
+nextgenrepl_reaptombs
 nextgenrepl_rtq_auto
 nextgenrepl_rtq_autocrdt
 nextgenrepl_rtq_autotypes
 nextgenrepl_rtq_pbsecurity
 nextgenrepl_rtq_peerdiscovery
 nextgenrepl_rtq_stdobj
+nextgenrepl_rtq_workercount
 nextgenrepl_sibling
 nextgenrepl_srcfail
 nextgenrepl_ttaaefs_autoall
@@ -25,3 +27,4 @@ verify_aaefold_nval_api
 verify_aaefold_range_api
 verify_aaefold_rangerepair
 verify_overflowq
+verify_vclock_prune

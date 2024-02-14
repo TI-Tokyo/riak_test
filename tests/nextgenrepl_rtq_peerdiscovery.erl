@@ -525,11 +525,19 @@ sink_action(Node, disable) ->
     rpc:call(Node, application, set_env, [riak_kv, replrtq_enablesink, false]),
     P = rpc:call(Node, erlang, whereis, [riak_kv_replrtq_snk]),
     rpc:call(Node, erlang, exit, [P, kill]),
+    rt:wait_until(
+        fun() ->
+            is_pid(rpc:call(Node, erlang, whereis, [riak_kv_replrtq_snk]))
+        end),
     ok;
 sink_action(Node, enable) ->
     rpc:call(Node, application, set_env, [riak_kv, replrtq_enablesink, true]),
     P = rpc:call(Node, erlang, whereis, [riak_kv_replrtq_snk]),
     rpc:call(Node, erlang, exit, [P, kill]),
+    rt:wait_until(
+        fun() ->
+            is_pid(rpc:call(Node, erlang, whereis, [riak_kv_replrtq_snk]))
+        end),
     ok.
 
 update_discovery(Node, QueueName) ->

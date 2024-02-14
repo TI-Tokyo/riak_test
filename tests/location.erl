@@ -1,7 +1,7 @@
 -module(location).
 -behavior(riak_test).
 -export([confirm/0]).
--export([setup_location/2]).
+-export([setup_location/2, plan_and_wait/2]).
 -compile([export_all, nowarn_export_all]).
 -include_lib("eunit/include/eunit.hrl").
 

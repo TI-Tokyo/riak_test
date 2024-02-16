@@ -53,7 +53,7 @@ confirm() ->
     
     lager:info("Query error with ErrCode ~p", [ErrCode]),
 
-    ?assertEqual(true, ErrCode >= 500),
+    ?assertEqual(true, ErrCode == 503),
     ?assertMatch({match, _}, re:run(Body, "request timed out|{error,timeout}")), %% shows the app.config timeout
 
     HttpRes = http_query(Http, Query, [{timeout, 5000}]),

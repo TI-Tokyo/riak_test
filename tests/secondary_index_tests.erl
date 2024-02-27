@@ -39,8 +39,7 @@ confirm() ->
             [{default_bucket_props,
                 [{allow_mult, true}, {dvv_enabled, true}]}
             ]},
-            {riak_kv,
-                [{secondary_index_json, thoas}]
+            {riak_kv, [{secondary_index_json, otp}]
         }],
     Nodes = rt:build_cluster(3, Conf),
     ?assertEqual(ok, rt:wait_until_nodes_ready(Nodes)),

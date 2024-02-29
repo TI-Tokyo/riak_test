@@ -515,6 +515,7 @@ common_stats() ->
         <<"executing_mappers">>,
         <<"exometer_core_version">>,
         <<"folsom_version">>,
+        <<"getopt_version">>,
         <<"gossip_received">>,
         <<"handoff_timeouts">>,
         <<"hll_bytes">>,
@@ -935,7 +936,8 @@ common_stats() ->
         <<"write_once_put_time_median">>,
         <<"write_once_puts">>,
         <<"write_once_puts_total">>,
-        <<"xmerl_version">>
+        <<"xmerl_version">>,
+        <<"zstd_version">>
     ]
     ++ pool_stats()
     ++ tictacaae_stats()

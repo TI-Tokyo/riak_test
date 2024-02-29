@@ -25,31 +25,29 @@
         warning/1, warning/2,
         error/1, error/2]).
 
--include_lib("kernel/include/logger.hrl").
-
 debug(Msg) ->
     debug(Msg, []).
 
 debug(Msg, Args) ->
-    ?LOG_DEBUG(Msg, Args).
+    logger:debug(Msg, Args).
 
 info(Msg) ->
     info(Msg, []).
 
 info(Msg, Args) ->
-    ?LOG_INFO(Msg, Args).
+    logger:info(Msg, Args).
 
 notice(Msg) ->
     notice(Msg, []).
 
 notice(Msg, Args) ->
-    ?LOG_NOTICE(Msg, Args).
+    logger:notice(Msg, Args).
 
 warning(Msg) ->
     warning(Msg, []).
 
 warning(Msg, Args) ->
-    ?LOG_WARNING(Msg, Args).
+    logger:warning(Msg, Args).
 
 error(Msg) ->
     log_error(Msg, []).
@@ -58,4 +56,4 @@ error(Msg, Args) ->
     log_error(Msg, Args).
 
 log_error(Msg, Args) ->
-    ?LOG_ERROR(Msg, Args).
+    logger:error(Msg, Args).

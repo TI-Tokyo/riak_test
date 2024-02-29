@@ -120,7 +120,6 @@ main(Args) ->
                     level,
                     "]",
                     {pid, [" ", pid, ""], ""},
-                    {mfa, [], ""},
                     ": ",
                     msg,
                     "\n"

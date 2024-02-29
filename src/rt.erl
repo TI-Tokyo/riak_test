@@ -2399,7 +2399,7 @@ assert_supported(Capabilities, Capability, Value) ->
 
 -spec reset_cookie(node(), atom(), atom()) -> true|tuple().
 
--ifdef(post_24).
+-if(?OTP_RELEASE > 24).
 
 reset_cookie(Node, OldCookie, NewCookie) ->
     lager:info(
@@ -2425,27 +2425,3 @@ reset_cookie(Node, OldCookie, _NewCookie) ->
 -spec no_op(term()) -> ok.
 no_op(_Params) ->
     ok.
-
--ifdef(TEST).
-
-verify_product(Applications, ExpectedApplication) ->
-    ?_test(begin
-               meck:new(rpc, [unstick]),
-               meck:expect(rpc, call, fun([], application, which_applications, []) ->
-                                           Applications end),
-               ?assertMatch(ExpectedApplication, product([])),
-               meck:unload(rpc)
-           end).
-
-product_test_() ->
-    {foreach,
-     fun() -> ok end,
-     [
-  verify_product([riak_cs], riak_cs),
-  verify_product([riak_repl, riak_kv, riak_cs], riak_cs),
-  verify_product([riak_repl, riak_kv], riak),
-  verify_product([riak_kv], riak),
-  verify_product([kernel], unknown)
-     ]}.
-
--endif.

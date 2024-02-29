@@ -406,12 +406,12 @@ verify_clock_pruning(Nodes, ClusterB) ->
 
     lager:info("Read repair all keys twice"),
     ExpectedKeys = length(Nodes) * ?NUM_KEYS_PERNODE,
-    {ok,{[], ExpectedKeys, all, _BS}} =
+    {ok,{[], ExpectedKeys, all, _BS0}} =
         riak_client:aae_fold({repair_keys_range, ?BUCKET, all, all, all}, CH),
     empty_read_queues(Nodes),
     _ = return_clock_lengths(CH),
     _ = return_clock_lengths(CR),
-    {ok,{[], ExpectedKeys, all, _BS}} =
+    {ok,{[], ExpectedKeys, all, _BS1}} =
         riak_client:aae_fold({repair_keys_range, ?BUCKET, all, all, all}, CH),
     empty_read_queues(Nodes),
     _ = return_clock_lengths(CH),

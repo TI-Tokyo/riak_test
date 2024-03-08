@@ -105,7 +105,7 @@ confirm() ->
     _SrcHTTPCC = rhc:create(IPC, PortCH, "riak", []),
     {ok, SrcPBCA} = riakc_pb_socket:start(IPA, PortAP),
     {ok, SrcPBCB} = riakc_pb_socket:start(IPB, PortBP),
-    {ok, _SrcPBCC} = riakc_pb_socket:start(IPC, PortCP),
+    {ok, SrcPBCC} = riakc_pb_socket:start(IPC, PortCP),
 
     {ok, KC1} =
         range_repl_compare(SrcHTTPCA, SrcPBCA,
@@ -255,6 +255,9 @@ confirm() ->
                             0,
                             5),
 
+    ok = riakc_pb_socket:stop(SrcPBCA),
+    ok = riakc_pb_socket:stop(SrcPBCB),
+    ok = riakc_pb_socket:stop(SrcPBCC),
     pass.
 
 

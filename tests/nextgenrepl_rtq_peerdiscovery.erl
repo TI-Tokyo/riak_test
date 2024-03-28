@@ -26,6 +26,7 @@
 -define(REPL_SLEEP, 2048). 
     % May need to wait for 2 x the 1024ms max sleep time of a snk worker
 -define(WAIT_LOOPS, 12).
+-define(INITIAL_TIMEOUT, 10000).
 
 -define(CONFIG(RingSize, NVal, SrcQueueDefns), [
         {riak_core,
@@ -54,7 +55,8 @@
             {delete_mode, keep},
             {replrtq_enablesrc, true},
             {replrtq_srcqueue, SrcQueueDefns},
-            {replrtq_peer_discovery, true}
+            {replrtq_peer_discovery, true},
+            {ngr_initial_timeout, ?INITIAL_TIMEOUT}
           ]}
         ]).
 
@@ -137,6 +139,8 @@ cluster_test(ClusterA, ClusterB, ClusterC, Protocol) ->
     lager:info("Confirm riak_kv is up on all nodes."),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end,
                     ClusterA ++ ClusterB ++ ClusterC),
+    lager:info("Wait for initial timeout on nextgenrepl services"),
+    timer:sleep(?INITIAL_TIMEOUT),
 
     lager:info("Ready for test - with ~w client for rtq.", [Protocol]),
     pass =

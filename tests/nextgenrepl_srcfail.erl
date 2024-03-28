@@ -268,4 +268,6 @@ range_repl(http, IP, Port, B, KR, MR, QN) ->
     rhc:aae_range_replkeys(RHC, B, KR, MR, QN);
 range_repl(pb, IP, Port, B, KR, MR, QN) ->
     {ok, Pid} = riakc_pb_socket:start(IP, Port),
-    riakc_pb_socket:aae_range_replkeys(Pid, B, KR, MR, QN).
+    R = riakc_pb_socket:aae_range_replkeys(Pid, B, KR, MR, QN),
+    ok = riakc_pb_socket:stop(Pid),
+    R.

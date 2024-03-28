@@ -158,10 +158,6 @@ setup_rt(Opts) ->
     %% Loads from ~/.riak_test.config
     rt_config:load(Config, ConfigFile),
 
-    application:set_env(lager, handlers, [{lager_console_backend,
-                                           rt_config:get(lager_level, info)}]),
-    lager:start(),
-
     %% Two hard-coded deps...
     riak_test_escript:add_deps(rt:get_deps()),
     riak_test_escript:add_deps("deps"),

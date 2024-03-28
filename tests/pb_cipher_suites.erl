@@ -259,7 +259,7 @@ check_reasons(ProtocolVersionError) ->
     error.
 
 
--ifdef(post_22).
+-if(?OTP_RELEASE > 22).
 
 check_with_reenabled_protools(_Port, _CertDir) -> ok.
 

@@ -29,7 +29,7 @@
 
 confirm() ->
     application:start(ibrowse),
-    lager:info("Deploy some nodes"),
+    logger:info("Deploy some nodes"),
     Nodes = rt:build_cluster(4, [], [
                                      {riak_core, [{default_bucket_props,
                                                    [
@@ -47,7 +47,7 @@ confirm() ->
                   end,
 
     RHC = rt:httpc(Node),
-    lager:info("default type get/put test"),
+    logger:info("default type get/put test"),
     %% write explicitly to the default type
     ok = rhc:put(RHC, riakc_obj:new({<<"default">>, <<"bucket">>},
                                <<"key">>, <<"value">>)),
@@ -73,18 +73,18 @@ confirm() ->
 
     ?assertEqual(<<"newvalue">>, riakc_obj:get_value(O3)),
 
-    lager:info("list_keys test"),
+    logger:info("list_keys test"),
     %% list keys
     ?WAIT({ok, [<<"key">>]} == rhc:list_keys(RHC, <<"bucket">>)),
     ?WAIT({ok, [<<"key">>]} == rhc:list_keys(RHC, {<<"default">>, <<"bucket">>})),
 
-    lager:info("list_buckets test"),
+    logger:info("list_buckets test"),
     %% list buckets
     ?WAIT({ok, [<<"bucket">>]} == rhc:list_buckets(RHC)),
     ?WAIT({ok, [<<"bucket">>]} == rhc:list_buckets(RHC, <<"default">>)),
 
     timer:sleep(5000),
-    lager:info("default type delete test"),
+    logger:info("default type delete test"),
     %% delete explicitly via the default bucket
     ok = rhc:delete_obj(RHC, O3),
 
@@ -122,33 +122,33 @@ confirm() ->
     ?WAIT({ok, []} == rhc:list_buckets(RHC)),
     ?WAIT({ok, []} == rhc:list_buckets(RHC, <<"default">>)),
 
-    lager:info("custom type get/put test"),
+    logger:info("custom type get/put test"),
     %% create a new type
     ok = rt:create_activate_and_wait_for_bucket_type(Nodes, <<"mytype">>, [{n_val,3}]),
 
-    lager:info("doing put"),
+    logger:info("doing put"),
     ok = rhc:put(RHC, riakc_obj:new({<<"mytype">>, <<"bucket">>},
                                <<"key">>, <<"newestvalue">>)),
 
-    lager:info("doing get"),
+    logger:info("doing get"),
     {ok, O5} = rhc:get(RHC, {<<"mytype">>, <<"bucket">>}, <<"key">>),
 
     ?assertEqual(<<"newestvalue">>, riakc_obj:get_value(O5)),
 
-    lager:info("doing get"),
+    logger:info("doing get"),
     %% this type is NOT aliased to the default buckey
     {error, notfound} = rhc:get(RHC, <<"bucket">>, <<"key">>),
 
-    lager:info("custom type list_keys test"),
+    logger:info("custom type list_keys test"),
     ?WAIT({ok, []} == rhc:list_keys(RHC, <<"bucket">>)),
     ?WAIT({ok, [<<"key">>]} == rhc:list_keys(RHC, {<<"mytype">>, <<"bucket">>})),
 
-    lager:info("custom type list_buckets test"),
+    logger:info("custom type list_buckets test"),
     %% list buckets
     ?WAIT({ok, []} == rhc:list_buckets(RHC)),
     ?WAIT({ok, [<<"bucket">>]} == rhc:list_buckets(RHC, <<"mytype">>)),
 
-    lager:info("UTF-8 type get/put test"),
+    logger:info("UTF-8 type get/put test"),
     %% こんにちは - konnichiwa (Japanese)
     UnicodeTypeBin = unicode:characters_to_binary([12371,12435,12395,12385,12399], utf8),
     %% سلام - Salam (Arabic)
@@ -158,19 +158,19 @@ confirm() ->
 
     ok = rt:create_activate_and_wait_for_bucket_type(Nodes, UnicodeTypeBin, [{n_val,3}]),
 
-    lager:info("doing put"),
+    logger:info("doing put"),
     ok = rhc:put(RHC, riakc_obj:new(UCBBin,
                                     <<"key">>, <<"unicode">>)),
 
-    lager:info("doing get"),
+    logger:info("doing get"),
     {ok, O6} = rhc:get(RHC, UCBBin, <<"key">>),
 
     ?assertEqual(<<"unicode">>, riakc_obj:get_value(O6)),
 
-    lager:info("unicode type list_keys test"),
+    logger:info("unicode type list_keys test"),
     ?WAIT({ok, [<<"key">>]}== rhc:list_keys(RHC, UCBBin)),
 
-    lager:info("unicode type list_buckets test"),
+    logger:info("unicode type list_buckets test"),
     %% list buckets
 
     %% This is a rather awkward representation, but it's what rhc is
@@ -181,7 +181,7 @@ confirm() ->
     %% name
     ?WAIT({ok, [<<"0633064406270645">>]} == rhc:list_buckets(RHC, UnicodeTypeBin)),
 
-    lager:info("bucket properties tests"),
+    logger:info("bucket properties tests"),
     rhc:set_bucket(RHC, {<<"default">>, <<"mybucket">>},
                    [{n_val, 5}]),
     {ok, BProps} = rhc:get_bucket(RHC, <<"mybucket">>),
@@ -208,7 +208,7 @@ confirm() ->
                                          <<"mybucket">>}),
     ?assertEqual(3, proplists:get_value(n_val, BProps4)),
 
-    lager:info("bucket type properties test"),
+    logger:info("bucket type properties test"),
 
     rhc:set_bucket_type(RHC, <<"mytype">>,
                         [{n_val, 5}]),
@@ -415,8 +415,8 @@ confirm() ->
 
     rt:clean_cluster(Nodes),
     rt_redbug:set_tracing_applied(true),
-    lager:info("Deploy a single node cluster"),
-    lager:info("Can only monitor one node with redbug"),
+    logger:info("Deploy a single node cluster"),
+    logger:info("Can only monitor one node with redbug"),
     [SingleNode] 
         = rt:build_cluster(1, 
                             [], 
@@ -427,7 +427,7 @@ confirm() ->
                                         {dvv_enabled, true}
                                     ]}]}]),
 
-    lager:info("Create a bucket type with selective sync enabled"),
+    logger:info("Create a bucket type with selective sync enabled"),
     ok =
         rt:create_activate_and_wait_for_bucket_type(
             [SingleNode], <<"sync_backend">>, [{sync_on_write,backend}, {n_val,3}]),
@@ -438,7 +438,7 @@ confirm() ->
         rt:create_activate_and_wait_for_bucket_type(
             [SingleNode], <<"sync_all">>, [{sync_on_write,all}, {n_val,3}]),
 
-    lager:info("Setup redbug tracing for selective sync test"),
+    logger:info("Setup redbug tracing for selective sync test"),
     {ok, CWD} = file:get_cwd(),
     FnameBase = "rt_vhc",
     FileBase = filename:join([CWD, FnameBase]),
@@ -449,39 +449,40 @@ confirm() ->
     file:delete(AllTrcFile),
     file:delete(BackendTrcFile),
 
-    lager:info("STARTING TRACE"),
+    logger:info("STARTING TRACE"),
     Backend = proplists:get_value(backend, riak_test_runner:metadata()),
     TraceFun = flushputfun(Backend),
 
     redbug_start(TraceFun, OneTrcFile, SingleNode),
-    lager:info("doing put"),
+    logger:info("doing put"),
     ok = rhc:put(RHC,
         riakc_obj:new({<<"sync_one">>, <<"b_sync_one">>}, <<"key">>, <<"newestvalue">>)),
-    lager:info("doing get"),
+    logger:info("doing get"),
     {ok, _} = rhc:get(RHC, {<<"sync_one">>, <<"b_sync_one">>}, <<"key">>),
     
-    stopped = redbug:stop(),
+    stopped = redbug:stop(SingleNode),
+        % but why? It has been started! We're going to check the file next
     ?assertMatch(1, flushput_cnt(TraceFun, OneTrcFile)),
 
 
     redbug_start(TraceFun, BackendTrcFile, SingleNode),
-    lager:info("doing put"),
+    logger:info("doing put"),
     ok = rhc:put(RHC,
         riakc_obj:new({<<"sync_backend">>, <<"b_sync_backend">>}, <<"key">>, <<"newestvalue">>)),
-    lager:info("doing get"),
+    logger:info("doing get"),
     {ok, _} = rhc:get(RHC, {<<"sync_backend">>, <<"b_sync_backend">>}, <<"key">>),
 
-    stopped = redbug:stop(),
+    stopped = redbug:stop(SingleNode),
     ?assertMatch(0, flushput_cnt(TraceFun, BackendTrcFile)),
 
     redbug_start(TraceFun, AllTrcFile, SingleNode),
-    lager:info("doing put"),
+    logger:info("doing put"),
     ok = rhc:put(RHC,
         riakc_obj:new({<<"sync_all">>, <<"b_sync_all">>}, <<"key">>, <<"newestvalue">>)),
-    lager:info("doing get"),
+    logger:info("doing get"),
     {ok, _} = rhc:get(RHC, {<<"sync_all">>, <<"b_sync_all">>}, <<"key">>),
 
-    stopped = redbug:stop(),
+    stopped = redbug:stop(SingleNode),
     ?assertMatch(3, flushput_cnt(TraceFun, AllTrcFile)),
 
     file:delete(OneTrcFile),
@@ -492,13 +493,13 @@ confirm() ->
 
 redbug_start(TraceFun, TrcFile, Node) ->
     timer:sleep(1000), % redbug doesn't always appear to immediately stop
-    lager:info("TracingFun ~s on ~w", [TraceFun, Node]),
+    logger:info("TracingFun ~s on ~w", [TraceFun, Node]),
     Start = redbug:start(TraceFun,
                         rt_redbug:default_trace_options() ++
                             [{target, Node},
                             {arity, true},
                             {print_file, TrcFile}]),
-    lager:info("Redbug start message ~w", [Start]).
+    logger:info("Redbug start message ~w", [Start]).
 
 mapred_modfun(Pipe, _Args, _Timeout) ->
     riak_pipe:queue_work(Pipe, {{<<"MRbucket">>, <<"foo">>}, {struct, []}}),
@@ -516,7 +517,7 @@ flushputfun(bitcask) ->
     "riak_kv_bitcask_backend:flush_put/5".
 
 flushput_cnt(TraceFun, File) ->
-    lager:info("checking ~p", [File]),
+    logger:info("checking ~p", [File]),
     case file:read_file(File) of
         {ok, FileData} ->
             count_matches(re:run(FileData, TraceFun, [global]));

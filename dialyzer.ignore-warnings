@@ -35,8 +35,6 @@
 ^leexinc.hrl:
 ^logReader.erl:
 ^mapred_verify.erl:
-^meck.erl:
-^meck_cover.erl:
 ^ntopConsumer.erl:
 ^otp_mib.erl:
 ^pokemon_pb.erl:

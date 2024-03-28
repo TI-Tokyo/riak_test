@@ -43,7 +43,7 @@ metadata(Pid) ->
 %% @doc Runs a module's run/0 function after setting up a log capturing backend for lager.
 %%      It then cleans up that backend and returns the logs as part of the return proplist.
 confirm(TestModule, Outdir, TestMetaData, HarnessArgs) ->
-    start_lager_backend(TestModule, Outdir),
+    start_logger_backend(TestModule, Outdir),
     rt:setup_harness(TestModule, HarnessArgs),
     BackendExtras = case proplists:get_value(multi_config, TestMetaData) of
                         undefined -> [];
@@ -62,7 +62,7 @@ confirm(TestModule, Outdir, TestMetaData, HarnessArgs) ->
     end,
 
     lager:notice("~s Test Run Complete ~p", [TestModule, Status]),
-    {ok, Logs} = stop_lager_backend(),
+    {ok, Logs} = stop_logger_backend(),
     Log = unicode:characters_to_binary(Logs),
 
     RetList = [{test, TestModule}, {status, Status}, {log, Log}, {backend, Backend} | proplists:delete(backend, TestMetaData)],
@@ -71,21 +71,11 @@ confirm(TestModule, Outdir, TestMetaData, HarnessArgs) ->
         _ -> RetList
     end.
 
-start_lager_backend(TestModule, Outdir) ->
-    case Outdir of
-        undefined -> ok;
-        _ ->
-            gen_event:add_handler(lager_event, lager_file_backend,
-                {Outdir ++ "/" ++ atom_to_list(TestModule) ++ ".dat_test_output",
-                 rt_config:get(lager_level, info), 10485760, "$D0", 1}),
-            lager:set_loglevel(lager_file_backend, rt_config:get(lager_level, info))
-    end,
-    gen_event:add_handler(lager_event, riak_test_lager_backend, [rt_config:get(lager_level, info), false]),
-    lager:set_loglevel(riak_test_lager_backend, rt_config:get(lager_level, info)).
+start_logger_backend(_TestModule, _Outdir) ->
+    ok.
 
-stop_lager_backend() ->
-    gen_event:delete_handler(lager_event, lager_file_backend, []),
-    gen_event:delete_handler(lager_event, riak_test_lager_backend, []).
+stop_logger_backend() ->
+    {ok, []}.
 
 %% does some group_leader swapping, in the style of EUnit.
 execute(TestModule, {Mod, Fun}, TestMetaData) ->

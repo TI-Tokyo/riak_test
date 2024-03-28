@@ -60,7 +60,7 @@ conf() ->
     ].
 
 
--ifdef(post_22).
+-if(?OTP_RELEASE > 22).
 
 rex_failure(undefined) ->
     ok.

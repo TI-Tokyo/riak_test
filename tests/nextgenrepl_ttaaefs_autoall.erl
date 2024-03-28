@@ -29,7 +29,7 @@
 -define(COMMMON_VAL_INIT, <<"CommonValueToWriteForAllObjects">>).
 -define(COMMMON_VAL_MOD, <<"CommonValueToWriteForAllModifiedObjects">>).
 
--define(CONFIG(RingSize, NVal, FetchClocksRepair), [
+-define(CONFIG(RingSize, NVal), [
         {riak_core,
             [
              {ring_creation_size, RingSize},
@@ -53,8 +53,7 @@
            {tictacaae_exchangetick, 120 * 1000},
            {tictacaae_rebuildtick, 3600000}, % don't tick for an hour!
            {ttaaefs_maxresults, 128},
-           {delete_mode, keep},
-           {aae_fetchclocks_repair, FetchClocksRepair}
+           {delete_mode, keep}
           ]}
         ]).
 
@@ -107,9 +106,9 @@ ttaae_config(Protocol, AAEPeer, RemoteClusterName, LocalClusterName,
 confirm() ->
     [ClusterAH, ClusterBH, ClusterCH] =
         rt:deploy_clusters([
-            {2, ?CONFIG(?A_RING, ?A_NVAL, true)},
-            {2, ?CONFIG(?B_RING, ?B_NVAL, false)},
-            {2, ?CONFIG(?C_RING, ?C_NVAL, false)}]),
+            {2, ?CONFIG(?A_RING, ?A_NVAL)},
+            {2, ?CONFIG(?B_RING, ?B_NVAL)},
+            {2, ?CONFIG(?C_RING, ?C_NVAL)}]),
 
     lager:info("Test run using HTTP protocol"),
     test_repl(http, [ClusterAH, ClusterBH, ClusterCH], all),
@@ -120,9 +119,9 @@ confirm() ->
 
     [ClusterAP, ClusterBP, ClusterCP] =
         rt:deploy_clusters([
-            {2, ?CONFIG(?A_RING, ?A_NVAL, false)},
-            {2, ?CONFIG(?B_RING, ?B_NVAL, true)},
-            {2, ?CONFIG(?C_RING, ?C_NVAL, false)}]),
+            {2, ?CONFIG(?A_RING, ?A_NVAL)},
+            {2, ?CONFIG(?B_RING, ?B_NVAL)},
+            {2, ?CONFIG(?C_RING, ?C_NVAL)}]),
     
     lager:info("Test run using PB protocol"),
     test_repl(pb, [ClusterAP, ClusterBP, ClusterCP], hour),
@@ -133,9 +132,9 @@ confirm() ->
 
     [ClusterAP1, ClusterBP1, ClusterCP1] =
         rt:deploy_clusters([
-            {2, ?CONFIG(?A_RING, ?A_NVAL, false)},
-            {2, ?CONFIG(?B_RING, ?B_NVAL, true)},
-            {2, ?CONFIG(?C_RING, ?C_NVAL, false)}]),
+            {2, ?CONFIG(?A_RING, ?A_NVAL)},
+            {2, ?CONFIG(?B_RING, ?B_NVAL)},
+            {2, ?CONFIG(?C_RING, ?C_NVAL)}]),
     
     lager:info("Test run using PB protocol"),
     test_repl(pb, [ClusterAP1, ClusterBP1, ClusterCP1], day),

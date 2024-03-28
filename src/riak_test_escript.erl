@@ -81,8 +81,6 @@ main(Args) ->
     %% ibrowse
     application:load(ibrowse),
     application:start(ibrowse),
-    %% Start Lager
-    application:load(lager),
 
     Config = proplists:get_value(config, ParsedArgs),
     ConfigFile = proplists:get_value(file, ParsedArgs),
@@ -97,34 +95,45 @@ main(Args) ->
     %% without needing the -d flag.
     code:add_paths(rt_config:get(test_paths, [])),
 
+    %% Fileoutput
+    Outdir = proplists:get_value(outdir, ParsedArgs),
+    ConsoleLoggerLevel =
+        case Outdir of
+            undefined ->
+                rt_config:get(lager_level, info);
+            _ ->
+                filelib:ensure_dir(Outdir),
+                notice
+        end,
+
+    logger:set_primary_config(level, ConsoleLoggerLevel),
+
+    %% The 'default' handler is already present. Make look more like lager.
+    logger:set_handler_config(default, #{
+        formatter =>
+            {logger_formatter, #{
+                single_line => true,
+                template => [
+                    time,
+                    " ",
+                    "[",
+                    level,
+                    "]",
+                    {pid, [" ", pid, ""], ""},
+                    ": ",
+                    msg,
+                    "\n"
+                ]
+            }}
+    }),
+
     %% Ensure existance of scratch_dir
     case file:make_dir(rt_config:get(rt_scratch_dir)) of
         ok -> great;
         {error, eexist} -> great;
-        {ErrorType, ErrorReason} -> lager:error("Could not create scratch dir, {~p, ~p}", [ErrorType, ErrorReason])
+        {ErrorType, ErrorReason} ->
+            lager:error("Could not create scratch dir, {~p, ~p}", [ErrorType, ErrorReason])
     end,
-
-    %% Fileoutput
-    Outdir = proplists:get_value(outdir, ParsedArgs),
-    ConsoleLagerLevel = case Outdir of
-        undefined -> rt_config:get(lager_level, info);
-        _ ->
-            filelib:ensure_dir(Outdir),
-            notice
-    end,
-
-    ConsoleFormatter = lager_default_formatter,
-    ConsoleFormatConfig = [time," [",severity,"] ", pid, " ", message, "\n"],
-    ConsoleBackend =
-        [{level, ConsoleLagerLevel},
-            {formatter, ConsoleFormatter},
-            {formatter_config, ConsoleFormatConfig}],
-    FileBackend = 
-        [{file, "log/test.log"}, {level, ConsoleLagerLevel}],
-    application:set_env(lager, error_logger_hwm, 250), %% helpful for debugging
-    application:set_env(lager, handlers, [{lager_console_backend, ConsoleBackend},
-                                          {lager_file_backend, FileBackend}]),
-    lager:start(),
 
     %% Report
     Report = case proplists:get_value(report, ParsedArgs, undefined) of

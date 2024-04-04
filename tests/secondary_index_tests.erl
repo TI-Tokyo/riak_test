@@ -34,8 +34,13 @@
 -define(KEYS(A,B,G1,G2), [int_to_key(N) || N <- lists:seq(A,B), G1, G2]).
 
 confirm() ->
-    Conf = [{riak_core, [{default_bucket_props, [{allow_mult, true},
-                                                 {dvv_enabled, true}]}]}],
+    Conf =
+        [{riak_core,
+            [{default_bucket_props,
+                [{allow_mult, true}, {dvv_enabled, true}]}
+            ]},
+            {riak_kv, [{secondary_index_json, otp}]
+        }],
     Nodes = rt:build_cluster(3, Conf),
     ?assertEqual(ok, rt:wait_until_nodes_ready(Nodes)),
     

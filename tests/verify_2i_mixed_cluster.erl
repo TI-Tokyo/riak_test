@@ -23,7 +23,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("riakc/include/riakc.hrl").
 
--import(secondary_index_tests, [put_an_object/2]).
+-import(secondary_index_tests, [put_an_object/2, int_to_key/1]).
 -define(BUCKET, <<"2ibucket">>).
 
 confirm() ->
@@ -51,10 +51,10 @@ confirm() ->
     assertExactQuery(Clients, [K(N) || N <- lists:seq(5, 9)], <<"field3_int">>, 5),
     assertRangeQuery(Clients, [K(N) || N <- lists:seq(10, 18)], <<"field1_bin">>, <<"val10">>, <<"val18">>),
     assertRangeQuery(Clients, [K(N) || N <- lists:seq(10, 19)], <<"field2_int">>, 10, 19),
-    assertRangeQuery(Clients, [K(N) || N <- lists:seq(10, 17)], <<"$key">>, <<"obj10">>, <<"obj17">>),
+    assertRangeQuery(Clients, [K(N) || N <- lists:seq(10, 17)], <<"$key">>, int_to_key(10), int_to_key(17)),
 
     lager:info("Delete an object, verify deletion..."),
-    ToDel = [<<"obj05">>, <<"obj11">>],
+    ToDel = [int_to_key(5), int_to_key(11)],
     [?assertMatch(ok, riakc_pb_socket:delete(PBC1, ?BUCKET, KD)) || KD <- ToDel],
     lager:info("Make sure the tombstone is reaped..."),
     ?assertMatch(ok, rt:wait_until(fun() -> rt:pbc_really_deleted(PBC1, ?BUCKET, ToDel) end)),
@@ -64,7 +64,7 @@ confirm() ->
     assertExactQuery(Clients, [K(N) || N <- lists:seq(6, 9)], <<"field3_int">>, 5),
     assertRangeQuery(Clients, [K(N) || N <- lists:seq(10, 18), N /= 11], <<"field1_bin">>, <<"val10">>, <<"val18">>),
     assertRangeQuery(Clients, [K(N) || N <- lists:seq(10, 19), N /= 11], <<"field2_int">>, 10, 19),
-    assertRangeQuery(Clients, [K(N) || N <- lists:seq(10, 17), N /= 11], <<"$key">>, <<"obj10">>, <<"obj17">>),
+    assertRangeQuery(Clients, [K(N) || N <- lists:seq(10, 17), N /= 11], <<"$key">>, int_to_key(10), int_to_key(17)),
 
     pass.
 

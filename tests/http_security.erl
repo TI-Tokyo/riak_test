@@ -67,11 +67,30 @@ confirm() ->
     ?assertMatch({error, {ok, "426", _, _}}, rhc:ping(C0)),
 
     lager:info("Checking SSL demands authentication"),
-    C1 = rhc:create(IP, Port, "riak", [{is_ssl, true}]),
+    C1 =
+        rhc:create(
+            IP,
+            Port,
+            "riak",
+            [{is_ssl, true},
+                {ssl_options, [{verify, verify_none}]}
+            ]
+        ),
     ?assertMatch({error, {ok, "401", _, _}}, rhc:ping(C1)),
 
     lager:info("Checking that unknown user demands reauth"),
-    C2 = rhc:create(IP, Port, "riak", [{is_ssl, true},
+    C2 =
+        rhc:create(
+            IP,
+            Port,
+            "riak",
+            [{is_ssl, true},
+                {ssl_options, [{verify, verify_none}]},
+                {credentials, "user", "pass"}
+            ]
+        ),
+    
+    rhc:create(IP, Port, "riak", [{is_ssl, true},
                                         {credentials, "user", "pass"}]),
     ?assertMatch({error, {ok, "401", _, _}}, rhc:ping(C2)),
 
@@ -99,9 +118,16 @@ confirm() ->
 
     lager:info("Checking that credentials are ignored in trust mode"),
     %% invalid credentials should be ignored in trust mode
-    C3 = rhc:create(IP, Port, "riak", [{is_ssl, true}, {credentials,
-                                                        Username,
-                                                        "pass"}]),
+    C3 =
+        rhc:create(
+            IP,
+            Port,
+            "riak",
+            [{is_ssl, true},
+                {ssl_options, [{verify, verify_none}]},
+                {credentials, Username, "pass"}
+            ]
+        ),
     ?assertEqual(ok, rhc:ping(C3)),
 
     lager:info("Setting password mode on user"),
@@ -112,30 +138,53 @@ confirm() ->
 
     lager:info("Checking that incorrect password demands reauth"),
     %% invalid credentials should be rejected in password mode
-    C4 = rhc:create(IP, Port, "riak", [{is_ssl, true}, {credentials,
-                                                        Username,
-                                                        "pass"}]),
+    C4 =
+        rhc:create(
+            IP,
+            Port,
+            "riak",
+            [{is_ssl, true},
+                {ssl_options, [{verify, verify_none}]},
+                {credentials, Username, "pass"}
+            ]
+        ),
     ?assertMatch({error, {ok, "401", _, _}}, rhc:ping(C4)),
 
     lager:info("Checking that correct password is successful"),
     %% valid credentials should be accepted in password mode
-    C5 = rhc:create(IP, Port, "riak", [{is_ssl, true}, {credentials,
-                                                        Username,
-                                                        "password"}]),
+    C5 =
+        rhc:create(
+            IP,
+            Port,
+            "riak",
+            [{is_ssl, true},
+                {ssl_options, [{verify, verify_none}]},
+                {credentials, Username, "password"}
+            ]
+        ),
 
     ?assertEqual(ok, rhc:ping(C5)),
 
     lager:info("verifying the peer certificate rejects mismatch with server cert"),
     %% verifying the peer certificate reject mismatch with server cert
-    C6 = rhc:create(IP, Port, "riak", [{is_ssl, true},
-                                       {credentials, Username, "password"},
-                                       {ssl_options, [
-                        {cacertfile, filename:join([PrivDir,
-                                                    "certs/cacert.org/ca/root.crt"])},
+    C6 =
+        rhc:create(
+            IP,
+            Port,
+            "riak",
+            [{is_ssl, true},
+                {credentials, Username, "password"},
+                {ssl_options,
+                    [
+                        {cacertfile,
+                            filename:join(
+                                [PrivDir, "certs/cacert.org/ca/root.crt"])},
                         {verify, verify_peer},
                         {reuse_sessions, false}
-                        ]}
-                                               ]),
+                    ]
+                }
+            ]
+        ),
 
     ?assertMatch({error,{conn_failed,{error,_}}}, rhc:ping(C6)),
 

@@ -2360,8 +2360,17 @@ maybe_create_ets() ->
 -spec stop_tracing() -> ok.
 stop_tracing() ->
     lager:info("stop all dbg tracing"),
-    dbg:stop_clear(),
+    stop_and_clear(),
     ok.
+
+-if(?OTP_RELEASE >= 25).
+stop_and_clear() ->
+    dbg:stop().
+-else.
+stop_and_clear() ->
+    dbg:stop_clear().
+-endif.
+
 
 get_primary_preflist(Node, Bucket, Key, NVal) ->
     DocIdx = rpc:call(Node, riak_core_util, chash_std_keyfun, [{Bucket, Key}]),

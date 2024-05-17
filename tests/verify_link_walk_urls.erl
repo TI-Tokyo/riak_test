@@ -33,22 +33,34 @@
 
 
 confirm() ->
-    [Node0 | _] = rt:build_cluster(?NUM_NODES),
-    Pbc = rt:pbc(Node0),
+    Nodes0 = rt:build_cluster(?NUM_NODES),
+    Pbc = rt:pbc(hd(Nodes0)),
+    test_with_links(pb, Pbc, hd(Nodes0)),
+    riakc_pb_socket:stop(Pbc),
 
+    rt:clean_cluster(Nodes0),
+
+    Nodes1 = rt:build_cluster(?NUM_NODES),
+    HTTPc = rt:httpc(hd(Nodes0)),
+    test_with_links(http, HTTPc, hd(Nodes1)),
+
+    pass.
+
+
+test_with_links(Protocol, Client, Node0) ->    
     lager:info("Inserting linked graph"),
     %%               (deleted)        (b/4,v4b) <-> (b/5,v5b)
     %%                  |            /
     %% (a/1,v1) <-> (a/2,v2) <-> (a/3,v3) <-> (a/4,v4) <-> (a/5,v5)  >
     %%     ^_________________________________________________________|
-    put_obj(Pbc, "a", "1", "v1", [{"a", "2", "next"}]),
-    put_obj(Pbc, "a", "2", "v2", [{"a", "3", "next"}, {"a", "1", "prev"}, {"b", "2", "next"}]),
-    put_obj(Pbc, "a", "3", "v3", [{"a", "4", "next"}, {"b", "4", "next"}, {"a", "2", "prev"}]),
-    put_obj(Pbc, "a", "4", "v4", [{"a", "5", "next"}, {"a", "3", "prev"}]),
-    put_obj(Pbc, "a", "5", "v5", [{"a", "1", "next"}, {"a", "4", "prev"}]),
+    put_obj(Protocol, Client, "a", "1", "v1", [{"a", "2", "next"}]),
+    put_obj(Protocol, Client, "a", "2", "v2", [{"a", "3", "next"}, {"a", "1", "prev"}, {"b", "2", "next"}]),
+    put_obj(Protocol, Client, "a", "3", "v3", [{"a", "4", "next"}, {"b", "4", "next"}, {"a", "2", "prev"}]),
+    put_obj(Protocol, Client, "a", "4", "v4", [{"a", "5", "next"}, {"a", "3", "prev"}]),
+    put_obj(Protocol, Client, "a", "5", "v5", [{"a", "1", "next"}, {"a", "4", "prev"}]),
 
-    put_obj(Pbc, "b", "4", "v4b", [{"b", "5", "next"}, {"a", "3", "prev"}]),
-    put_obj(Pbc, "b", "5", "v5b", [{"b", "4", "prev"}]),
+    put_obj(Protocol, Client, "b", "4", "v4b", [{"b", "5", "next"}, {"a", "3", "prev"}]),
+    put_obj(Protocol, Client, "b", "5", "v5b", [{"b", "4", "prev"}]),
 
     Config = get_config(Node0),
 
@@ -93,9 +105,7 @@ confirm() ->
     verify_query(Config, "a", "5", "_,_,1",
                  ["v1", "v4"]),
 
-    lager:info("Au revoir mes amies"),
-    riakc_pb_socket:stop(Pbc),
-    pass.
+    lager:info("Au revoir mes amies").
 
 verify_query(Cfg, Bucket, Key, Query, Expected) ->
     lager:info("Verifying (~p,~p) '~s' -> ~p", [Bucket, Key, Query, Expected]),
@@ -126,12 +136,21 @@ get_return_values(Body) ->
                   string:str(Line, "--") =:= 0],
     lists:sort(Vs).
 
-put_obj(Pbc, Bucket, Key, Value, Links) when is_list(Bucket), is_list(Key),
-                                             is_list(Value), is_list(Links) ->
+put_obj(pb, Pbc, Bucket, Key, Value, Links)
+            when is_list(Bucket), is_list(Key), is_list(Value), is_list(Links) ->
     Obj = riakc_obj:new(list_to_binary(Bucket),
                         list_to_binary(Key),
                         list_to_binary(Value)),
     Lns = [{{B, K}, T} || {B, K, T} <- Links],
     Md = dict:store(<<"Links">>, Lns, dict:new()),
     ObjWLinks = riakc_obj:update_metadata(Obj, Md),
-    riakc_pb_socket:put(Pbc, ObjWLinks).
+    ok = riakc_pb_socket:put(Pbc, ObjWLinks);
+put_obj(http, HTTPc, Bucket, Key, Value, Links)
+            when is_list(Bucket), is_list(Key), is_list(Value), is_list(Links) ->
+    Obj = riakc_obj:new(list_to_binary(Bucket),
+                        list_to_binary(Key),
+                        list_to_binary(Value)),
+    Lns = [{{B, K}, T} || {B, K, T} <- Links],
+    Md = dict:store(<<"Links">>, Lns, dict:new()),
+    ObjWLinks = riakc_obj:update_metadata(Obj, Md),
+    ok = rhc:put(HTTPc, ObjWLinks).

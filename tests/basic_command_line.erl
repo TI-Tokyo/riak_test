@@ -24,6 +24,11 @@
 -compile([export_all, nowarn_export_all]).
 -export([confirm/0]).
 
+-if(?OTP_RELEASE >= 26).
+-define(CONSOLE_PROMPT, "(press Ctrl+G to abort, type help(). for help)").
+-else.
+-define(CONSOLE_PROMPT, "\(abort with ^G\)").
+-endif.
 
 confirm() ->
 
@@ -62,7 +67,7 @@ console_test(Node) ->
     lager:info("Testing riak console on ~s", [Node]),
 
     %% Stop node, to test console working
-    rt:console(Node, [{expect, "\(abort with ^G\)"},
+    rt:console(Node, [{expect, ?CONSOLE_PROMPT},
                       {send, "riak_core_ring_manager:get_my_ring()."},
                       {expect, "dict,"},
                       {send, "q()."},
@@ -164,3 +169,4 @@ getpid_down_test(Node) ->
     {ok, PidOut} = rt:riak(Node, ["pid"]),
     ?assert(rt:str(PidOut, "not responding to pings")),
     ok.
+

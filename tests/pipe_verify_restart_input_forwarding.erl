@@ -82,9 +82,9 @@ verify_worker_restart_failure_input_forwarding([RN]) ->
             {trace,[error,restart,restart_fail,queue]}],
     {ok, Pipe} = rpc:call(RN, riak_pipe, exec, [Spec, Opts]),
 
-    Inputs1 = lists:seq(0,127),
-    Inputs2 = lists:seq(128,255),
-    Inputs3 = lists:seq(256,383),
+    Inputs1 = lists:seq(0,1270),
+    Inputs2 = lists:seq(1271,2550),
+    Inputs3 = lists:seq(2551,3830),
 
     %% sleep, send more inputs
 

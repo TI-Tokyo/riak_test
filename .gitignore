@@ -46,6 +46,7 @@ logs/
 erln8.config
 tags
 tmp/
+perf/*.beam
 
 # ===== Project-specific Elements =====
 

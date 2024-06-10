@@ -38,6 +38,7 @@
 -define(FOO, <<"foo">>).
 
 confirm() ->
+    KeyCount = 8000,
     inets:start(),
     Config = [{riak_kv, [{secondary_index_timeout, 1}]}], %% ludicrously short, should fail always
     Nodes = rt:build_cluster([{current, Config}, {current, Config}, {current, Config}]),
@@ -46,10 +47,10 @@ confirm() ->
     PBPid = rt:pbc(hd(Nodes)),
     Http = rt:http_url(hd(Nodes)),
 
-    [put_an_object(PBPid, N) || N <- lists:seq(0, 100)],
-    [put_an_object(PBPid, int_to_key(N), N, ?FOO) || N <- lists:seq(101, 200)],
+    [put_an_object(PBPid, N) || N <- lists:seq(0, 500)],
+    [put_an_object(PBPid, int_to_key(N), N, ?FOO) || N <- lists:seq(501, KeyCount)],
 
-    ExpectedKeys = lists:sort([int_to_key(N) || N <- lists:seq(0, 200)]),
+    ExpectedKeys = lists:sort([int_to_key(N) || N <- lists:seq(0, KeyCount)]),
     Query = {<<"$bucket">>, ?BUCKET},
     %% Verifies that the app.config param was used
     ?assertEqual({error, timeout}, stream_pb(PBPid, Query, [])),
@@ -58,10 +59,13 @@ confirm() ->
     {ok, Res} =  stream_pb(PBPid, Query, [{timeout, 5000}]),
     ?assertEqual(ExpectedKeys, lists:sort(proplists:get_value(keys, Res, []))),
 
-    {ok, {{_, ErrCode, _}, _, Body}} = httpc:request(url("~s/buckets/~s/index/~s/~s~s",
-                                                     [Http, ?BUCKET, <<"$bucket">>, ?BUCKET, []])),
+    {ok, {{_, ErrCode, _}, _, Body}} =
+        httpc:request(
+            url("~s/buckets/~s/index/~s/~s~s", [Http, ?BUCKET, <<"$bucket">>, ?BUCKET, []])),
+    
+    lager:info("Query error with ErrCode ~p", [ErrCode]),
 
-    ?assertEqual(true, ErrCode >= 500),
+    ?assertEqual(true, ErrCode == 503),
     ?assertMatch({match, _}, re:run(Body, "request timed out|{error,timeout}")), %% shows the app.config timeout
 
     HttpRes = http_query(Http, Query, [{timeout, 5000}]),
@@ -73,8 +77,15 @@ confirm() ->
     pass.
 
 stream_http(Http, Query, ExpectedKeys) ->
-     Res = http_stream(Http, Query, []),
-     ?assert(lists:member({<<"error">>,<<"timeout">>}, Res)),
-     Res2 = http_stream(Http, Query, [{timeout, 5000}]),
-     ?assertEqual(ExpectedKeys, lists:sort(proplists:get_value(<<"keys">>, Res2, []))).
+    {TC, Res} = timer:tc(fun() -> http_stream(Http, Query, []) end),
+    case lists:keyfind(<<"keys">>, 1, Res) of
+        {<<"keys">>, Keys} ->
+            lager:info(
+                "Stream returned in ~w microseconds result with keys ~p",
+                [TC, length(Keys)]);
+        _ ->
+            ok
+    end,
+    Res2 = http_stream(Http, Query, [{timeout, 5000}]),
+    ?assertEqual(ExpectedKeys, lists:sort(proplists:get_value(<<"keys">>, Res2, []))).
 

@@ -75,7 +75,7 @@
            {ring_creation_size, ?DEFAULT_RING_SIZE}
           ]}]
        ).
--define(CFG_REBUILD,
+-define(CFG_REBUILD(BlockTimeout),
         [{riak_kv,
           [
            % Speedy AAE configuration
@@ -91,7 +91,8 @@
            {max_aae_queue_time, 0},
            {tictacaae_stepinitialtick, false},
            {log_readrepair, true},
-           {tictacaae_enablekeyrange, true}
+           {tictacaae_enablekeyrange, true},
+           {tictacaae_rebuild_blocktime, BlockTimeout}
           ]},
          {riak_core,
           [
@@ -126,9 +127,14 @@ confirm() ->
     rt:clean_cluster(Nodes2),
 
     ?LOG_INFO("Test with rebuilds"),
-    Nodes3 = rt:build_cluster(?NUM_NODES, ?CFG_REBUILD),
-    ok = verify_aae_rebuild(Nodes3),
-    rt:clean_cluster(Nodes3),
+    Nodes3A = rt:build_cluster(?NUM_NODES, ?CFG_REBUILD(1000)),
+    ok = verify_aae_rebuild(Nodes3A),
+    rt:clean_cluster(Nodes3A),
+
+    ?LOG_INFO("Test with rebuilds - and immediate block timeout"),
+    Nodes3B = rt:build_cluster(?NUM_NODES, ?CFG_REBUILD(0)),
+    ok = verify_aae_rebuild(Nodes3B),
+    rt:clean_cluster(Nodes3B),
 
     ?LOG_INFO("Test with no rebuilds - and AAE on fallbacks"),
     Nodes4 = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD(false, false, 128, 10, false)),

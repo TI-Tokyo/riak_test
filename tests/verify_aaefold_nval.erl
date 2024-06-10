@@ -31,11 +31,10 @@
 % to use the test in small and large scenarios.
 -define(DEFAULT_RING_SIZE, 8).
 -define(REBUILD_TICK, 30 * 1000).
--define(CFG_NOREBUILD(FetchClocksRepair),
+-define(CFG_NOREBUILD(NVal),
         [{riak_kv,
           [
            {anti_entropy, {off, []}},
-           {aae_fetchclocks_repair, FetchClocksRepair},
            {tictacaae_active, active},
            {tictacaae_parallelstore, leveled_ko},
                 % if backend not leveled will use parallel key-ordered
@@ -47,10 +46,11 @@
           ]},
          {riak_core,
           [
-           {ring_creation_size, ?DEFAULT_RING_SIZE}
+           {ring_creation_size, ?DEFAULT_RING_SIZE},
+           {default_bucket_props, [{n_val, NVal}]}
           ]}]
        ).
--define(CFG_REBUILD,
+-define(CFG_REBUILD(NVal),
         [{riak_kv,
           [
            % Speedy AAE configuration
@@ -66,7 +66,8 @@
           ]},
          {riak_core,
           [
-           {ring_creation_size, ?DEFAULT_RING_SIZE}
+           {ring_creation_size, ?DEFAULT_RING_SIZE},
+           {default_bucket_props, [{n_val, NVal}]}
           ]}]
        ).
 -define(NUM_NODES, 3).
@@ -79,15 +80,17 @@
 -define(DELTA_COUNT, 10).
 
 confirm() ->
-    Nodes0 = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD(false)),
-    ok = verify_aae_fold(Nodes0),
-    rt:clean_cluster(Nodes0),
 
-    Nodes1 = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD(true)),
+    Nodes1 = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD(?N_VAL)),
     ok = verify_aae_fold(Nodes1),
     rt:clean_cluster(Nodes1),
 
-    Nodes2 = rt:build_cluster(?NUM_NODES, ?CFG_REBUILD),
+    [Node] = rt:build_cluster(1, ?CFG_NOREBUILD(1)),
+    ok = verify_aae_rebuildfold(Node),
+
+    rt:clean_cluster([Node]),
+
+    Nodes2 = rt:build_cluster(?NUM_NODES, ?CFG_REBUILD(?N_VAL)),
     ?LOG_INFO("Sleeping for twice rebuild tick - testing with rebuilds ongoing"),
     timer:sleep(2 * ?REBUILD_TICK),
     ok = verify_aae_fold(Nodes2),
@@ -236,24 +239,20 @@ verify_aae_fold(Nodes) ->
     ?LOG_INFO("Fetched ~w keys from 32 dirty segments", [length(KCL0N2)]),
     ?assertMatch(true, length(KCL0N2) >= 32),
     {ok, KCL1N2} =
-        riak_client:aae_fold({fetch_clocks_nval,
-                                    2,
-                                    lists:sublist(DirtySegmentsN2, 32)},
-                                CT),
+        riak_client:aae_fold(
+            {fetch_clocks_nval, 2, lists:sublist(DirtySegmentsN2, 32)},
+            CT),
     ?assertMatch(true, lists:sort(KCL0N2) == lists:sort(KCL1N2)),
 
 
 
     ?LOG_INFO("No nval=2 keys from fetch_clocks when searching for nval=3"),
     {ok, KCL0N3} =
-        riak_client:aae_fold({fetch_clocks_nval,
-                                    3,
-                                    lists:sublist(DirtySegmentsN2, 10)},
-                                CH),
-    lists:foreach(fun({B, _K, _C}) ->
-                        ?assertMatch(?BUCKET, B)
-                    end,
-                    KCL0N3),
+        riak_client:aae_fold(
+            {fetch_clocks_nval, 3, lists:sublist(DirtySegmentsN2, 10)},
+            CH),
+    lists:foreach(
+        fun({B, _K, _C}) -> ?assertMatch(?BUCKET, B) end, KCL0N3),
 
     ?LOG_INFO("Stopping a node - query results should be unchanged"),
     rt:stop_and_wait(hd(tl(Nodes))),
@@ -264,9 +263,163 @@ verify_aae_fold(Nodes) ->
         riak_client:aae_fold({fetch_clocks_nval, ?N_VAL, DirtySegments1}, CH),
     ?assertMatch(true, lists:sort(KCL1) == lists:sort(KCL2)),
 
-
     % Need to re-start or clean will fail
-    rt:start_and_wait(hd(tl(Nodes))).
+    rt:start_and_wait(hd(tl(Nodes))),
+
+    VnodeCount = get_vnode_count(hd(Nodes)),
+    {ok, KCL2} =
+        riak_client:aae_fold({fetch_clocks_nval, ?N_VAL, DirtySegments1}, CH),
+    
+    rt_redbug:set_tracing_applied(true),
+    logger:info("Setup redbug tracing for force rebuild test"),
+    {ok, CWD} = file:get_cwd(),
+    FnameBase = "rebug_aaefold",
+    FileBase = filename:join([CWD, FnameBase]),
+    ApproxTrcFile = FileBase ++ "Approx",
+    file:delete(ApproxTrcFile),
+
+    TraceFun  = "aae_controller:aae_fetchclocks/5",
+    enable_tree_rebuilds(hd(Nodes)),
+    VnodeCount = get_vnode_count(hd(Nodes)),
+
+    redbug_start(TraceFun, ApproxTrcFile, hd(Nodes)),
+
+    logger:info("Testing that each vnode repaired no more than once"),
+
+    {ok, KCL2} =
+        riak_client:aae_fold({fetch_clocks_nval, ?N_VAL, DirtySegments1}, CH),
+    {ok, KCL2} =
+        riak_client:aae_fold({fetch_clocks_nval, ?N_VAL, DirtySegments1}, CH),
+    {ok, KCL2} =
+        riak_client:aae_fold({fetch_clocks_nval, ?N_VAL, DirtySegments1}, CH),
+    {ok, KCL2} =
+        riak_client:aae_fold({fetch_clocks_nval, ?N_VAL, DirtySegments1}, CH),
+    {ok, KCL2} =
+        riak_client:aae_fold({fetch_clocks_nval, ?N_VAL, DirtySegments1}, CH),
+
+    stopped = redbug:stop(hd(Nodes)),
+
+    RebuildCount = trace_count(TraceFun, ApproxTrcFile),
+    ?assert(RebuildCount > 0),
+    ?assert(RebuildCount =< VnodeCount),
+
+    file:delete(ApproxTrcFile)
+    .
+
+verify_aae_rebuildfold(Node) ->
+    logger:info("Loading nval 1 node with 10000 keys"),
+    KVs = test_data(1, 10000, list_to_binary("U1")),
+    ok = write_data(Node, KVs),
+
+    rt_redbug:set_tracing_applied(true),
+    logger:info("Setup redbug tracing for force rebuild test"),
+    {ok, CWD} = file:get_cwd(),
+    FnameBase = "rebug_aaefold",
+    FileBase = filename:join([CWD, FnameBase]),
+    PreTrcFile = FileBase ++ "Pre",
+    RebuildTrcFile = FileBase ++ "Rebuild",
+    PostTrcFile = FileBase ++ "Post",
+    RerunTrcFile = FileBase ++ "Rerun",
+    file:delete(PreTrcFile),
+    file:delete(RebuildTrcFile),
+    file:delete(PostTrcFile),
+    file:delete(RerunTrcFile),
+    TraceFun  = "aae_controller:aae_fetchclocks/5",
+
+    {ok, CH} = riak:client_connect(Node),
+
+    redbug_start(TraceFun, PreTrcFile, Node),
+
+    {ok, _KCL} =
+        riak_client:aae_fold({fetch_clocks_nval, 1, lists:seq(1, 1000)}, CH),
+    SegCount = fold_until_segments_hit_key(CH, 500),
+    TestSegs = lists:seq(1, SegCount),
+
+    stopped = redbug:stop(Node),
+
+    enable_tree_rebuilds(Node),
+
+    ?assertMatch(0, trace_count(TraceFun, PreTrcFile)),
+    file:delete(PreTrcFile),
+    
+    VnodeCount = get_vnode_count(Node),
+    redbug_start(TraceFun, RebuildTrcFile, Node),
+    logger:info("Testing each vnode repaired exactly once"),
+    {ok, KCLN} = riak_client:aae_fold({fetch_clocks_nval, 1, TestSegs}, CH),
+    {ok, KCLN} = riak_client:aae_fold({fetch_clocks_nval, 1, TestSegs}, CH),
+    {ok, KCLN} = riak_client:aae_fold({fetch_clocks_nval, 1, TestSegs}, CH),
+    stopped = redbug:stop(Node),
+    ?assertMatch(VnodeCount, trace_count(TraceFun, RebuildTrcFile)),
+    file:delete(RebuildTrcFile),
+
+    disable_tree_rebuilds(Node),
+
+    redbug_start(TraceFun, PostTrcFile, Node),
+    {ok, KCLN} = riak_client:aae_fold({fetch_clocks_nval, 1, TestSegs}, CH),
+    stopped = redbug:stop(Node),
+    ?assertMatch(0, trace_count(TraceFun, PostTrcFile)),
+    file:delete(PostTrcFile),
+
+    enable_tree_rebuilds(Node),
+
+    redbug_start(TraceFun, RerunTrcFile, Node),
+    logger:info("Testing each vnode repaired exactly once - again"),
+    {ok, KCLN} = riak_client:aae_fold({fetch_clocks_nval, 1, TestSegs}, CH),
+    {ok, KCLN} = riak_client:aae_fold({fetch_clocks_nval, 1, TestSegs}, CH),
+    {ok, KCLN} = riak_client:aae_fold({fetch_clocks_nval, 1, TestSegs}, CH),
+    stopped = redbug:stop(Node),
+    ?assertMatch(VnodeCount, trace_count(TraceFun, RerunTrcFile)),
+    file:delete(RerunTrcFile),
+
+    ok.
+
+
+enable_tree_rebuilds(Node) ->
+    rpc:call(Node, riak_kv_ttaaefs_manager, trigger_tree_repairs, []).
+
+disable_tree_rebuilds(Node) ->
+    rpc:call(Node, riak_kv_ttaaefs_manager, diable_tree_repairs, []).
+
+fold_until_segments_hit_key(CH, N) ->
+    {ok, KCL} =
+        riak_client:aae_fold({fetch_clocks_nval, 1, lists:seq(1, N)}, CH),
+    case length(KCL) of
+        L when L > 0 ->
+            logger:info("Testing ~w segments hit ~w keys", [N, L]),
+            N;
+        _ ->
+            fold_until_segments_hit_key(CH, N + 100)
+    end.
+
+get_vnode_count(Node) ->
+    {ok, R} = rpc:call(Node, riak_core_ring_manager, get_my_ring, []),
+    length(rpc:call(Node, riak_core_ring, my_indices, [R])).
+
+trace_count(TraceFun, File) ->
+    logger:info("checking ~p", [File]),
+    case file:read_file(File) of
+        {ok, FileData} ->
+            count_matches(re:run(FileData, TraceFun, [global]));
+        {error, enoent} ->
+            0
+    end.
+
+count_matches(nomatch) ->
+    0;
+count_matches({match, Matches}) ->
+    length(Matches).
+    
+
+redbug_start(TraceFun, TrcFile, Node) ->
+    timer:sleep(1000), % redbug doesn't always appear to immediately stop
+    logger:info("TracingFun ~s on ~w", [TraceFun, Node]),
+    Start = redbug:start(TraceFun,
+                        rt_redbug:default_trace_options() ++
+                            [{target, Node},
+                            {arity, true},
+                            {print_file, TrcFile}]),
+    logger:info("Redbug start message ~w", [Start]).
+    
 
 
 to_key(N) ->

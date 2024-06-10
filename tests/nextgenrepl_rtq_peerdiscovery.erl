@@ -45,6 +45,7 @@
 -define(REPL_SLEEP, 2048).
     % May need to wait for 2 x the 1024ms max sleep time of a snk worker
 -define(WAIT_LOOPS, 12).
+-define(INITIAL_TIMEOUT, 10000).
 
 -define(CONFIG(RingSize, NVal, SrcQueueDefns), [
         {riak_core,
@@ -73,7 +74,8 @@
             {delete_mode, keep},
             {replrtq_enablesrc, true},
             {replrtq_srcqueue, SrcQueueDefns},
-            {replrtq_peer_discovery, true}
+            {replrtq_peer_discovery, true},
+            {ngr_initial_timeout, ?INITIAL_TIMEOUT}
           ]}
         ]).
 
@@ -156,6 +158,8 @@ cluster_test(ClusterA, ClusterB, ClusterC, Protocol) ->
     ?LOG_INFO("Confirm riak_kv is up on all nodes."),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end,
                     ClusterA ++ ClusterB ++ ClusterC),
+    lager:info("Wait for initial timeout on nextgenrepl services"),
+    timer:sleep(?INITIAL_TIMEOUT),
 
     ?LOG_INFO("Ready for test - with ~w client for rtq.", [Protocol]),
     pass =
@@ -182,6 +186,31 @@ cluster_test(ClusterA, ClusterB, ClusterC, Protocol) ->
     ?LOG_INFO("Every peer should change on reset after start"),
     ?assertMatch(LA, length(reset_cluster_peers(NodeA, cluster_a))),
     ?assertMatch(LB, length(reset_cluster_peers(NodeB, cluster_b))),
+
+
+    lager:info("Confirm peer discovery handles suspended queue"),
+    PidA = get_peerdiscovery_pid(NodeA),
+    ok = sink_action(NodeA, {suspend, cluster_a}),
+    UA0 = update_discovery(NodeA, cluster_a),
+    PidB = get_peerdiscovery_pid(NodeA),
+    ok = sink_action(NodeA, {resume, cluster_a}),
+
+    ?assert(not UA0),
+    ?assertMatch(PidA, PidB),
+
+    lager:info("Confirm peer discovery handles disabled sink"),
+    ok = sink_action(NodeA, disable),
+    UA1 = update_discovery(NodeA, cluster_a),
+    PidC = get_peerdiscovery_pid(NodeA),
+    ok = sink_action(NodeA, enable),
+    UA2 = update_discovery(NodeA, cluster_a),
+    PidD = get_peerdiscovery_pid(NodeA),
+
+    ?assert(not UA1),
+    ?assertMatch(PidA, PidC),
+    ?assert(UA2),
+    ?assertMatch(PidA, PidD),
+
     pass.
 
 compare_peer_info(ExpectedPeers, Protocol) ->
@@ -506,4 +535,38 @@ set_max_delay([Node|Rest], S) ->
     set_max_delay(Rest, S).
 
 check_peers_stable(Node, QueueName) ->
+    rpc:call(Node, riak_kv_replrtq_peer, update_discovery, [QueueName]).
+
+get_peerdiscovery_pid(Node) ->
+    rpc:call(Node, erlang, whereis, [riak_kv_replrtq_peer]).
+
+sink_action(Node, {suspend, QueueName}) ->
+    rpc:call(Node, riak_kv_replrtq_snk, suspend_snkqueue, [QueueName]);
+sink_action(Node, {resume, QueueName}) ->
+    rpc:call(Node, riak_kv_replrtq_snk, resume_snkqueue, [QueueName]);
+sink_action(Node, disable) ->
+    rpc:call(Node, application, set_env, [riak_kv, replrtq_enablesink, false]),
+    P = rpc:call(Node, erlang, whereis, [riak_kv_replrtq_snk]),
+    rpc:call(Node, erlang, exit, [P, kill]),
+    true = wait_until_sink_reactivated(Node, 10),
+    ok;
+sink_action(Node, enable) ->
+    rpc:call(Node, application, set_env, [riak_kv, replrtq_enablesink, true]),
+    P = rpc:call(Node, erlang, whereis, [riak_kv_replrtq_snk]),
+    rpc:call(Node, erlang, exit, [P, kill]),
+    true = wait_until_sink_reactivated(Node, 10),
+    ok.
+
+wait_until_sink_reactivated(_Node, 0) ->
+    false;
+wait_until_sink_reactivated(Node, N) ->
+    case is_pid(rpc:call(Node, erlang, whereis, [riak_kv_replrtq_snk])) of
+        true ->
+            true;
+        _ ->
+            timer:sleep(10),
+            wait_until_sink_reactivated(Node, N - 1)
+    end.
+
+update_discovery(Node, QueueName) ->
     rpc:call(Node, riak_kv_replrtq_peer, update_discovery, [QueueName]).

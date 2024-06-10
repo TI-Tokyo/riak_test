@@ -38,7 +38,7 @@
 -include_lib("stdlib/include/assert.hrl").
 
 %% local copy of riak_pipe.hrl
--include("rt_pipe.hrl").
+-include("../include/rt_pipe.hrl").
 
 -define(NODE_COUNT, 3).
 

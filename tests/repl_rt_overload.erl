@@ -83,7 +83,7 @@ verify_overload_writes(LeaderA, LeaderB) ->
                 <<X>> <= erlang:md5(term_to_binary(os:timestamp()))]),
     TestBucket = <<TestHash/binary, "-rt_test_overload">>,
     First = 1,
-    Last = 10000,
+    Last = 100000,
 
     %% Write some objects to the source cluster (A),
     ?LOG_INFO("Writing ~b keys to ~0p, to ~0p",

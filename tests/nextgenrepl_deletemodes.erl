@@ -43,7 +43,6 @@
 -define(SNK_WORKERS, 4).
 
 -define(DELETE_WAIT, 8000).
-
 %% This must be increased, otherwise tombstones may be reaped before their
 %% presence can be checked in the test
 -define(TOMB_PAUSE, 2).

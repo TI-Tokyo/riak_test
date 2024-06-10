@@ -64,14 +64,14 @@
 confirm() ->
     ?LOG_INFO("Test erasing and reaping of keys - overflow queue"),
     Nodes1 = rt:build_cluster(?NUM_NODES, ?CONFIG(16, 3, keep, 1000)),
-    pass = test_eraseandreap(Nodes1),
+    pass = test_eraseandreap(Nodes1, 1000),
     rt:clean_cluster(Nodes1),
 
     ?LOG_INFO("Test erasing and reaping of keys - no overflow"),
     Nodes2 = rt:build_cluster(?NUM_NODES, ?CONFIG(16, 3, keep, 100000)),
-    test_eraseandreap(Nodes2).
+    test_eraseandreap(Nodes2, 100000).
 
-test_eraseandreap(Nodes) ->
+test_eraseandreap(Nodes, MaxQueueSize) ->
     KeyCount = 50000,
     Mod = nextgenrepl_deletewithfailure,
 
@@ -90,8 +90,12 @@ test_eraseandreap(Nodes) ->
                             ?TEST_BUCKET, all, all, all,
                             local}),
     ?assertMatch(KeyCount, K1),
+    wait_for_deletes_to_queue(Nodes, MaxQueueSize),
 
-    {ok, 0} =
+    ?LOG_INFO(
+        "Counting keys to be erased - should be 0"
+    ),
+    {ok, 0} = 
         Mod:wait_for_outcome
             (Mod, aae_fold,
                 [Node1, pb,
@@ -107,7 +111,11 @@ test_eraseandreap(Nodes) ->
                             ?TEST_BUCKET, all, all, all,
                             local}),
     ?assertMatch(KeyCount, K2),
+    wait_for_reaps_to_queue(Nodes, MaxQueueSize),
 
+    ?LOG_INFO(
+        "Counting tombs to be reaped - should be 0"
+    ),
     0 = Mod:wait_for_outcome
             (Mod,
                 length_aae_fold,
@@ -119,3 +127,46 @@ test_eraseandreap(Nodes) ->
                     ?LOOP_COUNT),
 
     pass.
+
+
+wait_for_reaps_to_queue([], _MaxQueueSize) ->
+    ?LOG_INFO(
+        "Reaps queued on all nodes - "
+        "change_method of local distributed reaps");
+wait_for_reaps_to_queue([N|Rest], MaxQueueSize) ->
+    rt:wait_until(
+        fun() ->
+            {mqueue_lengths, MQLs} =
+                lists:keyfind(
+                    mqueue_lengths,
+                    1,
+                    rpc:call(N, riak_kv_reaper, reap_stats, [])),
+            ?LOG_INFO("Reap queue lengths ~w on ~w", [MQLs, N]),
+            QS = lists:sum(lists:map(fun({_P, L}) -> L end, MQLs)),
+            ?assert(QS =< MaxQueueSize),
+            QS > 0
+        end
+    ),
+    ?LOG_INFO("Reaps queued on Node ~p", [N]),
+    wait_for_reaps_to_queue(Rest, MaxQueueSize).
+
+wait_for_deletes_to_queue([], _MaxQueueSize) ->
+    ?LOG_INFO(
+        "Deletes queued on all nodes - "
+        "change_method of local distributed erases");
+wait_for_deletes_to_queue([N|Rest], MaxQueueSize) ->
+    rt:wait_until(
+        fun() ->
+            {mqueue_lengths, MQLs} =
+                lists:keyfind(
+                    mqueue_lengths,
+                    1,
+                    rpc:call(N, riak_kv_eraser, delete_stats, [])),
+            ?LOG_INFO("Erase queue lengths ~w on ~w", [MQLs, N]),
+            QS = lists:sum(lists:map(fun({_P, L}) -> L end, MQLs)),
+            ?assert(QS =< MaxQueueSize),
+            QS > 0
+        end
+    ),
+    ?LOG_INFO("Deletes queued on Node ~p", [N]),
+    wait_for_deletes_to_queue(Rest, MaxQueueSize).

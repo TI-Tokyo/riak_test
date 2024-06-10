@@ -39,6 +39,8 @@ confirm() ->
     CertDir = rt_config:get(rt_scratch_dir) ++ "/pb_cipher_suites_certs",
 
     %% make a bunch of crypto keys
+    lager:info("running make_certs with version ~p", [make_certs:version()]),
+
     make_certs:rootCA(CertDir, "rootCA"),
     make_certs:intermediateCA(CertDir, "intCA", "rootCA"),
     make_certs:intermediateCA(CertDir, "revokedCA", "rootCA"),
@@ -270,18 +272,13 @@ insufficient_check(Port, SingleCipherProps) ->
                 {insufficient_security, _ErrorMsg}}}} =
         pb_connection_info(Port, SingleCipherProps).
 
-check_reasons(
-    {protocol_version,
-        "TLS client: In state hello received SERVER ALERT: Fatal - Protocol Version\n "}) ->
-    ok;
-check_reasons(
-    {protocol_version,
-        "TLS client: In state hello received SERVER ALERT: Fatal - Protocol Version\n"}) ->
+check_reasons({protocol_version,
+                "TLS client: In state hello received SERVER ALERT:"
+                " Fatal - Protocol Version\n"}) ->
     ok;
 check_reasons(ProtocolVersionError) ->
     ?LOG_INFO("Unexpected error ~0p", [ProtocolVersionError]),
     error.
-
 
 check_with_reenabled_protools(Port, CertDir) ->
     case rt:otp_release() of

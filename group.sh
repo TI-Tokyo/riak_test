@@ -66,11 +66,7 @@ if [ -z "$CONFIG" ]; then
     die "No config specified (-c | --config)"
 fi
 
-if [ "$GROUP" != "yoko" ]; then
-    TEST_EBIN=_build/test/lib/riak_test/tests
-else
-    TEST_EBIN=~/yokozuna/riak_test/ebin
-fi
+TEST_EBIN=_build/prod/lib/riak_test/ebin
 
 LOG=$GROUP-$(date +"%FT%H%M")-${BACKEND:-default}
 

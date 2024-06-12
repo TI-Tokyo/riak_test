@@ -21,7 +21,6 @@
 -export([confirm/0]).
 
 -include_lib("kernel/include/logger.hrl").
--include_lib("stdlib/include/assert.hrl").
 
 -import(location, [
     algorithm_supported/1,
@@ -29,22 +28,17 @@
     assert_no_ownership_change/4,
     assert_ring_satisfy_n_val/1,
     plan_and_wait/2,
-    setup_algorithm_cache/0,
     setup_location/2
 ]).
 
--define(N_VAL, 3).
 -define(CLAIMANT_TICK, 5000).
 
 -define(RACK_A, "rack_a").
 -define(RACK_B, "rack_b").
 -define(RACK_C, "rack_c").
 -define(RACK_D, "rack_d").
--define(RACK_E, "rack_e").
--define(RACK_F, "rack_f").
 
 confirm() ->
-    setup_algorithm_cache(),
 
     % Test takes a long time, so testing other ring sizes is expensive
 

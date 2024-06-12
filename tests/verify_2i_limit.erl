@@ -24,6 +24,7 @@
 
 -include_lib("stdlib/include/assert.hrl").
 -include_lib("riakc/include/riakc.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -import(secondary_index_tests, [
     http_query/3,
@@ -67,6 +68,17 @@ confirm() ->
                             {int_to_key(0), int_to_key(999)},
                            [{max_results, ?MAX_RESULTS}]),
     ?assertMatch({ok, ?INDEX_RESULTS{}}, HttpRes),
+
+    receive
+        {Ref, done} ->
+            %% https://github.com/nhs-riak/riak-erlang-http-client/issues/3
+            ?LOG_INFO("Got a rogue done from ~w", [Ref])
+    after
+        500 ->
+            ?LOG_WARNING("No rogue done")
+    end,
+
+
     {ok, ?INDEX_RESULTS{keys=HttpResKeys,
                         continuation=HttpContinuation}} = HttpRes,
     ?assertEqual(FirstHalf, HttpResKeys),
@@ -87,13 +99,17 @@ confirm() ->
     riakc_pb_socket:put(PBPid, O2),
 
     MQ = {"i1_int", 300, 302},
-    {ok, ?INDEX_RESULTS{terms=Terms, continuation=RTContinuation}} = pb_query(PBPid, MQ, [{max_results, 2}, return_terms]),
+    {ok, ?INDEX_RESULTS{terms=Terms, continuation=RTContinuation}} =
+        pb_query(PBPid, MQ, [{max_results, 2}, return_terms]),
 
     ?assertEqual([{<<"300">>, <<"bob">>},
                   {<<"301">>, <<"bob">>}], Terms),
-
-    {ok, ?INDEX_RESULTS{terms=Terms2}} = pb_query(PBPid, MQ, [{max_results, 2}, return_terms,
-                                      {continuation, RTContinuation}]),
+    
+    {ok, ?INDEX_RESULTS{terms=Terms2}} =
+        pb_query(
+            PBPid,
+            MQ,
+            [{max_results, 2}, return_terms, {continuation, RTContinuation}]),
 
     ?assertEqual([{<<"302">>,<<"bob">>}], Terms2),
 
@@ -112,13 +128,22 @@ confirm() ->
     pass.
 
 verify_eq_pag(PBPid, RiakHttp, EqualsQuery, FirstHalf, Rest) ->
-    HTTPEqs = http_query(RiakHttp, EqualsQuery, [{max_results, ?MAX_RESULTS}]),
+    HTTPEqs =
+        http_query(
+            RiakHttp,
+            EqualsQuery,
+            [{max_results, ?MAX_RESULTS}]
+        ),
     ?assertEqual({EqualsQuery, FirstHalf},
                  {EqualsQuery, proplists:get_value(<<"keys">>, HTTPEqs, [])}),
     EqualsHttpContinuation = proplists:get_value(<<"continuation">>, HTTPEqs),
 
-    HTTPEqs2 = http_query(RiakHttp, EqualsQuery,
-                          [{continuation, EqualsHttpContinuation}]),
+    HTTPEqs2 =
+        http_query(
+            RiakHttp,
+            EqualsQuery,
+            [{continuation, EqualsHttpContinuation}]
+        ),
     ?assertEqual({EqualsQuery, Rest},
                  {EqualsQuery, proplists:get_value(<<"keys">>, HTTPEqs2, [])}),
 

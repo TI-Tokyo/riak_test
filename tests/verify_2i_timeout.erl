@@ -22,6 +22,7 @@
 
 -export([confirm/0]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 -import(secondary_index_tests, [
@@ -63,7 +64,7 @@ confirm() ->
         httpc:request(
             url("~s/buckets/~s/index/~s/~s~s", [Http, ?BUCKET, <<"$bucket">>, ?BUCKET, []])),
     
-    lager:info("Query error with ErrCode ~p", [ErrCode]),
+    ?LOG_INFO("Query error with ErrCode ~p", [ErrCode]),
 
     ?assertEqual(true, ErrCode == 503),
     ?assertMatch({match, _}, re:run(Body, "request timed out|{error,timeout}")), %% shows the app.config timeout
@@ -80,7 +81,7 @@ stream_http(Http, Query, ExpectedKeys) ->
     {TC, Res} = timer:tc(fun() -> http_stream(Http, Query, []) end),
     case lists:keyfind(<<"keys">>, 1, Res) of
         {<<"keys">>, Keys} ->
-            lager:info(
+            ?LOG_INFO(
                 "Stream returned in ~w microseconds result with keys ~p",
                 [TC, length(Keys)]);
         _ ->

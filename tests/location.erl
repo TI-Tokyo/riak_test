@@ -27,7 +27,6 @@
     assert_no_ownership_change/4,
     assert_ring_satisfy_n_val/1,
     plan_and_wait/2,
-    setup_algorithm_cache/0,
     setup_location/2
 ]).
 
@@ -41,14 +40,8 @@
 -define(RACK_B, "rack_b").
 -define(RACK_C, "rack_c").
 -define(RACK_D, "rack_d").
--define(RACK_E, "rack_e").
--define(RACK_F, "rack_f").
-
--define(EXP_CACHE_KEY, riak_core_claim_exports).
 
 confirm() ->
-    setup_algorithm_cache(),
-
     % Test takes a long time, so testing other ring sizes is expensive
     % The Ring size of 64 is a distinct scenario to ring size of 32 or
     % 128 (because it does not create a tail violation).
@@ -77,10 +70,10 @@ run_test(RingSize, ClaimAlgorithm) ->
         ]},
         {riak_core, [
             {ring_creation_size,    RingSize},
-            {choose_claim_fun,      {riak_core_claim, ClaimAlgorithm}},
+            {choose_claim_fun,      ClaimAlgorithm},
             {claimant_tick,         ?CLAIMANT_TICK},
             {default_bucket_props,  [{allow_mult, true}, {dvv_enabled, true}]},
-            {handoff_concurrency,   100},
+            {handoff_concurrency,   16},
             {vnode_inactivity_timeout, 4000},
             {vnode_management_timer, 2000}
         ]}
@@ -282,30 +275,10 @@ log_assert_no_location_violation(NVal, MinNumberOfDistinctLocation) ->
   ?LOG_INFO("Ensure that every preflists (n_val: ~b) have at leaset ~b distinct locations",
              [NVal, MinNumberOfDistinctLocation]).
 
--spec algorithm_supported(ClaimAlgorithm :: atom()) -> boolean() | no_return().
+-spec algorithm_supported(ClaimAlgorithm :: atom()) -> boolean().
 algorithm_supported(ClaimAlgorithm) ->
-    Exports = erlang:get(?EXP_CACHE_KEY),
-    ?assertMatch([_|_], Exports,
-        "Cache not initialized with setup_algorithm_cache/0"),
-    ArityMember = fun(Arity) ->
-        lists:member({ClaimAlgorithm, Arity}, Exports)
-    end,
-    lists:all(ArityMember, [1, 2, 3]).
-
--spec setup_algorithm_cache() -> ok.
-%% This is kinda sleazy, but rt in general makes the assumption that 'current'
-%% Riak is on the code path, so we roll with it.
-%% If you insist on doing it The Right Way, that implementation is below.
-setup_algorithm_cache() ->
-    Exports = riak_core_claim:module_info(exports),
-    erlang:put(?EXP_CACHE_KEY, Exports).
-
-%%-spec setup_algorithm_cache() -> ok | no_return().
-%%%% Start one node so we can get riak_core_claim exports.
-%%setup_algorithm_cache() ->
-%%    [Node] = Nodes = rt:deploy_nodes(1),
-%%    Exports = rpc:call(Node, riak_core_claim, module_info, [exports]),
-%%    ?assertMatch(ok, rt:clean_cluster(Nodes)),
-%%    ?assertMatch([_|_], Exports,
-%%        "RPC failed to riak_core_claim:module_info(exports)"),
-%%    erlang:put(?EXP_CACHE_KEY, Exports).
+    erlang:function_exported(riak_core_claim_swapping, ClaimAlgorithm, 3)
+    orelse
+      erlang:function_exported(riak_core_membership_claim, ClaimAlgorithm, 3)
+      orelse
+        erlang:function_exported(riak_core_claim, ClaimAlgorithm, 3).

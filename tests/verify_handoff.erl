@@ -57,6 +57,8 @@ run_test(FastTestMode, NTestItems, NTestNodes, Encoding) ->
     [RootNode | TestNodes] = Nodes =
         deploy_test_nodes(FastTestMode, Encoding, NTestNodes),
 
+    rt:wait_for_service(RootNode, riak_kv),
+
     %% Insert delay into handoff folding to test the efficacy of the
     %% handoff heartbeat addition
     [rt_intercept:add(N, {riak_core_handoff_sender,
@@ -94,7 +96,8 @@ test_ownership_handoff(RootNode, NewNode, NTestItems) ->
     rt:wait_for_service(NewNode, riak_kv),
 
     ?LOG_INFO("Joining new node ~0p with cluster.", [NewNode]),
-    rt:join(NewNode, RootNode),
+    rt:staged_join(NewNode, RootNode),
+    rt:plan_and_commit(NewNode),
     rt:wait_until_nodes_ready([RootNode, NewNode]),
     rt:wait_until_no_pending_changes([RootNode, NewNode]),
 
@@ -103,6 +106,7 @@ test_ownership_handoff(RootNode, NewNode, NTestItems) ->
     ?LOG_INFO("Validating data after handoff:"),
     Results = rt:systest_read(NewNode, NTestItems),
     ?assertEqual(0, length(Results)),
+    ?LOG_INFO("Validating data after handoff - typed bucket:"),
     Results2 = rt:systest_read(RootNode, 1, 2, {<<"type">>, <<"bucket">>}, 2),
     ?assertEqual(0, length(Results2)),
     ?LOG_INFO("Data looks ok.").
@@ -192,7 +196,7 @@ deploy_test_nodes(FastTestMode, default = Encoding, NumNodes) ->
     Nodes;
 deploy_test_nodes(FastTestMode, Encoding, NumNodes) ->
     EncodingConfig =
-        {riak_kv, [
+        {riak_core, [
             {override_capability, [
                 {handoff_data_encoding, [
                     {   use, Encoding},

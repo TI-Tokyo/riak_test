@@ -247,7 +247,7 @@ put_a_sibling_object(Pid, N) ->
     put_an_object(Pid, Key, Data, Indexes).
 
 put_an_object(Pid, Key, Data, Indexes) when is_list(Indexes) ->
-    ?LOG_INFO("Putting object ~0p", [Key]),
+    ?LOG_DEBUG("Putting object ~0p", [Key]),
     MetaData = dict:from_list([{<<"index">>, Indexes}]),
     Robj0 = riakc_obj:new(?BUCKET, Key),
     Robj1 = riakc_obj:update_value(Robj0, Data),
@@ -265,10 +265,12 @@ int_to_field1_bin(N) ->
     list_to_binary(io_lib:format("val~p", [N])).
 
 stream_pb(Pid, Q) ->
+    ?LOG_INFO("Stream PB Query ~p", [Q]),
     pb_query(Pid, Q, [stream]),
     stream_loop().
 
 stream_pb(Pid, Q, Opts) ->
+    ?LOG_INFO("Stream PB Query ~p Opts ~p", [Q, Opts]),
     pb_query(Pid, Q, [stream|Opts]),
     stream_loop().
 
@@ -300,7 +302,7 @@ stream_loop(Acc) ->
         {_Ref, {error, _} = Err} ->
             Err;
         {_Ref, Wat} ->
-            ?LOG_INFO("got a wat ~0p", [Wat]),
+            ?LOG_INFO("got a wat ~p", [Wat]),
             {error, {wat, Wat}}
     end.
 
@@ -380,8 +382,10 @@ start_http_stream(Ref) ->
 http_stream_loop(Ref, Acc, {Boundary, BLen}=B) ->
     receive
         {http, {Ref, stream, Chunk}} ->
+            ?LOG_INFO("Received HTTP stream_chunk for ~w", [Ref]),
             http_stream_loop(Ref, <<Acc/binary,Chunk/binary>>, B);
         {http, {Ref, stream_end, _Headers}} ->
+            ?LOG_INFO("Received HTTP stream_end for ~w", [Ref]),
             Parts = binary:split(Acc,[
                         <<"\r\n--", Boundary:BLen/bytes, "\r\nContent-Type: application/json\r\n\r\n">>,
                         <<"\r\n--", Boundary:BLen/bytes,"--\r\n">>

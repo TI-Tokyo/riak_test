@@ -204,8 +204,8 @@ verify_aae_fold(Nodes, Mod, CH, CT, Rebuild) ->
 
     case Rebuild of
         true ->
-            lager:info("Test fold many times"),
-            lager:info("Maybe catch race with rebuild"),
+            ?LOG_INFO("Test fold many times"),
+            ?LOG_INFO("Maybe catch race with rebuild"),
             lists:foreach(
                 fun(_I) ->
                     check_all_ranges(Mod, CH, Stage1Range)
@@ -216,7 +216,7 @@ verify_aae_fold(Nodes, Mod, CH, CT, Rebuild) ->
             check_all_ranges(Mod, CH, Stage1Range)
     end,
 
-    lager:info("Regressing object version to 0 on head Node"),
+    ?LOG_INFO("Regressing object version to 0 on head Node"),
     ok = 
         rpc:call(
             hd(Nodes),
@@ -233,8 +233,8 @@ verify_aae_fold(Nodes, Mod, CH, CT, Rebuild) ->
     
     case Rebuild of
         true ->
-            lager:info("Test fold many times"),
-            lager:info("Maybe catch race with rebuild"),
+            ?LOG_INFO("Test fold many times"),
+            ?LOG_INFO("Maybe catch race with rebuild"),
             lists:foreach(
                 fun(_I) ->
                     check_all_ranges(Mod, CH, Stage1Range)
@@ -245,7 +245,7 @@ verify_aae_fold(Nodes, Mod, CH, CT, Rebuild) ->
             check_all_ranges(Mod, CH, Stage1Range)
     end,
 
-    lager:info("Reverting object version to 1 on head Node"),
+    ?LOG_INFO("Reverting object version to 1 on head Node"),
     ok = 
         rpc:call(
             hd(Nodes),
@@ -265,14 +265,14 @@ verify_aae_fold(Nodes, Mod, CH, CT, Rebuild) ->
 
     {ok, {keysclocks, KCL6}} =
         Mod:aae_range_clocks(CH, ?BUCKET, all, all, Stage2Range),
-    lager:info(
+    ?LOG_INFO(
         "Fetched ~w keys loaded in stage 2",
         [length(KCL6)]
     ),
     ?assert(length(KCL6) == ?NUM_NODES * ?NUM_KEYS_PERNODE),
     {ok, {keysclocks, KCL7}} =
         Mod:aae_range_clocks(CH, ?BUCKET, all, all, Stage3Range),
-    lager:info(
+    ?LOG_INFO(
         "Fetched ~w keys loaded in stage 3",
         [length(KCL7)]
     ),
@@ -280,8 +280,8 @@ verify_aae_fold(Nodes, Mod, CH, CT, Rebuild) ->
 
     case Rebuild of
         true ->
-            lager:info("Test fold many times"),
-            lager:info("Maybe catch race with rebuild"),
+            ?LOG_INFO("Test fold many times"),
+            ?LOG_INFO("Maybe catch race with rebuild"),
             lists:foreach(
                 fun(_I) ->
                     check_all_ranges(Mod, CH, Stage1Range)
@@ -356,7 +356,7 @@ wait_until_object_format(Nodes, Format) ->
 check_all_ranges(Mod, CH, Stage1Range) ->
     {ok, {keysclocks, KCL5}} =
         Mod:aae_range_clocks(CH, ?BUCKET, all, all, Stage1Range),
-    lager:info(
+    ?LOG_INFO(
         "Fetched ~w keys loaded in stage 1",
         [length(KCL5)]
     ).

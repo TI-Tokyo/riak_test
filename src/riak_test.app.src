@@ -25,7 +25,10 @@
     {applications, [
         kernel,
         stdlib,
-        mapred_verify
+        inets,
+        tools,
+        mapred_verify,
+        kvc
     ]},
     {env, [
         %% Log formatter templates, used by multiple modules

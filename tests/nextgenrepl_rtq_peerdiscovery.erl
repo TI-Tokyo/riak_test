@@ -39,7 +39,10 @@
 -define(COMMMON_VAL_INIT, <<"CommonValueToWriteForAllObjects">>).
 -define(COMMMON_VAL_MOD, <<"CommonValueToWriteForAllModifiedObjects">>).
 
+-define(INIT_MIN_DELAY, 30).
 -define(INIT_MAX_DELAY, 60).
+
+-define(STND_MIN_DELAY, 120).
 -define(STND_MAX_DELAY, 3600).
 
 -define(REPL_SLEEP, 2048).
@@ -82,6 +85,7 @@
 -define(SNK_CONFIG(ClusterName, PeerList),
         [{riak_kv,
             [{replrtq_enablesink, true},
+                {replrtq_prompt_min_seconds, ?INIT_MIN_DELAY},
                 {replrtq_prompt_max_seconds, ?INIT_MAX_DELAY},
                 {replrtq_sinkqueue, ClusterName},
                 {replrtq_sinkpeers, PeerList},
@@ -158,7 +162,7 @@ cluster_test(ClusterA, ClusterB, ClusterC, Protocol) ->
     ?LOG_INFO("Confirm riak_kv is up on all nodes."),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end,
                     ClusterA ++ ClusterB ++ ClusterC),
-    lager:info("Wait for initial timeout on nextgenrepl services"),
+    ?LOG_INFO("Wait for initial timeout on nextgenrepl services"),
     timer:sleep(?INITIAL_TIMEOUT),
 
     ?LOG_INFO("Ready for test - with ~w client for rtq.", [Protocol]),
@@ -172,7 +176,6 @@ cluster_test(ClusterA, ClusterB, ClusterC, Protocol) ->
     ?LOG_INFO("Stopping a node - to confirm peers will reset"),
     [NodeC1|_RestC1] = RestC,
     rt:stop_and_wait(NodeC1),
-    timer:sleep(?REPL_SLEEP),
     ?LOG_INFO("Every peer in cluster should reset"),
     LA = length(ClusterA),
     ?assertMatch(LA, length(reset_cluster_peers(NodeA, cluster_a))),
@@ -188,7 +191,7 @@ cluster_test(ClusterA, ClusterB, ClusterC, Protocol) ->
     ?assertMatch(LB, length(reset_cluster_peers(NodeB, cluster_b))),
 
 
-    lager:info("Confirm peer discovery handles suspended queue"),
+    ?LOG_INFO("Confirm peer discovery handles suspended queue"),
     PidA = get_peerdiscovery_pid(NodeA),
     ok = sink_action(NodeA, {suspend, cluster_a}),
     UA0 = update_discovery(NodeA, cluster_a),
@@ -198,7 +201,7 @@ cluster_test(ClusterA, ClusterB, ClusterC, Protocol) ->
     ?assert(not UA0),
     ?assertMatch(PidA, PidB),
 
-    lager:info("Confirm peer discovery handles disabled sink"),
+    ?LOG_INFO("Confirm peer discovery handles disabled sink"),
     ok = sink_action(NodeA, disable),
     UA1 = update_discovery(NodeA, cluster_a),
     PidC = get_peerdiscovery_pid(NodeA),
@@ -270,7 +273,12 @@ test_rtqrepl_between_clusters(ClusterA, ClusterB, ClusterC) ->
 
     ?LOG_INFO("Sleep for peer discovery"),
     timer:sleep((?INIT_MAX_DELAY + 1) * 1000),
-    set_max_delay(ClusterA ++ ClusterB ++ ClusterC, ?STND_MAX_DELAY),
+    set_max_delay(
+        ClusterA ++ ClusterB ++ ClusterC,
+        {?STND_MIN_DELAY, ?STND_MAX_DELAY}
+    ),
+    ?LOG_INFO("Sleep for next scheduled peer discovery"),
+    timer:sleep((?INIT_MAX_DELAY + 1) * 1000),
 
     ?LOG_INFO("Test empty clusters don't show any differences"),
     {http, {IPA, PortA}} = lists:keyfind(http, 1, rt:connection_info(NodeA)),
@@ -526,13 +534,18 @@ get_stats(Cluster) ->
 
 set_max_delay([], S) ->
     ?LOG_INFO("Set Max Delay on all clusters to ~w", [S]);
-set_max_delay([Node|Rest], S) ->
+set_max_delay([Node|Rest], {Min, Max}) ->
     rpc:call(
         Node,
         application,
         set_env,
-        [riak_kv, replrtq_prompt_max_seconds, S]),
-    set_max_delay(Rest, S).
+        [riak_kv, replrtq_prompt_min_seconds, Min]),
+    rpc:call(
+        Node,
+        application,
+        set_env,
+        [riak_kv, replrtq_prompt_max_seconds, Max]),
+    set_max_delay(Rest, {Min, Max}).
 
 check_peers_stable(Node, QueueName) ->
     rpc:call(Node, riak_kv_replrtq_peer, update_discovery, [QueueName]).

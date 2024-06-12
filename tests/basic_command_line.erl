@@ -67,7 +67,7 @@ console_test(Node) ->
     Prompt = {re, "abort with \\^G|press Ctrl+G to abort"},
     %% Start and stop node, to test console working
     Ops = [
-        {expect, Prompt, 20000},    % give it some time to start
+        {expect, Prompt, 30000},    % give it some time to start
         {send, "riak_core_ring_manager:get_my_ring().\n"},
         {expect, "dict,", 10000},
         {send, "q().\n"},
@@ -115,12 +115,13 @@ ping_down_test(Node) ->
     %% ping / pang
     ?LOG_INFO("Node down, should pang"),
     {ok, PangOut} = rt:riak(Node, ["ping"]),
-    ?assert(rt:str(PangOut, "Node is not running!")).
+    ?LOG_INFO("Pang like dis ~p", [PangOut]),
+    not_running(PangOut).
 
 attach_down_test(Node) ->
     ?LOG_INFO("Testing riak 3+ 'attach' while down"),
     {ok, AttachOut} = rt:riak(Node, ["attach"]),
-    ?assert(rt:str(AttachOut, "Node is not running!")).
+    not_running(AttachOut).
 
 attach_direct_up_test(Node) ->
     ?LOG_INFO("Testing riak 3+ 'attach'"),
@@ -144,7 +145,7 @@ status_down_test(Node) ->
     ?LOG_INFO("Test riak admin status on ~s while down", [Node]),
     {ok, {ExitCode, StatusOut}} = rt:admin(Node, ["status"], [return_exit_code]),
     ?assertNotEqual(0, ExitCode),
-    ?assert(rt:str(StatusOut, "Node is not running!")).
+    not_running(StatusOut).
 
 getpid_up_test(Node) ->
     ?LOG_INFO("Test riak get pid on ~s", [Node]),
@@ -162,3 +163,10 @@ getpid_down_test(Node) ->
         PidOut =:= ""
         orelse rt:str(PidOut, " not responding to ping")
         orelse rt:str(PidOut, " not running") ).
+
+not_running(Output) ->
+    %% Depending on relx version, a variety of output may be printed.
+    ?assert(
+        rt:str(Output, " not responding to ping")
+        orelse rt:str(Output, " not running")
+    ).

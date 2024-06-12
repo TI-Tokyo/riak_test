@@ -50,7 +50,6 @@
 % I would hope this would come from the testing framework some day
 % to use the test in small and large scenarios.
 -define(DEFAULT_RING_SIZE, 16).
--define(AAE_THROTTLE_LIMITS, [{-1, 0}, {100, 10}]).
 -define(CFG_NOREBUILD(PrimaryOnly, InitialSkip, MaxResults, ExTick, KR),
         [{riak_kv,
           [

@@ -152,14 +152,6 @@ confirm() ->
         {<<"pbc_active">>, 1}
     ]),
 
-    Stats4 = get_stats(Node1),
-    %% make sure the stats that were supposed to increment did
-    verify_inc(Stats3, Stats4, [
-        {<<"pbc_connects_total">>, 1},
-        {<<"pbc_connects">>, 1},
-        {<<"pbc_active">>, 1}
-    ]),
-
     %% make sure the stats that were supposed to increment did
     %% PB and HTTP API change stats the same
     verify_inc(Stats3, Stats4, ExpectedNodeStats),
@@ -525,17 +517,7 @@ common_stats() ->
         <<"folsom_version">>,
         <<"getopt_version">>,
         <<"gossip_received">>,
-        <<"handoff_acksync_wait_95">>,
-        <<"handoff_acksync_wait_99">>,
-        <<"handoff_acksync_wait_max">>,
-        <<"handoff_acksync_wait_mean">>,
-        <<"handoff_acksync_wait_median">>,
-        <<"handoff_acksync_wait_min">>,
         <<"handoff_timeouts">>,
-        <<"hinted_handoff_bytes_sent">>,
-        <<"hinted_handoff_inbound_active_transfers">>,
-        <<"hinted_handoff_objects_sent">>,
-        <<"hinted_handoff_outbound_active_transfers">>,
         <<"hll_bytes">>,
         <<"hll_bytes_mean">>,
         <<"hll_bytes_100">>,
@@ -741,10 +723,6 @@ common_stats() ->
         <<"node_puts_set">>,
         <<"node_puts_set_total">>,
         <<"node_puts_total">>,
-        <<"node_pb_put_requests_total">>,
-        <<"node_pb_get_requests_total">>,
-        <<"node_pb_delete_requests_total">>,
-        <<"node_put_fsm_tombstones_total">>,
         <<"nodename">>,
         <<"object_counter_merge">>,
         <<"object_counter_merge_time_100">>,
@@ -781,11 +759,8 @@ common_stats() ->
         <<"object_set_merge_time_mean">>,
         <<"object_set_merge_time_median">>,
         <<"object_set_merge_total">>,
+        <<"observer_version">>,
         <<"os_mon_version">>,
-        <<"ownership_handoff_bytes_sent">>,
-        <<"ownership_handoff_inbound_active_transfers">>,
-        <<"ownership_handoff_objects_sent">>,
-        <<"ownership_handoff_outbound_active_transfers">>,
         <<"parse_trans_version">>,
         <<"pbc_active">>,
         <<"pbc_connects">>,
@@ -826,14 +801,6 @@ common_stats() ->
         <<"recon_version">>,
         <<"redbug_version">>,
         <<"rejected_handoffs">>,
-        <<"repair_handoff_bytes_sent">>,
-        <<"repair_handoff_inbound_active_transfers">>,
-        <<"repair_handoff_objects_sent">>,
-        <<"repair_handoff_outbound_active_transfers">>,
-        <<"resize_handoff_bytes_sent">>,
-        <<"resize_handoff_inbound_active_transfers">>,
-        <<"resize_handoff_objects_sent">>,
-        <<"resize_handoff_outbound_active_transfers">>,
         <<"rhc_version">>,
         <<"riak_api_version">>,
         <<"riak_auth_mods_version">>,
@@ -893,8 +860,7 @@ common_stats() ->
         <<"sys_thread_pool_size">>,
         <<"sys_threads_enabled">>,
         <<"sys_wordsize">>,
-        <<"uncovered_preflists">>,
-        <<"uncovered_preflists2">>,
+        <<"tools_version">>,
         <<"vnode_counter_update">>,
         <<"vnode_counter_update_time_100">>,
         <<"vnode_counter_update_time_95">>,
@@ -975,6 +941,7 @@ common_stats() ->
     ]
     ++ pool_stats()
         ++ tictacaae_stats()
+        ++ organisation_stats()
         ++ ttaaefs_stats().
 
 product_stats(riak_ee) ->
@@ -1087,6 +1054,55 @@ ttaaefs_stats() ->
         <<"ttaaefs_hourcheck_total">>
     ].
 
+
+organisation_stats() ->
+    case rt_config:get(organisation) of
+        workday ->
+            workday_stats();
+        nhse ->
+            nhse_stats();
+        bet365 ->
+            bet365_stats()
+    end.
+
+workday_stats() ->
+    [
+        <<"handoff_acksync_wait_95">>,
+        <<"handoff_acksync_wait_99">>,
+        <<"handoff_acksync_wait_max">>,
+        <<"handoff_acksync_wait_mean">>,
+        <<"handoff_acksync_wait_median">>,
+        <<"handoff_acksync_wait_min">>,
+        <<"hinted_handoff_bytes_sent">>,
+        <<"hinted_handoff_inbound_active_transfers">>,
+        <<"hinted_handoff_objects_sent">>,
+        <<"hinted_handoff_outbound_active_transfers">>,
+        <<"node_pb_put_requests_total">>,
+        <<"node_pb_get_requests_total">>,
+        <<"node_pb_delete_requests_total">>,
+        <<"node_put_fsm_tombstones_total">>,
+        <<"ownership_handoff_bytes_sent">>,
+        <<"ownership_handoff_inbound_active_transfers">>,
+        <<"ownership_handoff_objects_sent">>,
+        <<"ownership_handoff_outbound_active_transfers">>,
+        <<"repair_handoff_bytes_sent">>,
+        <<"repair_handoff_inbound_active_transfers">>,
+        <<"repair_handoff_objects_sent">>,
+        <<"repair_handoff_outbound_active_transfers">>,
+        <<"resize_handoff_bytes_sent">>,
+        <<"resize_handoff_inbound_active_transfers">>,
+        <<"resize_handoff_objects_sent">>,
+        <<"resize_handoff_outbound_active_transfers">>,
+        <<"uncovered_preflists">>,
+        <<"uncovered_preflists2">>
+    ].
+
+nhse_stats() ->
+    [
+        <<"leveldb_read_block_error">>
+    ].
+
+bet365_stats() -> [].
 
 do_pools(Node) ->
     do_pools(Node, rpc:call(Node, riak_core_node_worker_pool, dscp_pools, [])).

@@ -18,9 +18,9 @@
 %% @doc
 %% This module implements a riak_test to prove real-time repl
 %% works as expected with automated discovery of peers
+
 -module(nextgenrepl_bouncingtomb).
 -behavior(riak_test).
-
 -export([confirm/0]).
 
 -include_lib("kernel/include/logger.hrl").
@@ -76,7 +76,7 @@
             {tictacaae_suspend, true}
         ]).
 
--define(CONFIG(RingSize, NVal, Q, DeleteMode),
+-define(CONFIG(RingSize, NVal, Q, DeleteMode), 
         ?CORE_CONFIG(RingSize, NVal) ++
         [{riak_kv,
             ?AAE_CONFIG ++
@@ -89,7 +89,7 @@
             ]
         }]).
 
--define(SNK_CONFIG(RingSize, Nval, Q, ClusterName, IP, P, DeleteMode),
+-define(SNK_CONFIG(RingSize, Nval, Q, ClusterName, IP, P, DeleteMode), 
         ?CORE_CONFIG(RingSize, Nval) ++
         [{riak_kv,
             ?AAE_CONFIG ++
@@ -120,14 +120,14 @@ confirm() ->
     ?LOG_INFO("***************"),
     ?LOG_INFO("Testing rotating tombs with key insomnia"),
     ?LOG_INFO("***************"),
-
+    
     [ClusterA1, ClusterB1] =
         rt:deploy_clusters([
             {3, ?CONFIG(?A_RING, ?A_NVAL, cluster_b, ?DELETE_TIMEOUT)},
             {3, ?CONFIG(?B_RING, ?B_NVAL, cluster_a, keep)}]),
 
     pass = with_insomnia_test(ClusterA1, ClusterB1),
-
+    
     rt:clean_cluster(ClusterA1),
     rt:clean_cluster(ClusterB1),
 
@@ -140,7 +140,7 @@ confirm() ->
             {2, ?CONFIG(?A_RING, ?A_NVAL, cluster_b, keep)},
             {2, ?CONFIG(?B_RING, ?B_NVAL, cluster_a, ?DELETE_TIMEOUT)},
             {1, ?CONFIG(?C_RING, ?C_NVAL, q1_ttaaefs, keep)}]),
-
+    
     no_insomnia_test(ClusterA2, ClusterB2, ClusterC2).
 
 no_insomnia_test(ClusterA, ClusterB, ClusterC) ->
@@ -164,7 +164,7 @@ no_insomnia_test(ClusterA, ClusterB, ClusterC) ->
                 lists:keyfind(pb, 1, rt:connection_info(Node)),
             {IP, Port}
         end,
-
+    
     reset_peer_config(
         NodeA1, cluster_a, ?A_RING, ?A_NVAL, cluster_b,
         PeerConfigFun(NodeB1), ?DELETE_TIMEOUT),
@@ -184,7 +184,7 @@ no_insomnia_test(ClusterA, ClusterB, ClusterC) ->
     ?LOG_INFO("Confirm riak_kv is up on all nodes."),
     lists:foreach(fun(N) -> rt:wait_for_service(N, riak_kv) end,
                     ClusterA ++ ClusterB),
-
+    
     ?LOG_INFO("Wait for peer discovery"),
     timer:sleep((?INIT_MAX_DELAY + 1) * 1000),
 
@@ -208,7 +208,7 @@ no_insomnia_test(ClusterA, ClusterB, ClusterC) ->
 
     ?LOG_INFO("Resetting delete_mode on Cluster B"),
     reset_peer_config(
-        NodeB1, cluster_b, ?B_RING, ?B_NVAL, cluster_a,
+        NodeB1, cluster_b, ?B_RING, ?B_NVAL, cluster_a, 
         PeerConfigFun(NodeA1), ?DELETE_TIMEOUT),
     reset_peer_config(
         NodeB2, cluster_b, ?B_RING, ?B_NVAL, cluster_a,
@@ -223,13 +223,13 @@ no_insomnia_test(ClusterA, ClusterB, ClusterC) ->
             get_stats(NodeB1),
             get_stats(NodeB2)
         end,
-
+    
     ?LOG_INFO("Cluster B has tombstones, but Cluster A has objects"),
     ?LOG_INFO("Enabling AAE to avoid inconsistent results on coverage"),
     rpc:multicall(ClusterA, riak_client, tictacaae_resume_node, []),
     rpc:multicall(ClusterB, riak_client, tictacaae_resume_node, []),
     {_InitACount, _InitBCount} = log_fun(NodeA1, NodeB1),
-
+    
     GetStatsFun(),
 
     rotating_full_sync(
@@ -245,14 +245,14 @@ log_fun(NodeA, NodeB) ->
             riak_client,
             aae_fold,
             [{find_tombs, ?TEST_BUCKET, all, all, all}]),
-    ?LOG_INFO("Cluster A ~b tombs", [length(A1C)]),
+    ?LOG_INFO("Cluster A ~w tombs", [length(A1C)]),
 
     {ok, B1C} =
         rpc:call(NodeB,
             riak_client,
             aae_fold,
             [{find_tombs, ?TEST_BUCKET, all, all, all}]),
-    ?LOG_INFO("Cluster B ~b tombs", [length(B1C)]),
+    ?LOG_INFO("Cluster B ~w tombs", [length(B1C)]),
 
     case {length(A1C), length(B1C)} of
         {0, 0} ->
@@ -282,10 +282,11 @@ with_insomnia_test(ClusterA, ClusterB) ->
 
     PeerConfigFun =
         fun(Node) ->
-            {ok, PbEndpoint} = rt:get_pb_conn_info(Node),
-            PbEndpoint
+            {pb, {IP, Port}} =
+                lists:keyfind(pb, 1, rt:connection_info(Node)),
+            {IP, Port}
         end,
-
+    
     reset_peer_config(
         NodeA1, cluster_a, ?A_RING, ?A_NVAL, cluster_b,
         PeerConfigFun(NodeB1), ?DELETE_TIMEOUT),
@@ -348,7 +349,7 @@ with_insomnia_test(ClusterA, ClusterB) ->
     rpc:multicall(ClusterA, riak_client, tictacaae_resume_node, []),
     rpc:multicall(ClusterB, riak_client, tictacaae_resume_node, []),
     {_InitACount, _InitBCount} = log_fun(NodeA1, NodeB1),
-
+    
     GetStatsFun(),
 
     rotating_full_sync(
@@ -359,20 +360,20 @@ with_insomnia_test(ClusterA, ClusterB) ->
     pass.
 
 rotating_full_sync(NodeA, NodeB, GetStatsFun, LogFun, 0) ->
-    LoopLogFun =
+    LoopLogFun = 
         fun(X) ->
-            ?LOG_INFO("Closing count loop ~b", [X]),
+            ?LOG_INFO("Closing count loop ~w", [X]),
             _ = LogFun(NodeA, NodeB)
         end,
     GetStatsFun(),
     lists:foreach(LoopLogFun, lists:seq(1, ?LOOP_COUNT)),
     GetStatsFun();
 rotating_full_sync(NodeA, NodeB, GetStatsFun, LogFun, Rotations) ->
-    ?LOG_INFO("Full sync from Cluster B - loops to go ~b", [Rotations]),
+    ?LOG_INFO("Full sync from Cluster B - loops to go ~w", [Rotations]),
     rpc:call(NodeB, riak_client, ttaaefs_fullsync, [all_check, 60]),
     timer:sleep(?BIG_REPL_SLEEP),
     _ = LogFun(NodeA, NodeB),
-    ?LOG_INFO("Full sync from Cluster A - loops to go ~b", [Rotations]),
+    ?LOG_INFO("Full sync from Cluster A - loops to go ~w", [Rotations]),
     rpc:call(NodeA, riak_client, ttaaefs_fullsync, [all_check, 60]),
     timer:sleep(?BIG_REPL_SLEEP),
     _ = LogFun(NodeA, NodeB),
@@ -382,7 +383,8 @@ rotating_full_sync(NodeA, NodeB, GetStatsFun, LogFun, Rotations) ->
 reset_peer_config(Node, ClusterName, RS, NV, Q, PeerX, DeleteMode) ->
     {IP, Port} = PeerX,
     ClusterSNkCfg = ?SNK_CONFIG(RS, NV, Q, ClusterName, IP, Port, DeleteMode),
-    rt:set_advanced_conf(Node, ClusterSNkCfg).
+    rt:set_advanced_conf(Node, ClusterSNkCfg),
+    rt:wait_for_service(Node, [riak_kv]).
 
 count_keys_fun(N, ExpectedC, Type) ->
     fun() ->
@@ -397,13 +399,12 @@ count_keys_fun(N, ExpectedC, Type) ->
 
 %% @doc Write a series of keys and ensure they are all written.
 write_to_cluster(Node, Start, End, CommonValBin) ->
-    ?LOG_INFO("Writing ~b keys to node ~0p.", [End - Start + 1, Node]),
-    ?LOG_WARNING("Note that only utf-8 keys are used"),
+    ?LOG_INFO("Writing ~0p keys to node ~0p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
-    F =
+    F = 
         fun(N, Acc) ->
             Key = list_to_binary(io_lib:format("~8..0B~n", [N])),
-            Obj =
+            Obj = 
                 case CommonValBin of
                     new_obj ->
                         CVB = ?COMMMON_VAL_INIT,
@@ -426,14 +427,13 @@ write_to_cluster(Node, Start, End, CommonValBin) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    ?LOG_WARNING("~b errors while writing: ~0p", [length(Errors), Errors]),
+    ?LOG_WARNING("~w errors while writing: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 delete_from_cluster(Node, Start, End) ->
-    ?LOG_INFO("Deleting ~b keys from node ~0p.", [End - Start + 1, Node]),
-    ?LOG_WARNING("Note that only utf-8 keys are used"),
+    ?LOG_INFO("Deleting ~0p keys from node ~0p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
-    F =
+    F = 
         fun(N, Acc) ->
             Key = list_to_binary(io_lib:format("~8..0B~n", [N])),
             try riak_client:delete(?TEST_BUCKET, Key, C) of
@@ -447,7 +447,7 @@ delete_from_cluster(Node, Start, End) ->
             end
         end,
     Errors = lists:foldl(F, [], lists:seq(Start, End)),
-    ?LOG_WARNING("~b errors while deleting: ~0p", [length(Errors), Errors]),
+    ?LOG_WARNING("~w errors while deleting: ~0p", [length(Errors), Errors]),
     ?assertEqual([], Errors).
 
 
@@ -483,5 +483,5 @@ get_stats(Node) ->
     {<<"read_repairs_total">>, RRT} =
         lists:keyfind(<<"read_repairs_total">>, 1, S),
     ?LOG_INFO(
-        "Stats for Node ~0p, PFT=~0p TFT=~0p NFT=~0p FOT=~0p FErT=~0p FEmT=~0p RRT=~0p",
+        "Stats for Node ~w, PFT=~w TFT=~w NFT=~w FOT=~w FErT=~w FEmT=~w RRT=~w",
         [Node, PFT, TFT, NFT, FOT, FErT, FEmT, RRT]).

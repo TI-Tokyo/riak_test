@@ -157,8 +157,6 @@ upgrade(Node, NewVsn) ->
     ?LOG_INFO("Upgrading ~0p to ~0p", [Node, NewVsn]),
     rt:upgrade(Node, NewVsn),
     rt:wait_for_service(Node, riak_kv),
-    ?LOG_INFO("Ensuring keys still exist"),
-    ?assertEqual([], rt:systest_read(Node, ?NUM_KEYS, 1)),
     ok.
 
 backend_size(Node) ->

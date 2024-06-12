@@ -39,7 +39,7 @@ confirm() ->
     CertDir = rt_config:get(rt_scratch_dir) ++ "/pb_cipher_suites_certs",
 
     %% make a bunch of crypto keys
-    lager:info("running make_certs with version ~p", [make_certs:version()]),
+    ?LOG_INFO("running make_certs with version ~p", [make_certs:version()]),
 
     make_certs:rootCA(CertDir, "rootCA"),
     make_certs:intermediateCA(CertDir, "intCA", "rootCA"),

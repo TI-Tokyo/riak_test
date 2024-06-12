@@ -271,7 +271,7 @@ verify_aae_fold(Nodes) ->
         riak_client:aae_fold({fetch_clocks_nval, ?N_VAL, DirtySegments1}, CH),
     
     rt_redbug:set_tracing_applied(true),
-    logger:info("Setup redbug tracing for force rebuild test"),
+    ?LOG_INFO("Setup redbug tracing for force rebuild test"),
     {ok, CWD} = file:get_cwd(),
     FnameBase = "rebug_aaefold",
     FileBase = filename:join([CWD, FnameBase]),
@@ -284,7 +284,7 @@ verify_aae_fold(Nodes) ->
 
     redbug_start(TraceFun, ApproxTrcFile, hd(Nodes)),
 
-    logger:info("Testing that each vnode repaired no more than once"),
+    ?LOG_INFO("Testing that each vnode repaired no more than once"),
 
     {ok, KCL2} =
         riak_client:aae_fold({fetch_clocks_nval, ?N_VAL, DirtySegments1}, CH),
@@ -307,12 +307,12 @@ verify_aae_fold(Nodes) ->
     .
 
 verify_aae_rebuildfold(Node) ->
-    logger:info("Loading nval 1 node with 10000 keys"),
+    ?LOG_INFO("Loading nval 1 node with 10000 keys"),
     KVs = test_data(1, 10000, list_to_binary("U1")),
     ok = write_data(Node, KVs),
 
     rt_redbug:set_tracing_applied(true),
-    logger:info("Setup redbug tracing for force rebuild test"),
+    ?LOG_INFO("Setup redbug tracing for force rebuild test"),
     {ok, CWD} = file:get_cwd(),
     FnameBase = "rebug_aaefold",
     FileBase = filename:join([CWD, FnameBase]),
@@ -344,7 +344,7 @@ verify_aae_rebuildfold(Node) ->
     
     VnodeCount = get_vnode_count(Node),
     redbug_start(TraceFun, RebuildTrcFile, Node),
-    logger:info("Testing each vnode repaired exactly once"),
+    ?LOG_INFO("Testing each vnode repaired exactly once"),
     {ok, KCLN} = riak_client:aae_fold({fetch_clocks_nval, 1, TestSegs}, CH),
     {ok, KCLN} = riak_client:aae_fold({fetch_clocks_nval, 1, TestSegs}, CH),
     {ok, KCLN} = riak_client:aae_fold({fetch_clocks_nval, 1, TestSegs}, CH),
@@ -363,7 +363,7 @@ verify_aae_rebuildfold(Node) ->
     enable_tree_rebuilds(Node),
 
     redbug_start(TraceFun, RerunTrcFile, Node),
-    logger:info("Testing each vnode repaired exactly once - again"),
+    ?LOG_INFO("Testing each vnode repaired exactly once - again"),
     {ok, KCLN} = riak_client:aae_fold({fetch_clocks_nval, 1, TestSegs}, CH),
     {ok, KCLN} = riak_client:aae_fold({fetch_clocks_nval, 1, TestSegs}, CH),
     {ok, KCLN} = riak_client:aae_fold({fetch_clocks_nval, 1, TestSegs}, CH),
@@ -385,7 +385,7 @@ fold_until_segments_hit_key(CH, N) ->
         riak_client:aae_fold({fetch_clocks_nval, 1, lists:seq(1, N)}, CH),
     case length(KCL) of
         L when L > 0 ->
-            logger:info("Testing ~w segments hit ~w keys", [N, L]),
+            ?LOG_INFO("Testing ~w segments hit ~w keys", [N, L]),
             N;
         _ ->
             fold_until_segments_hit_key(CH, N + 100)
@@ -396,7 +396,7 @@ get_vnode_count(Node) ->
     length(rpc:call(Node, riak_core_ring, my_indices, [R])).
 
 trace_count(TraceFun, File) ->
-    logger:info("checking ~p", [File]),
+    ?LOG_INFO("checking ~p", [File]),
     case file:read_file(File) of
         {ok, FileData} ->
             count_matches(re:run(FileData, TraceFun, [global]));
@@ -412,16 +412,16 @@ count_matches({match, Matches}) ->
 
 redbug_start(TraceFun, TrcFile, Node) ->
     timer:sleep(1000), % redbug doesn't always appear to immediately stop
-    logger:info("TracingFun ~s on ~w", [TraceFun, Node]),
-    Start = redbug:start(TraceFun,
-                        rt_redbug:default_trace_options() ++
-                            [{target, Node},
-                            {arity, true},
-                            {print_file, TrcFile}]),
-    logger:info("Redbug start message ~w", [Start]).
+    ?LOG_INFO("TracingFun ~s on ~w", [TraceFun, Node]),
+    TraceOpts =
+        maps:merge(
+            maps:from_list(
+                [{target, Node}, {arity, true}, {print_file, TrcFile}]),
+                rt_redbug:default_trace_options()
+            ),
+    Start = redbug:start(TraceFun, TraceOpts),
+    ?LOG_INFO("Redbug start message ~w", [Start]).
     
-
-
 to_key(N) ->
     list_to_binary(io_lib:format("K~4..0B", [N])).
 

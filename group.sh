@@ -77,10 +77,12 @@ echo "Backend is ${BACKEND:-unspecified/default}"
 echo "Res dir is $BASE_DIR"
 echo "Test ebin $TEST_EBIN"
 
+groupfile="groups/$GROUP"
+
 # copy test beams
 echo "Copying beams"
 mkdir -p $BASE_DIR/group_tests/$GROUP
-while read t; do cp $TEST_EBIN/$t.beam $BASE_DIR/group_tests/$GROUP;done <groups/$GROUP
+{ cat "$groupfile"; echo; } | while read t; do if [ -n "$t" ]; then cp $TEST_EBIN/$t.beam $BASE_DIR/group_tests/$GROUP; fi done
 
 # run tests independently
 mkdir -p $BASE_DIR/results/$GROUP
@@ -99,4 +101,4 @@ for t in $BASE_DIR/group_tests/$GROUP/*; do ./riak_test --batch -c $CONFIG $BECM
 
 # output results
 echo "making summary"
-while read t; do grep $t- $BASE_DIR/results/$GROUP/log ;done <groups/$GROUP | tee $BASE_DIR/results/$GROUP/summary
+{ cat "$groupfile"; echo; } | while read t; do if [ -n "$t" ]; then grep $t- $BASE_DIR/results/$GROUP/log; fi done | tee $BASE_DIR/results/$GROUP/summary

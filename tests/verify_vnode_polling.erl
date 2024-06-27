@@ -31,7 +31,7 @@
 -define(KEY, <<"key">>).
 -define(VALUE, <<"value">>).
 
--define(RING_SIZE, 8).
+-define(RING_SIZE, 16).
 
 -define(CONF(MBoxCheck), [
     {riak_kv, [
@@ -39,14 +39,12 @@
         {mbox_check_enabled, MBoxCheck}
     ]},
     {riak_core, [
-        {default_bucket_props, [
-            {allow_mult, true},
-            {dvv_enabled, true},
+        {default_bucket_props,
+            [{allow_mult, true}, {dvv_enabled, true}]},
             {ring_creation_size, ?RING_SIZE},
-            {vnode_management_timer, 1000},
-            {handoff_concurrency, 100},
-            {vnode_inactivity_timeout, 1000}
-        ]}
+            {vnode_inactivity_timeout, 12000},
+            {forced_ownership_handoff, 8},
+            {handoff_concurrency, 8}
     ]}
 ]).
 

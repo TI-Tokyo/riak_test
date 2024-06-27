@@ -27,16 +27,20 @@
 
 -define(BUCKET, <<"bucket">>).
 -define(KEY, <<"key">>).
+-define(RING_SIZE, 32).
 
 confirm() ->
     Conf = [
             {riak_kv, [{anti_entropy, {off, []}}]},
-            {riak_core, [{default_bucket_props, [{allow_mult, true},
-                                                 {dvv_enabled, true},
-                                                 {ring_creation_size, 8},
-                                                 {vnode_management_timer, 1000},
-                                                 {handoff_concurrency, 100},
-                                                 {vnode_inactivity_timeout, 1000}]}]},
+            {riak_core,
+                [{default_bucket_props,
+                    [{allow_mult, true}, {dvv_enabled, true}]},
+                    {ring_creation_size, ?RING_SIZE},
+                    {vnode_inactivity_timeout, 12000},
+                    {forced_ownership_handoff, 8},
+                    {handoff_concurrency, 8}
+                ]
+            },
             {bitcask, [{sync_strategy, o_sync}, {io_mode, nif}]}],
 
     [Node1|_] = Cluster = rt:build_cluster(5, Conf),

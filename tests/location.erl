@@ -22,7 +22,7 @@
 
 %% Shared
 -export([
-    algorithm_supported/1,
+    algorithm_supported/2,
     assert_no_location_violation/3,
     assert_no_ownership_change/4,
     assert_ring_satisfy_n_val/1,
@@ -48,19 +48,9 @@ confirm() ->
 
     pass = run_test(64, choose_claim_v2),
     pass = run_test(128, choose_claim_v2),
-
-    Algo4 = choose_claim_v4,
-    case algorithm_supported(Algo4) of
-        true ->
-            pass = run_test(64, Algo4),
-            pass = run_test(256, Algo4),
-            pass = run_test(512, Algo4);
-        _ ->
-            ?LOG_INFO("*************************"),
-            ?LOG_INFO("Skipping unsupported algorithm ~w", [Algo4]),
-            ?LOG_INFO("*************************")
-    end,
-
+    pass = run_test(64, choose_claim_v4),
+    pass = run_test(256, choose_claim_v4),
+    pass = run_test(512, choose_claim_v4),
     pass.
 
 run_test(RingSize, ClaimAlgorithm) ->
@@ -69,13 +59,14 @@ run_test(RingSize, ClaimAlgorithm) ->
             {anti_entropy, {off, []}}
         ]},
         {riak_core, [
-            {ring_creation_size,    RingSize},
-            {choose_claim_fun,      ClaimAlgorithm},
-            {claimant_tick,         ?CLAIMANT_TICK},
-            {default_bucket_props,  [{allow_mult, true}, {dvv_enabled, true}]},
-            {handoff_concurrency,   16},
-            {vnode_inactivity_timeout, 4000},
-            {vnode_management_timer, 2000}
+            {ring_creation_size,        RingSize},
+            {choose_claim_fun,          ClaimAlgorithm},
+            {claimant_tick,             ?CLAIMANT_TICK},
+            {default_bucket_props,      [{allow_mult, true}, {dvv_enabled, true}]},
+            {handoff_concurrency,       max(8, RingSize div 16)},
+            {forced_ownership_handoff,  max(8, RingSize div 16)},
+            {vnode_inactivity_timeout,  4000},
+            {vnode_management_timer,    2000}
         ]}
     ],
 
@@ -85,6 +76,18 @@ run_test(RingSize, ClaimAlgorithm) ->
     ?LOG_INFO("*************************"),
 
     AllNodes = rt:deploy_nodes(6, Conf),
+
+    case algorithm_supported(ClaimAlgorithm, hd(AllNodes)) of
+        true ->
+            run_test(RingSize, ClaimAlgorithm, AllNodes);
+        false ->
+            ?LOG_INFO("*************************"),
+            ?LOG_INFO("Skipping unsupported algorithm ~w", [ClaimAlgorithm]),
+            ?LOG_INFO("*************************"),
+            pass
+    end.
+
+run_test(RingSize, ClaimAlgorithm, AllNodes) ->
     [Node1, Node2, Node3, Node4, Node5, Node6] = AllNodes,
     Nodes = [Node1, Node2, Node3, Node4],
 
@@ -275,10 +278,14 @@ log_assert_no_location_violation(NVal, MinNumberOfDistinctLocation) ->
   ?LOG_INFO("Ensure that every preflists (n_val: ~b) have at leaset ~b distinct locations",
              [NVal, MinNumberOfDistinctLocation]).
 
--spec algorithm_supported(ClaimAlgorithm :: atom()) -> boolean().
-algorithm_supported(ClaimAlgorithm) ->
-    erlang:function_exported(riak_core_claim_swapping, ClaimAlgorithm, 3)
-    orelse
-      erlang:function_exported(riak_core_membership_claim, ClaimAlgorithm, 3)
-      orelse
-        erlang:function_exported(riak_core_claim, ClaimAlgorithm, 3).
+-spec algorithm_supported(ClaimAlgorithm :: atom(), node()) -> boolean().
+algorithm_supported(ClaimAlgorithm, Node) ->
+    Swapping = [riak_core_claim_swapping, ClaimAlgorithm, 3],
+    Membership = [riak_core_membership_claim, ClaimAlgorithm, 3],
+    Original = [riak_core_claim, ClaimAlgorithm, 3],
+    CheckFun =
+      fun(MFA) ->
+        rpc:call(Node, code, ensure_loaded, [hd(MFA)]),
+        rpc:call(Node, erlang, function_exported, MFA)
+      end,
+    CheckFun(Swapping) orelse CheckFun(Membership) orelse CheckFun(Original).

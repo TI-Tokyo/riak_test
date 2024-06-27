@@ -46,7 +46,7 @@ confirm() ->
     [Primary,ToKill|_] = rt:build_cluster(NodeCount),
 
     %% We need one node down for this test
-    rt:stop(ToKill),
+    rt:stop_and_wait(ToKill),
 
     %% store our test data
     Bucket = <<"verify_mr_prereduce_node_down">>,

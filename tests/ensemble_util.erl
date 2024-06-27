@@ -62,10 +62,12 @@ fast_config(NVal, RingSize, EnableAAE) ->
              {allow_mult, true},
              {dvv_enabled, true}
           ]},
-          {vnode_management_timer, 10000},
-          {target_n_val, max(4, NVal)},
-          {ring_creation_size, RingSize},
-          {enable_consensus, true}]}].
+            {vnode_inactivity_timeout, 15000},
+            {forced_ownership_handoff, 8},
+            {handoff_concurrency, 8},
+            {target_n_val, max(4, NVal)},
+            {ring_creation_size, RingSize},
+            {enable_consensus, true}]}].
 
 config_aae(true) ->
     {riak_kv, [{anti_entropy_build_limit, {100, 1000}},

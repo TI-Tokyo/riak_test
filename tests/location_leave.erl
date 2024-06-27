@@ -23,7 +23,7 @@
 -include_lib("kernel/include/logger.hrl").
 
 -import(location, [
-    algorithm_supported/1,
+    algorithm_supported/2,
     assert_no_location_violation/3,
     assert_no_ownership_change/4,
     assert_ring_satisfy_n_val/1,
@@ -41,18 +41,9 @@
 confirm() ->
 
     % Test takes a long time, so testing other ring sizes is expensive
-
-%%    Algo4 = choose_claim_v4,
-    Algo4 = choose_claim_v3,
-    case algorithm_supported(Algo4) of
-        true ->
-            pass = run_test(64, Algo4, 3, 3),
-            pass = run_test(512, Algo4, 3, 3);
-        _ ->
-            ?LOG_INFO("*************************"),
-            ?LOG_INFO("Skipping unsupported algorithm ~w", [Algo4]),
-            ?LOG_INFO("*************************")
-    end,
+    Algo4 = choose_claim_v4,
+    pass = run_test(64, Algo4, 3, 3),
+    pass = run_test(512, Algo4, 3, 3),
     pass.
 
 run_test(RingSize, ClaimAlgorithm, LNV, ActualL) ->
@@ -63,10 +54,11 @@ run_test(RingSize, ClaimAlgorithm, LNV, ActualL) ->
             [
               {ring_creation_size, RingSize},
               {claimant_tick, ?CLAIMANT_TICK},
-%%              {vnode_management_timer, 2000},
-              {vnode_inactivity_timeout, 4000},
-              {handoff_concurrency, 100},
-              {choose_claim_fun, {riak_core_claim, ClaimAlgorithm}},
+              {handoff_concurrency,       max(8, RingSize div 16)},
+              {forced_ownership_handoff,  max(8, RingSize div 16)},
+              {vnode_inactivity_timeout,  4000},
+              {vnode_management_timer,    2000},
+              {choose_claim_fun, ClaimAlgorithm},
               {target_location_n_val, 3},
               {full_rebalance_onleave, true},
               {default_bucket_props,
@@ -80,6 +72,18 @@ run_test(RingSize, ClaimAlgorithm, LNV, ActualL) ->
     ?LOG_INFO("*************************"),
 
     AllNodes = rt:deploy_nodes(8, Conf),
+
+    case algorithm_supported(ClaimAlgorithm, hd(AllNodes)) of
+        true ->
+            really_run_test(ClaimAlgorithm, LNV, ActualL, AllNodes);
+        false ->
+            ?LOG_INFO("*************************"),
+            ?LOG_INFO("Skipping unsupported algorithm ~w", [ClaimAlgorithm]),
+            ?LOG_INFO("*************************"),
+            pass
+    end.
+    
+really_run_test(ClaimAlgorithm, LNV, ActualL, AllNodes) ->
     [Node1, Node2, Node3, Node4, Node5, Node6, Node7, Node8] = AllNodes,
 
     rt:staged_join(Node2, Node1),

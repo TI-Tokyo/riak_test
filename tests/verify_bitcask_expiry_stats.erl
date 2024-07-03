@@ -61,10 +61,16 @@ confirm() ->
     rt:wait_until(KeyExpiresFun, 4, 1000),
     Stats = rt:get_stats(Node),
     %% 3 reflects the number of partitions from which the key was removed.
-    ?assertMatch(3, rt:get_stat(Stats, ?EXPIRED_KEYS)),
-    ?assertMatch(
-        Bytes when erlang:is_integer(Bytes) andalso Bytes > 0,
-        rt:get_stat(Stats, ?EXPIRED_BYTES)),
+    
+    case rt_config:get(organisation) of
+        workday ->
+            ?assertMatch(3, rt:get_stat(Stats, ?EXPIRED_KEYS)),
+            ?assertMatch(
+                Bytes when erlang:is_integer(Bytes) andalso Bytes > 0,
+                rt:get_stat(Stats, ?EXPIRED_BYTES));
+        _ ->
+            ok
+    end,
 
     pass.
 

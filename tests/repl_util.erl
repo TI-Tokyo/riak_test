@@ -200,22 +200,42 @@ wait_until_no_connection(Node) ->
         end). %% 40 seconds is enough for repl
 
 wait_until_fullsync_started(SourceLeader) ->
-    rt:wait_until(fun() ->
-                     ?LOG_INFO("Waiting for fullsync to start"),
-                     Coordinators = [Pid || {"B", Pid} <-
-                         riak_repl2_fscoordinator_sup:started(SourceLeader)],
-                     lists:any(fun riak_repl2_fscoordinator:is_running/1,
-                         Coordinators)
-                  end).
+    rt:wait_until(
+        fun() ->
+            ?LOG_INFO("Waiting for fullsync to start"),
+            Coordinators = [Pid || {"B", Pid} <-
+                riak_repl2_fscoordinator_sup:started(SourceLeader)],
+            lists:any(
+                fun(C) ->
+                    rpc:call(SourceLeader, erlang, is_process_alive, [C])
+                        andalso
+                        rpc:call(SourceLeader, riak_repl2_fscoordinator, is_running, [C])
+                end,
+                Coordinators
+            )
+        end
+    ).
 
 wait_until_fullsync_stopped(SourceLeader) ->
-    rt:wait_until(fun() ->
-                     ?LOG_INFO("Waiting for fullsync to stop"),
-                     Coordinators = [Pid || {"B", Pid} <-
-                         riak_repl2_fscoordinator_sup:started(SourceLeader)],
-                     not lists:any(fun riak_repl2_fscoordinator:is_running/1,
-                         Coordinators)
-                  end).
+    rt:wait_until(
+        fun() ->
+            ?LOG_INFO("Waiting for fullsync to stop"),
+            Coordinators = [Pid || {"B", Pid} <-
+                riak_repl2_fscoordinator_sup:started(SourceLeader)],
+            timer:sleep(10), % don't want to race with stop message
+            lists:all(
+                fun(C) ->
+                    not 
+                    (
+                        rpc:call(SourceLeader, erlang, is_process_alive, [C])
+                            andalso
+                            rpc:call(SourceLeader, riak_repl2_fscoordinator, is_running, [C])
+                    )
+                end,
+                Coordinators
+            )
+        end
+    ).
 
 wait_for_reads(Node, Start, End, Bucket, R) ->
     wait_for_x(Node, fun() -> rt:systest_read(Node, Start, End, Bucket, R, <<>>, true) end).
@@ -249,7 +269,7 @@ start_and_wait_until_fullsync_complete(Node, Cluster) ->
     start_and_wait_until_fullsync_complete(Node, Cluster, undefined).
 
 start_and_wait_until_fullsync_complete(Node, Cluster, NotifyPid) ->
-    start_and_wait_until_fullsync_complete(Node, Cluster, NotifyPid, 20).
+    start_and_wait_until_fullsync_complete(Node, Cluster, NotifyPid, 5).
 
 start_and_wait_until_fullsync_complete(Node, Cluster, NotifyPid, Retries) ->
     Status0 = rpc:call(Node, riak_repl_console, status, [quiet]),
@@ -268,6 +288,11 @@ start_and_wait_until_fullsync_complete(Node, Cluster, NotifyPid, Retries) ->
     %% Send message to process and notify fullsync has began.
     fullsync_notify(NotifyPid),
 
+    ?LOG_INFO(
+        "Console status ~0p at Retries ~w",
+        [rpc:call(Node, riak_repl_console, status, [quiet]), Retries]
+    ),
+
     case rt:wait_until(make_fullsync_wait_fun(Node, Count), 100, 1000) of
         ok ->
             ok;
@@ -276,6 +301,12 @@ start_and_wait_until_fullsync_complete(Node, Cluster, NotifyPid, Retries) ->
             ?LOG_WARNING("Node failed to fullsync, retrying"),
             start_and_wait_until_fullsync_complete(Node, Cluster, NotifyPid, Retries-1)
     end,
+
+    ?LOG_INFO(
+        "Console status ~0p when complete",
+        [rpc:call(Node, riak_repl_console, status, [quiet])]
+    ),
+
     ?LOG_INFO("Fullsync on ~0p complete", [Node]).
 
 fullsync_count(Count, Status, undefined) ->
@@ -299,18 +330,18 @@ fullsync_notify(_) ->
 
 make_fullsync_wait_fun(Node, Count) ->
     fun() ->
-            Status = rpc:call(Node, riak_repl_console, status, [quiet]),
-            case Status of
-                {badrpc, _} ->
-                    false;
-                _ ->
-                    case proplists:get_value(server_fullsyncs, Status) of
-                        C when C >= Count ->
-                            true;
-                        _ ->
-                            false
-                    end
-            end
+        Status = rpc:call(Node, riak_repl_console, status, [quiet]),
+        case Status of
+            {badrpc, _} ->
+                false;
+            _ ->
+                case proplists:get_value(server_fullsyncs, Status) of
+                    C when C >= Count ->
+                        true;
+                    _ ->
+                        false
+                end
+        end
     end.
 
 connect_cluster(Node, IP, Port) ->

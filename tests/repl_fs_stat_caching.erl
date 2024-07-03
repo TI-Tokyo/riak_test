@@ -29,6 +29,7 @@
 -include_lib("stdlib/include/assert.hrl").
 
 -define(TEST_BUCKET, <<"repl_fs_stat_caching">>).
+-define(RING_SIZE, 32).
 
 confirm() ->
     {{SrcLead, SrcCluster}, {SinkLead, _SinkCluster}} = setup(),
@@ -97,6 +98,13 @@ cluster_conf() ->
             {max_fssource_node, 1},
             {max_fssink_node, 20},
             {rtq_max_bytes, 1048576}
+        ]},
+        {riak_core, [
+            {ring_creation_size,        ?RING_SIZE},
+            {handoff_concurrency,       8},
+            {forced_ownership_handoff,  8},
+            {vnode_inactivity_timeout,  4000},
+            {vnode_management_timer,    2000}
         ]}
     ].
 

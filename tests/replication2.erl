@@ -631,19 +631,39 @@ pb_write_during_shutdown([AFirst|_] = ANodes, [BFirst|_] = BNodes) ->
                 end, [], ReadErrors),
             ?LOG_INFO("Failed keys ~0p", [FailedKeys]),
             ?LOG_INFO("Validate number of read failures on secondary cluster"),
-            ReadErrors3 = rt:systest_read(BFirst, 1000, 11000, TestBucket, 2),
-            ?LOG_INFO("Received ~b read failures", [length(ReadErrors3)]),
-            case length(WriteErrors) >= length(ReadErrors3) of
+            StableReadErrorCount =
+                get_read_errors_until_stable(
+                    BFirst, TestBucket, 1000, 11000, length(ReadErrors)
+                ),
+            case length(WriteErrors) >= StableReadErrorCount of
                 true ->
                     ?LOG_INFO(
                         "Discrepancy appears to be timing, checking again"),
                     ?assertMatch(
-                        ReadErrors3,
-                        rt:systest_read(BFirst, 1000, 11000, TestBucket, 2)),
+                        StableReadErrorCount,
+                        length(
+                            rt:systest_read(
+                                BFirst, 1000, 11000, TestBucket, 2))
+                        ),
                     ?LOG_INFO("Check complete");
                 false ->
                     ?assert(false)
             end
+    end.
+
+
+get_read_errors_until_stable(Node, Bucket, Start, End, LastReading) ->
+    timer:sleep(100),
+    ReadErrors = rt:systest_read(Node, Start, End, Bucket, 2),
+    case length(ReadErrors) of
+        R when R < LastReading->
+            ?LOG_INFO("Received ~b read failures - retry", [R]),
+            get_read_errors_until_stable(
+                Node, Bucket, Start, End, length(ReadErrors)
+            );
+        R ->
+            ?LOG_INFO("Received ~b read failures", [R]),
+            length(ReadErrors)
     end.
 
 

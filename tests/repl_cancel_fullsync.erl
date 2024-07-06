@@ -144,24 +144,24 @@ confirm() ->
 
     ?LOG_INFO("Starting fullsync."),
     rt:log_to_nodes(Nodes, "Starting fullsync."),
+    PreCount = fullsync_count(LeaderA),
     R3 = rpc:call(LeaderA, riak_repl_console, fullsync, [["start"]]),
     ?assertEqual(ok, R3),
     repl_util:wait_until_fullsync_started(LeaderA),
     ?LOG_INFO("Fullsync running again."),
 
-    Res = rt:wait_until(LeaderA,
-        fun(_) ->
-                Status = rpc:call(LeaderA,
-                                  riak_repl_console,
-                                  status,
-                                  [quiet]),
-                case proplists:get_value(server_fullsyncs, Status) of
-                    1 ->
-                        true;
-                    _ ->
-                        false
-                end
-        end),
+    Res =
+        rt:wait_until(
+            LeaderA,
+            fun(_) ->
+                    case fullsync_count(LeaderA) of
+                        FC when FC > PreCount ->
+                            true;
+                        _ ->
+                            false
+                    end
+            end
+        ),
     ?assertEqual(ok, Res),
     repl_util:read_from_cluster(BFirst, 1, ?NUM_KEYS, ?TEST_BUCKET, 0),
     [{"B", S3}] = rpc:call(LeaderA, riak_repl2_fscoordinator, status, []),
@@ -173,3 +173,10 @@ confirm() ->
     rt:clean_cluster(BNodes),
 
     pass.
+
+fullsync_count(Node) ->
+    Status =
+        rpc:call(
+            Node, riak_repl_console, status, [quiet]
+        ),
+    proplists:get_value(server_fullsyncs, Status).

@@ -20,7 +20,7 @@
 %% of that API activity
 
 -module(general_api_perf).
--export([confirm/0]).
+-export([confirm/0, spawn_profile_fun/1]).
 
 -import(secondary_index_tests, [http_query/3, pb_query/3]).
 -include_lib("eunit/include/eunit.hrl").
@@ -37,6 +37,12 @@
 -define(PROFILE_LENGTH, 50).
 -define(REQUEST_PAUSE_UPTO, 3).
 -define(CLIENT_MOD, rhc).
+
+-if(?OTP_RELEASE > 23).
+-define(RPC_MODULE, erpc).
+-else.
+-define(RPC_MODULE, rpc).
+-endif.
 
 -define(CONF,
         [{riak_kv,
@@ -139,7 +145,7 @@ profile(Node) ->
         complete ->
             ok
     after ?PROFILE_PAUSE ->
-        erpc:call(Node, riak_kv_util, profile_riak, [?PROFILE_LENGTH]),
+        ?RPC_MODULE:call(Node, riak_kv_util, profile_riak, [?PROFILE_LENGTH]),
         profile(Node)
     end.
 

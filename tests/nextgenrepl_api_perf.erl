@@ -31,12 +31,18 @@
 -define(QUERY_EVERY, 5000).
 -define(GET_EVERY, 1).
 -define(LOG_EVERY, 10000).
--define(KEY_COUNT, 150000).
+-define(KEY_COUNT, 50000).
 -define(OBJECT_SIZE_BYTES, 32768).
 -define(REQUEST_PAUSE_UPTO, 3).
--define(CLIENT_MOD, rhc).
+-define(CLIENT_MOD, riakc_pb_socket).
 -define(SNK_WORKERS, 16).
 -define(FIELD_LIST, ["bin1"]).
+
+-if(?OTP_RELEASE > 23).
+-define(RPC_MODULE, erpc).
+-else.
+-define(RPC_MODULE, rpc).
+-endif.
 
 -define(CONFIG(SrcQueueDefns, WireCompress),
         [{riak_kv,
@@ -78,14 +84,24 @@ confirm() ->
         ]),
     
     lager:info("Discover Peer IP/ports and restart with peer config"),
-    FoldToPeerConfigHTTP = 
-        fun(Node, Acc) ->
-            {http, {IP, Port}} =
-                lists:keyfind(http, 1, rt:connection_info(Node)),
-            Acc0 = case Acc of "" -> ""; _ -> Acc ++ "|" end,
-            Acc0 ++ IP ++ ":" ++ integer_to_list(Port) ++ ":http"
+    FoldToPeerConfig =
+        case ?CLIENT_MOD of
+            rhc ->
+                fun(Node, Acc) ->
+                    {http, {IP, Port}} =
+                        lists:keyfind(http, 1, rt:connection_info(Node)),
+                    Acc0 = case Acc of "" -> ""; _ -> Acc ++ "|" end,
+                    Acc0 ++ IP ++ ":" ++ integer_to_list(Port) ++ ":http"
+                end;
+            riakc_pb_socket ->
+                fun(Node, Acc) ->
+                    {pb, {IP, Port}} =
+                        lists:keyfind(pb, 1, rt:connection_info(Node)),
+                    Acc0 = case Acc of "" -> ""; _ -> Acc ++ "|" end,
+                    Acc0 ++ IP ++ ":" ++ integer_to_list(Port) ++ ":pb"
+                end
         end,
-    reset_peer_config(FoldToPeerConfigHTTP, ClusterA, ClusterB),
+    reset_peer_config(FoldToPeerConfig, ClusterA, ClusterB),
 
     perf_test(hd(ClusterA), ?CLIENT_MOD, ?CLIENT_COUNT),
 
@@ -109,8 +125,32 @@ reset_peer_config(FoldToPeerConfig, ClusterA, ClusterB) ->
     ).
 
 get_memory(Node) ->
-    MemStats = rpc:call(Node, erlang, memory, []),
-    lager:info("MemStats for Node ~w ~p", [Node, MemStats]).
+    MemStats = ?RPC_MODULE:call(Node, erlang, memory, []),
+    lager:info("MemStats for Node ~w ~p", [Node, MemStats]),
+    Top10 = ?RPC_MODULE:call(Node, riak_kv_util, top_n_binary_total_memory, [10]),
+    lager:info("Top 10 processes for binary memory:"),
+    lists:foreach(
+        fun(BinProc) -> lager:info("Process memory stat ~p", [BinProc]) end,
+        Top10
+    ),
+    lager:info("Top 50 processes for binary - summary by initial call"),
+    Top50Summary =
+        ?RPC_MODULE:call(
+            Node, riak_kv_util, summarise_binary_memory_by_initial_call, [50]
+        ),
+    lists:foreach(fun(ICSumm) -> lager:info("~p", [ICSumm]) end, Top50Summary),
+    Top5 = ?RPC_MODULE:call(Node, riak_kv_util, top_n_process_total_memory, [5]),
+    lager:info("Top 5 processes for process memory:"),
+    lists:foreach(
+        fun(BinProc) -> lager:info("Process memory stat ~p", [BinProc]) end,
+        Top5
+    ),
+    lager:info("Top 100 processes for process memory - summary by initial call"),
+    Top100Summary =
+        ?RPC_MODULE:call(
+            Node, riak_kv_util, summarise_process_memory_by_initial_call, [100]
+        ),
+    lists:foreach(fun(ICSumm) -> lager:info("~p", [ICSumm]) end, Top100Summary).
 
 perf_test(Node, ClientMod, ClientCount) ->
     Clients = get_clients(ClientCount, Node, ClientMod),
@@ -140,7 +180,11 @@ perf_test(Node, ClientMod, ClientCount) ->
     SpawnFuns = lists:map(SpawnUpdateFun, ClientBPairs),
     lists:foreach(fun spawn/1, SpawnFuns),
 
+    Profiler = general_api_perf:spawn_profile_fun(Node),
+
     ok = receive_complete(0, length(Clients)),
+
+    Profiler ! complete,
 
     close_clients(Clients, ClientMod),
 
@@ -274,4 +318,3 @@ act(Client, ClientMod, Bucket, I, V) ->
     end,
     timer:sleep(rand:uniform(?REQUEST_PAUSE_UPTO))
     .
-

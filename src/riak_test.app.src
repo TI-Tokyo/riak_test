@@ -28,7 +28,8 @@
         inets,
         tools,
         mapred_verify,
-        kvc
+        kvc,
+        riakhttpc
     ]},
     {env, [
         %% Log formatter templates, used by multiple modules

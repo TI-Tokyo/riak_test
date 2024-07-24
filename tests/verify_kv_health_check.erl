@@ -65,7 +65,7 @@ confirm() ->
     ?LOG_INFO("health check should re-enable riak_kv on ~0p after some messages have been processed",
                [Node1]),
     %% wait for health check timer to do its thing, don't explicitly execute it
-    ?assertMatch(ok, rt:wait_for_service(Node1, riak_kv)),
+    ok = rt:wait_for_service(Node1, riak_kv),
     ?LOG_INFO("health check successfully re-enabled riak_kv on ~0p", [Node1]),
     riakc_pb_socket:stop(C),
     pass.

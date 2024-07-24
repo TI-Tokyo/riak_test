@@ -2296,20 +2296,20 @@ pbc(Node, Options) ->
     Pid.
 
 %% @doc does a read via the erlang protobuf client
--spec pbc_read(pid(), binary(), binary()) -> binary().
+-spec pbc_read(pid(), binary()|{binary(), binary()}, binary()) -> binary().
 pbc_read(Pid, Bucket, Key) ->
     pbc_read(Pid, Bucket, Key, []).
 
--spec pbc_read(pid(), binary(), binary(), [any()]) -> binary().
+-spec pbc_read(pid(), binary()|{binary(), binary()}, binary(), [any()]) -> binary().
 pbc_read(Pid, Bucket, Key, Options) ->
     {ok, Value} = riakc_pb_socket:get(Pid, Bucket, Key, Options),
     Value.
 
--spec pbc_read_check(pid(), binary(), binary(), [any()]) -> boolean().
+-spec pbc_read_check(pid(), binary()|{binary(), binary()}, binary(), [any()]) -> boolean().
 pbc_read_check(Pid, Bucket, Key, Allowed) ->
     pbc_read_check(Pid, Bucket, Key, Allowed, []).
 
--spec pbc_read_check(pid(), binary(), binary(), [any()], [any()]) -> boolean().
+-spec pbc_read_check(pid(), binary()|{binary(), binary()}, binary(), [any()], [any()]) -> boolean().
 pbc_read_check(Pid, Bucket, Key, Allowed, Options) ->
     case riakc_pb_socket:get(Pid, Bucket, Key, Options) of
         {ok, _} ->
@@ -2319,19 +2319,19 @@ pbc_read_check(Pid, Bucket, Key, Allowed, Options) ->
     end.
 
 %% @doc does a write via the erlang protobuf client
--spec pbc_write(pid(), binary(), binary(), binary()) -> atom().
+-spec pbc_write(pid(), binary()|{binary(), binary()}, binary(), binary()) -> atom().
 pbc_write(Pid, Bucket, Key, Value) ->
     Object = riakc_obj:new(Bucket, Key, Value),
     riakc_pb_socket:put(Pid, Object).
 
 %% @doc does a write via the erlang protobuf client plus content-type
--spec pbc_write(pid(), binary(), binary(), binary(), list()) -> atom().
+-spec pbc_write(pid(), binary()|{binary(), binary()}, binary(), binary(), list()) -> atom().
 pbc_write(Pid, Bucket, Key, Value, CT) ->
     Object = riakc_obj:new(Bucket, Key, Value, CT),
     riakc_pb_socket:put(Pid, Object).
 
 %% @doc does a write via the erlang protobuf client plus content-type
--spec pbc_write(pid(), binary(), binary(), binary(), list(), list()) -> atom().
+-spec pbc_write(pid(), binary()|{binary(), binary()}, binary(), binary(), list(), list()) -> atom().
 pbc_write(Pid, Bucket, Key, Value, CT, Opts) ->
     Object = riakc_obj:new(Bucket, Key, Value, CT),
     riakc_pb_socket:put(Pid, Object, Opts).
@@ -2427,19 +2427,19 @@ httpc(Node) ->
     end.
 
 %% @doc does a read via the http erlang client.
--spec httpc_read(term(), binary(), binary()) -> binary().
+-spec httpc_read(term(), binary()|{binary(), binary()}, binary()) -> binary().
 httpc_read(C, Bucket, Key) ->
     {_, Value} = rhc:get(C, Bucket, Key),
     Value.
 
 %% @doc does a write via the http erlang client.
--spec httpc_write(term(), binary(), binary(), binary()) -> atom().
+-spec httpc_write(term(), binary()|{binary(), binary()}, binary(), binary()) -> atom().
 httpc_write(C, Bucket, Key, Value) ->
     Object = riakc_obj:new(Bucket, Key, Value),
     rhc:put(C, Object).
 
 %% @doc does a write via the http erlang client.
--spec httpc_write(term(), binary(), binary(), binary(), list()) -> atom().
+-spec httpc_write(term(), binary()|{binary(), binary()}, binary(), binary(), list()) -> atom().
 httpc_write(C, Bucket, Key, Value, Opts) ->
     Object = riakc_obj:new(Bucket, Key, Value),
     rhc:put(C, Object, Opts).

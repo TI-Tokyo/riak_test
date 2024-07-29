@@ -56,10 +56,7 @@ rex_test(Node) ->
 
 
 deploy_node(NumNodes, current) ->
-    rt:deploy_nodes(NumNodes, conf());
-deploy_node(_, mixed) ->
-    Conf = conf(),
-    rt:deploy_nodes([{current, Conf}, {previous, Conf}]).
+    rt:deploy_nodes(NumNodes, conf()).
 
 deploy_node(Type) ->
     NumNodes = rt_config:get(num_nodes, 1),

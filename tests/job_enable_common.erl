@@ -308,7 +308,7 @@ test_request(Node, ?TOKEN_LIST_BUCKETS = Class, Enabled, pbc = ClientType) ->
     close_client(Client),
     ok;
 test_request(Node, ?TOKEN_LIST_BUCKETS = Class, Enabled, http = Scheme) ->
-    URL = make_url(Node, Scheme, "/buckets?buckets=true"),
+    URL = make_url(Node, Scheme, ["/buckets?buckets=true"]),
     Result = ibrowse:send_req(URL, [], get, [], [{response_format, binary}]),
     ?assertMatch({ok, _, _, _}, Result),
     {_, Code, _, Body} = Result,
@@ -323,7 +323,7 @@ test_request(Node, ?TOKEN_LIST_BUCKETS = Class, Enabled, http = Scheme) ->
     end;
 
 test_request(Node, ?TOKEN_LIST_BUCKETS_S = Class, false, http = Scheme) ->
-    URL = make_url(Node, Scheme, "/buckets?buckets=stream"),
+    URL = make_url(Node, Scheme, ["/buckets?buckets=stream"]),
     Result = ibrowse:send_req(URL, [], get),
     ?assertMatch({ok, _, _, _}, Result),
     {_, Code, _, Body} = Result,
@@ -579,6 +579,11 @@ make_url(#rhc{ip = IP, port = Port, options = Opts}, Parts) ->
     end;
 make_url(Node, Parts) ->
     make_url(Node, http, Parts).
+
+
+-dialyzer({nowarn_function, make_url/3}).
+    % this would be resolved by switching to rt:get_https_conn_info
+    % but comment indicates not using this is deliberate
 
 make_url(Node, Scheme, Parts) ->
     % seems to be more reliable than calling rt:get_https_conn_info directly

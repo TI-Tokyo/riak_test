@@ -79,8 +79,7 @@ get_put_mix(Node) ->
                          ?LOG_ERROR("got unexpected return: ~0p",
                                      [Reason]),
                          throw(Reason);
-                     {ok, _O} -> ok;
-                     Else -> throw(Else)
+                     {ok, _O} -> ok
                  end
          end
      end

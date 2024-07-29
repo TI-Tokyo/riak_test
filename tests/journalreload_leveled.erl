@@ -289,10 +289,13 @@ check_objects(Node, KCStart, KCEnd, VFlag, RVal) ->
 check_index(Node) ->
     PBC = rt:pbc(Node),
     {ok, Results} =
-        riakc_pb_socket:get_index_range(PBC,
-                                        ?BUCKET, ?INDEX ++ "_bin",
-                                        integer_to_binary(0),
-                                        integer_to_binary(999999)),
+        riakc_pb_socket:get_index_range(
+            PBC,
+            ?BUCKET,
+            {binary_index, ?INDEX},
+            integer_to_binary(0),
+            integer_to_binary(999999)
+        ),
     length(Results?INDEX_RESULTS.keys).
 
 backend_dir() ->

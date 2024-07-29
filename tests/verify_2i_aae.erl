@@ -170,7 +170,7 @@ check_kill_repair(Node1) ->
 
 run_2i_repair(Node1) ->
     ?LOG_INFO("Run 2i AAE repair"),
-    ?assertMatch({ok, _}, rt:admin(Node1, ["repair-2i"])),
+    {ok, _} = rt:admin(Node1, ["repair-2i"]),
     RepairPid = rpc:call(Node1, erlang, whereis, [riak_kv_2i_aae]),
     ?LOG_INFO("Wait for repair process to finish"),
     Mon = monitor(process, RepairPid),

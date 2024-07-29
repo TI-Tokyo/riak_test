@@ -234,13 +234,11 @@ write_to_cluster(Node, Start, End, Bucket, NewObj, CVB) ->
             Obj =
                 case NewObj of
                     true ->
-                        riak_object:new(Bucket,
-                                        Key,
-                                        <<N:32/integer, CVB/binary>>);
-                    false ->
-                        UPDV = <<N:32/integer, CVB/binary>>,
-                        {ok, PrevObj} = riak_client:get(Bucket, Key, C),
-                        riak_object:update_value(PrevObj, UPDV)
+                        riak_object:new(
+                            Bucket,
+                            Key,
+                            <<N:32/integer, CVB/binary>>
+                        )
                 end,
             try riak_client:put(Obj, C) of
                 ok ->
@@ -283,14 +281,7 @@ read_from_cluster(Node, Start, End, Errors, Bucket, CommonValBin) ->
             end
         end,
     ErrorsFound = lists:foldl(F, [], lists:seq(Start, End)),
-    case Errors of
-        undefined ->
-            ?LOG_INFO("Errors Found in read_from_cluster ~w",
-                        [length(ErrorsFound)]),
-            length(ErrorsFound);
-        _ ->
-            ?assertEqual(Errors, length(ErrorsFound))
-    end.
+    ?assertEqual(Errors, length(ErrorsFound)).
 
 key(N) ->
     list_to_binary(io_lib:format("~8..0B~n", [N])).

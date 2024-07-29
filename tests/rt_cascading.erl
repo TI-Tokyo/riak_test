@@ -153,7 +153,7 @@ get_cluster_mgr_port(Node) ->
 
 maybe_reconnect_rt(SourceNode, SinkPort, SinkName) ->
     case repl_util:wait_for_connection(SourceNode, SinkName) of
-        fail ->
+        {fail, _} ->
             connect_rt(SourceNode, SinkPort, SinkName);
         Oot ->
             Oot
@@ -257,8 +257,6 @@ wait_until_pending_count_zero(Nodes) ->
 
 check_status(Status) ->
     case proplists:get_all_values(consumers, Status) of
-        undefined ->
-            true;
         [] ->
             true;
         Cs ->

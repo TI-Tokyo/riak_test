@@ -90,7 +90,7 @@ confirm() ->
 
 %% @doc Determine if current, legacy or previous is a Riak 2.0+
 %% version or not and test accordingly.
--spec(determine_test_suite(atom()) -> fun()).
+-spec determine_test_suite(atom()) -> ok.
 determine_test_suite(Vsn) ->
     VersionBinary = rt:get_version(Vsn),
     case VersionBinary of
@@ -103,7 +103,7 @@ determine_test_suite(Vsn) ->
     end.
 
 %% @doc Test authentication methods for versions since Riak 2.0
--spec(verify_authentication_post20(atom()) -> ok).
+-spec verify_authentication_post20(atom()) -> ok.
 verify_authentication_post20(Vsn) ->
     %% Verify authentication none, and then with forced SSL.
     verify_authentication(Vsn, ?RC_AUTH_NONE_CONFIG),
@@ -115,7 +115,7 @@ verify_authentication_post20(Vsn) ->
     ok.
 
 %% @doc Test authentication methods for versions before Riak 2.0
--spec(verify_authentication_pre20(atom()) -> ok).
+-spec verify_authentication_pre20(atom()) -> ok.
 verify_authentication_pre20(Vsn) ->
     %% Verify authentication method 'none'.
     verify_authentication(Vsn, ?RC_AUTH_NONE_CONFIG),

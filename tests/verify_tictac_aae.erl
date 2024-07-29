@@ -360,7 +360,7 @@ verify_data(Node, KeyValues, Bucket) ->
         case rt:wait_until(CheckFun, Retry, Delay) of
             ok ->
                 ?LOG_INFO("Data is now correct. Yay!");
-            fail ->
+            _ ->
                 ?LOG_ERROR("AAE failed to fix data"),
                 aae_failed_to_fix_data
         end,
@@ -440,15 +440,18 @@ restart_vnode(Node, Service, Partition) ->
                          [Partition, VNodeName]),
     ?assert(rpc:call(Node, erlang, exit, [Pid, kill_for_test])),
     Mon = monitor(process, Pid),
-    receive
-        {'DOWN', Mon, _, _, _} ->
-            ok
-    after
-        rt_config:get(rt_max_wait_time) ->
-            ?LOG_ERROR("VNode for partition ~0p did not die, the bastard",
-                        [Partition]),
-            ?assertEqual(vnode_killed, {failed_to_kill_vnode, Partition})
-    end,
+    ok =
+        receive
+            {'DOWN', Mon, _, _, _} ->
+                ok
+        after
+            rt_config:get(rt_max_wait_time) ->
+                ?LOG_ERROR(
+                    "VNode for partition ~0p did not die, the bastard",
+                    [Partition]
+                ),
+                {failed_to_kill_vnode, Partition}
+        end,
     {ok, NewPid} = rpc:call(Node, riak_core_vnode_manager, get_vnode_pid,
                             [Partition, VNodeName]),
     ?LOG_INFO("Vnode for partition ~0p restarted as ~0p",

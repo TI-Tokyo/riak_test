@@ -62,7 +62,7 @@ cli_options() ->
         {skip,               $x, "skip",     string,     "list of tests to skip in a directory"},
         {verbose,            $v, "verbose",  undefined,  "verbose output"},
         {outdir,             $o, "outdir",   string,     "output directory"},
-        {backend,            $b, "backend",  atom,       "backend to test [memory | bitcask | eleveldb | leveldb]"},
+        {backend,            $b, "backend",  atom,       "backend to test [memory | bitcask | eleveldb | leveled]"},
         {junit,       undefined, "junit",    boolean,    "output junit xml to the outdir directory"},
         {upgrade_version,    $u, "upgrade",  atom,       "which version to upgrade from [ previous | legacy ]"},
         {keep,        undefined, "keep",     boolean,    "do not teardown cluster"},

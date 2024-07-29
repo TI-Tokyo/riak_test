@@ -444,8 +444,12 @@ get_and_update(Pid, map) ->
     _ = [riakc_pb_socket:fetch_type(Pid, {?MTYPE, <<"pb">>}, <<I>>)
         || I <- lists:seq(1, 10)].
 
-all_stats(Node) ->
-    common_stats() ++ product_stats(rt:product(Node)).
+all_stats(_Node) ->
+    common_stats()
+    ++ pool_stats()
+    ++ tictacaae_stats()
+    ++ organisation_stats()
+    ++ ttaaefs_stats().
 
 common_stats() ->
     [
@@ -860,7 +864,6 @@ common_stats() ->
         <<"sys_thread_pool_size">>,
         <<"sys_threads_enabled">>,
         <<"sys_wordsize">>,
-        <<"tools_version">>,
         <<"vnode_counter_update">>,
         <<"vnode_counter_update_time_100">>,
         <<"vnode_counter_update_time_95">>,
@@ -938,24 +941,7 @@ common_stats() ->
         <<"write_once_puts_total">>,
         <<"xmerl_version">>,
         <<"zstd_version">>
-    ]
-    ++ pool_stats()
-        ++ tictacaae_stats()
-        ++ organisation_stats()
-        ++ ttaaefs_stats().
-
-product_stats(riak_ee) ->
-    [
-        <<"ebloom_version">>,
-        <<"mnesia_version">>,
-        <<"ranch_version">>,
-        <<"riak_jmx_version">>,
-        <<"riak_repl_version">>,
-        <<"riak_snmp_version">>,
-        <<"snmp_version">>
-    ];
-product_stats(riak) ->
-    [].
+    ].
 
 pool_stats() ->
     dscp_stats() ++ [

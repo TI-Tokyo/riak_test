@@ -322,7 +322,7 @@ delete_from_cluster(Node, Start, End) ->
 read_from_cluster(Node, Start, End, CommonValBin, Errors) ->
     read_from_cluster(Node, Start, End, CommonValBin, Errors, false).
 
-read_from_cluster(Node, Start, End, CommonValBin, Errors, LogErrors) ->
+read_from_cluster(Node, Start, End, CommonValBin, Errors, _LogErrors) ->
     ?LOG_INFO("Reading ~b keys from node ~0p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
     F =
@@ -342,29 +342,7 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors, LogErrors) ->
             end
         end,
     ErrorsFound = lists:foldl(F, [], lists:seq(Start, End)),
-    case Errors of
-        undefined ->
-            ?LOG_INFO("Errors Found in read_from_cluster ~w",
-                        [length(ErrorsFound)]);
-        _ ->
-            case LogErrors of
-                true ->
-                    LogFun =
-                        fun(Error) ->
-                            ?LOG_INFO("Read error ~w", [Error])
-                        end,
-                    lists:foreach(LogFun, ErrorsFound);
-                false ->
-                    ok
-            end,
-            % case length(ErrorsFound) of
-            %     Errors ->
-            %         ok;
-            %     _ ->
-            %         lists:foreach(fun(E) -> ?LOG_WARNING("Read error ~w", [E]) end, ErrorsFound)
-            % end,
-            ?assertEqual(Errors, length(ErrorsFound))
-    end.
+    ?assertEqual(Errors, length(ErrorsFound)).
 
 
 get_stats(Cluster) ->

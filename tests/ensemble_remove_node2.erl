@@ -53,7 +53,7 @@ confirm() ->
     Bucket = {<<"strong">>, <<"test">>},
     Key = <<"testkey">>,
     PBC = rt:pbc(Node),
-    ok = rt:pbc_write(PBC, Bucket, Key, testval),
+    ok = rt:pbc_write(PBC, Bucket, Key, <<"testval">>),
     Val1 = rt:pbc_read(PBC, Bucket, Key),
     ?assertEqual(element(1, Val1), riakc_obj),
 

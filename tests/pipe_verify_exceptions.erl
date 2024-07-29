@@ -470,9 +470,11 @@ verify_queue_limit(RN, Retries) when Retries > 0 ->
     ?assertEqual(Full, NoLongerFull),
 
     case Full of
-        [] ->
-            ?LOG_INFO("Queues were never full; Retries left: ~b",
-                       [Retries-1]);
+        0 ->
+            ?LOG_INFO(
+                "Queues were never full; Retries left: ~b",
+                [Retries-1]
+            );
         _ ->
             ok
     end;

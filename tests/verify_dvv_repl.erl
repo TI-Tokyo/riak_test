@@ -43,7 +43,7 @@ confirm() ->
     {{ClientA, ClusterA}, {ClientB, ClusterB}} = make_clusters(),
 
     %% Write data to B
-    write_object(ClientB),
+    ok = fetch_resolve_write(ClientB),
 
     %% Connect for real time repl A->B
     connect_realtime(ClusterA, ClusterB),
@@ -53,7 +53,7 @@ confirm() ->
     rt:wait_until(IsReplicating),
 
     %% Update ClusterA 100 times
-    [write_object(ClientA) || _ <- lists:seq(1, 100)],
+    [ok = fetch_resolve_write(ClientA) || _ <- lists:seq(1, 100)],
 
     %% Get the object, and see if it has 100 siblings (not the two it
     %% should have.) Turn off DVV in `make_cluster` and see the
@@ -115,14 +115,6 @@ make_cluster(Nodes, Name) ->
     riakc_pb_socket:set_options(C, [queue_if_disconnected]),
     {C, Nodes}.
 
-write_object([]) ->
-    ok;
-write_object([Client | Rest]) ->
-    ok = write_object(Client),
-    write_object(Rest);
-write_object(Client) ->
-    fetch_resolve_write(Client).
-
 get_object(Client) ->
     case riakc_pb_socket:get(Client, ?BUCKET, ?KEY) of
         {ok, Obj} ->
@@ -133,7 +125,7 @@ get_object(Client) ->
 
 fetch_resolve_write(Client) ->
     Obj = get_object(Client),
-    Value = resolve_update(riakc_obj:get_values(Obj)),
+    Value = term_to_binary(resolve_update(riakc_obj:get_values(Obj))),
     Obj3 = riakc_obj:update_metadata(riakc_obj:update_value(Obj, Value), dict:new()),
     ok = riakc_pb_socket:put(Client, Obj3).
 

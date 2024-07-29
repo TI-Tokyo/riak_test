@@ -47,7 +47,7 @@ confirm() ->
     % status.
     {ok, Suspended} = suspend_an_fs_source(SrcCluster),
     ?LOG_INFO("Suspended: ~0p", [Suspended]),
-    {ok, Status} = rt:riak_repl(SrcLead, "status"),
+    {ok, Status} = rt:riak_repl(SrcLead, ["status"]),
     FailLine = "RPC to '" ++ atom_to_list(SrcLead) ++ "' failed: timeout\n",
     ?assertNotEqual(FailLine, Status),
 
@@ -108,8 +108,6 @@ cluster_conf() ->
         ]}
     ].
 
-suspend_an_fs_source([]) ->
-    {error, no_nodes};
 
 suspend_an_fs_source(Nodes) ->
     suspend_an_fs_source(Nodes, 10000).

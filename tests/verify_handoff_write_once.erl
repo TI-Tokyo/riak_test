@@ -117,7 +117,7 @@ run_test(Config, AsyncWrites) ->
     start_proc(RootNode, NTestItems, RingSize div 2),
     rt:join(NewNode, RootNode),
     TotalSent = wait_until_async_writes_complete(),
-    ?assertMatch(ok, rt:wait_until_nodes_ready(Cluster)),
+    ok = rt:wait_until_nodes_ready(Cluster),
     rt:wait_until_bucket_type_visible(Cluster, ?BUCKET_TYPE),
     rt:wait_until_no_pending_changes(Cluster),
     rt:wait_until_transfers_complete(Cluster),

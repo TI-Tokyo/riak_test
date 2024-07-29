@@ -513,12 +513,8 @@ pid_name(_Pid, RegName, _VNodeMap) ->
 report_stats(Mod, Keys) ->
     Stats = Mod:get_stats(),
     case Keys of
-    all ->
-        Stats;
-    _ ->
-        lists:filter(fun({Key, _Value}) ->
-                 lists:member(Key, Keys)
-             end, Stats)
+        all ->
+            Stats
     end.
 
 %%%===================================================================

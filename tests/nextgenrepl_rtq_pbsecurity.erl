@@ -589,32 +589,26 @@ read_from_cluster(Node, Start, End, CommonValBin, Errors, LogErrors) ->
             end
         end,
     ErrorsFound = lists:foldl(F, [], lists:seq(Start, End)),
-    case Errors of
-        undefined ->
-            ?LOG_INFO("Errors Found in read_from_cluster ~b",
-                        [length(ErrorsFound)]);
+    case LogErrors of
+        true ->
+            LogFun =
+                fun(Error) ->
+                    ?LOG_INFO("Read error ~0p", [Error])
+                end,
+            lists:foreach(LogFun, ErrorsFound);
+        false ->
+            ok
+    end,
+    case length(ErrorsFound) of
+        Errors ->
+            ok;
         _ ->
-            case LogErrors of
-                true ->
-                    LogFun =
-                        fun(Error) ->
-                            ?LOG_INFO("Read error ~0p", [Error])
-                        end,
-                    lists:foreach(LogFun, ErrorsFound);
-                false ->
-                    ok
-            end,
-            case length(ErrorsFound) of
-                Errors ->
-                    ok;
-                _ ->
-                    lists:foreach(
-                        fun(E) ->
-                            ?LOG_WARNING("Read error ~0p", [E])
-                        end, ErrorsFound)
-            end,
-            ?assertEqual(Errors, length(ErrorsFound))
-    end.
+            lists:foreach(
+                fun(E) ->
+                    ?LOG_WARNING("Read error ~0p", [E])
+                end, ErrorsFound)
+    end,
+    ?assertEqual(Errors, length(ErrorsFound)).
 
 
 wait_for_outcome(Module, Func, Args, ExpOutcome, Loops) ->

@@ -226,23 +226,23 @@ assertRangeQuery({ClientType, Client}, Expected, Index, StartValue, EndValue, Re
 %% general 2i utility
 put_an_object(Pid, N) ->
     Key = int_to_key(N),
-    Data = io_lib:format("data~p", [N]),
+    Data = iolist_to_binary(io_lib:format("data~p", [N])),
     BinIndex = int_to_field1_bin(N),
-    Indexes = [{"field1_bin", BinIndex},
-               {"field2_int", N},
+    Indexes = [{<<"field1_bin">>, BinIndex},
+               {<<"field2_int">>, N},
                % every 5 items indexed together
-               {"field3_int", N - (N rem 5)}
+               {<<"field3_int">>, N - (N rem 5)}
               ],
     put_an_object(Pid, Key, Data, Indexes).
 
 put_a_sibling_object(Pid, N) ->
     Key = int_to_key(N),
-    Data = io_lib:format("data~p", [N + 1]),
+    Data = iolist_to_binary(io_lib:format("data~p", [N + 1])),
     BinIndex = int_to_field1_bin(N + 1),
-    Indexes = [{"field1_bin", BinIndex},
-               {"field2_int", N + 1},
+    Indexes = [{<<"field1_bin">>, BinIndex},
+               {<<"field2_int">>, N + 1},
                % every 5 items indexed together
-               {"field3_int", N - (N rem 5)}
+               {<<"field3_int">>, N - (N rem 5)}
               ],
     put_an_object(Pid, Key, Data, Indexes).
 
@@ -254,7 +254,12 @@ put_an_object(Pid, Key, Data, Indexes) when is_list(Indexes) ->
     Robj2 = riakc_obj:update_metadata(Robj1, MetaData),
     riakc_pb_socket:put(Pid, Robj2);
 put_an_object(Pid, Key, IntIndex, BinIndex) when is_integer(IntIndex), is_binary(BinIndex) ->
-    put_an_object(Pid, Key, Key, [{"field1_bin", BinIndex},{"field2_int", IntIndex}]).
+    put_an_object(
+        Pid,
+        Key,
+        Key,
+        [{<<"field1_bin">>, BinIndex},{<<"field2_int">>, IntIndex}]
+    ).
 
 
 

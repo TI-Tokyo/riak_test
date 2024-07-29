@@ -107,7 +107,7 @@ confirm() ->
     rt:wait_until_ring_converged(ANodes),
 
     ?LOG_INFO("Starting fullsync."),
-    rt:log_to_nodes(Nodes, "Starting fullsync."),
+    rt:log_to_nodes(lists:flatten(Nodes), "Starting fullsync."),
     R1 = rpc:call(LeaderA, riak_repl_console, fullsync, [["start"]]),
     ?assertEqual(ok, R1),
     repl_util:wait_until_fullsync_started(LeaderA),
@@ -122,7 +122,7 @@ confirm() ->
     [?assertEqual(state, element(1, State)) || State <- KLStates],
 
     ?LOG_INFO("Stopping fullsync."),
-    rt:log_to_nodes(Nodes, "Stopping fullsync."),
+    rt:log_to_nodes(lists:flatten(Nodes), "Stopping fullsync."),
     R2 = rpc:call(LeaderA, riak_repl_console, fullsync, [["stop"]]),
     ?assertEqual(ok, R2),
     repl_util:wait_until_fullsync_stopped(LeaderA),
@@ -143,7 +143,7 @@ confirm() ->
     ?LOG_INFO("** ~0p", [S2]),
 
     ?LOG_INFO("Starting fullsync."),
-    rt:log_to_nodes(Nodes, "Starting fullsync."),
+    rt:log_to_nodes(lists:flatten(Nodes), "Starting fullsync."),
     PreCount = fullsync_count(LeaderA),
     R3 = rpc:call(LeaderA, riak_repl_console, fullsync, [["start"]]),
     ?assertEqual(ok, R3),
@@ -168,7 +168,7 @@ confirm() ->
     ?assertEqual(true, lists:member({fullsyncs_completed, 1}, S3)),
     ?LOG_INFO("Fullsync Complete"),
 
-    rt:log_to_nodes(Nodes, "Test completed."),
+    rt:log_to_nodes(lists:flatten(Nodes), "Test completed."),
     rt:clean_cluster(ANodes),
     rt:clean_cluster(BNodes),
 

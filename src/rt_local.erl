@@ -24,7 +24,7 @@
 
 -export([
          assert_which/1,
-         download/1,
+         % download/1,
          home_dir/0,
          install_on_absence/2,
          stream_cmd/1,
@@ -57,17 +57,17 @@ which(Command) ->
 assert_which(Command) ->
     ?assert(which(Command)).
 
-download(Url) ->
-    ?LOG_INFO("Downloading ~s", [Url]),
-    Filename = url_to_filename(Url),
-    case filelib:is_file(filename:join(rt_config:get(rt_scratch_dir), Filename))  of
-        true ->
-            ?LOG_INFO("Got it ~0p", [Filename]),
-            ok;
-        _ ->
-            ?LOG_INFO("Getting it ~0p", [Filename]),
-            rt_local:stream_cmd("curl  -O -L " ++ Url, [{cd, rt_config:get(rt_scratch_dir)}])
-    end.
+% download(Url) ->
+%     ?LOG_INFO("Downloading ~s", [Url]),
+%     Filename = url_to_filename(Url),
+%     case filelib:is_file(filename:join(rt_config:get(rt_scratch_dir), Filename))  of
+%         true ->
+%             ?LOG_INFO("Got it ~0p", [Filename]),
+%             ok;
+%         _ ->
+%             ?LOG_INFO("Getting it ~0p", [Filename]),
+%             rt_local:stream_cmd("curl  -O -L " ++ Url, [{cd, rt_config:get(rt_scratch_dir)}])
+%     end.
 
 url_to_filename(Url) ->
     lists:last(string:tokens(Url, "/")).

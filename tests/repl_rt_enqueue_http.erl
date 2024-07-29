@@ -32,8 +32,6 @@
 
 -define(TEST_BUCKET, <<"test-bucket">>).
 -define(KEY(I), <<I:32/integer>>).
--define(KEY_ONE, ?KEY(1)).
--define(KEY_TWO, ?KEY(2)).
 -define(VAL(I), ?KEY(I)).
 -define(TEST_BUCKET_TYPE, <<"my-type">>).
 
@@ -82,7 +80,9 @@ confirm() ->
 
     connect_clusters(AFirst, BFirst),
 
-    run_test_for_buckets([{?TEST_BUCKET_TYPE, ?TEST_BUCKET}, ?TEST_BUCKET], ANodes, BNodes).
+    run_test_for_buckets(
+        [{?TEST_BUCKET_TYPE, ?TEST_BUCKET}, ?TEST_BUCKET], ANodes, BNodes
+    ).
 
 run_test_for_buckets(Buckets, ANodes, BNodes) ->
     KeyRange = {First, Last} = {1, 20},
@@ -92,93 +92,89 @@ run_test_for_buckets(Buckets, ANodes, BNodes) ->
 
     {ok, CA} = riak:client_connect(AFirst),
     {ok, CB} = riak:client_connect(BFirst),
-    HTTPCA = rt:httpc(AFirst),
 
-    set_up_data(Buckets, KeyRange, AFirst, BFirst, HTTPCA),
+    set_up_data(Buckets, KeyRange, AFirst, BFirst),
 
     %% enable realtime
     enable_rt(AFirst, ANodes),
 
     %% DO the test, for each bucket(type)
-    [
-     begin
-         ?LOG_INFO("RTE tests for ~0p", [Bucket]),
-         %% write new key to A
-         Obj3 = riak_object:new(Bucket, ?KEY((Last+1)), ?VAL((Last+1))),
-         WriteRes3 = riak_client:put(Obj3, [{w, 2}], CA),
-         ?assertEqual(ok, WriteRes3),
-
-         %% verify you can read from B now
-         ReplRead =
-             rt:wait_until(fun() ->
-                                   {BReadRes3, _} =
-                                        riak_client:get(Bucket,
-                                                        ?KEY((Last+1)),
-                                                        [{r, 3}],
-                                                        CB),
-                                   ?LOG_INFO("waiting for 'realtime repl' to repl"),
-                                   BReadRes3 == ok
-                           end, 10, 200),
-         ?assertEqual(ok, ReplRead),
-
-         BReReadRes1 = riak_client:get(Bucket, ?KEY(First), [], CB),
-         ?assertEqual({error, notfound}, BReReadRes1),
-
-         %% touch an original key
-         EnqRes = rhc:rt_enqueue(HTTPCA, Bucket, ?KEY(First), []),
-         ?assertEqual(ok, EnqRes),
-
-         %% verify read touched from B
-         TouchRead =
-             rt:wait_until(fun() ->
-                                   {BReReadResPresent, _} =
-                                        riak_client:get(Bucket,
-                                                        ?KEY(First),
-                                                        [],
-                                                        CB),
-                                   ?LOG_INFO("waiting for touch to repl"),
-                                   BReReadResPresent == ok
-                           end, 10, 200),
-         ?assertEqual(ok, TouchRead),
-
-         %% touch an original key with the PB client
-         PBEnqRes = rhc:rt_enqueue(HTTPCA, Bucket, ?KEY((First+1)), [{r, 2}]),
-         ?assertEqual(ok, PBEnqRes),
-
-         TouchRead2 =
-             rt:wait_until(fun() ->
-                                   {BReReadResPresent, _} =
-                                        riak_client:get(Bucket,
-                                                        ?KEY((First+1)),
-                                                        [],
-                                                        CB),
-                                   ?LOG_INFO("waiting for touch to repl"),
-                                   BReReadResPresent == ok
-                           end, 10, 200),
-         ?assertEqual(ok, TouchRead2),
-
-         %% touch an original key with the HTTP client
-         HTTPEnqRes = rhc:rt_enqueue(HTTPCA, Bucket, ?KEY((First+9))),
-         ?assertEqual(ok, HTTPEnqRes),
-
-         TouchRead3 =
-             rt:wait_until(fun() ->
-                                   {BReReadResPresent, _} =
-                                        riak_client:get(Bucket,
-                                                        ?KEY((First+9)),
-                                                        [],
-                                                        CB),
-                                   ?LOG_INFO("waiting for touch to repl"),
-                                   BReReadResPresent == ok
-                           end, 10, 200),
-         ?assertEqual(ok, TouchRead3),
-
-         %% But still not object 3, neither repl'd nor touched
-         BReReadRes4 = riak_client:get(Bucket, ?KEY((First+2)), [], CB),
-         ?assertEqual({error, notfound}, BReReadRes4)
-     end || Bucket <- Buckets],
-
+    lists:foreach(
+        fun(B) -> ok = test_bucket(B, AFirst, CA, CB, First, Last) end,
+        Buckets
+    ),
     pass.
+
+test_bucket(Bucket, AFirst, CA, CB, First, Last) ->
+    ?LOG_INFO("RTE tests for ~0p", [Bucket]),
+    HTTPCA = rt:httpc(AFirst),
+    %% write new key to A
+    Obj3 = riak_object:new(Bucket, ?KEY((Last+1)), ?VAL((Last+1))),
+    WriteRes3 = riak_client:put(Obj3, [{w, 2}], CA),
+    ?assertEqual(ok, WriteRes3),
+
+    %% verify you can read from B now
+    ReplRead =
+        rt:wait_until(fun() ->
+                            {BReadRes3, _} =
+                                riak_client:get(Bucket,
+                                                ?KEY((Last+1)),
+                                                [{r, 3}],
+                                                CB),
+                            ?LOG_INFO("waiting for 'realtime repl' to repl"),
+                            BReadRes3 == ok
+                    end, 10, 200),
+    ?assertEqual(ok, ReplRead),
+
+    BReReadRes1 = riak_client:get(Bucket, ?KEY(First), [], CB),
+    ?assertEqual({error, notfound}, BReReadRes1),
+
+    %% touch an original key
+    ok = rhc:rt_enqueue(HTTPCA, Bucket, ?KEY(First)),
+
+    %% verify read touched from B
+    ok =
+        rt:wait_until(fun() ->
+                            {BReReadResPresent, _} =
+                                riak_client:get(Bucket,
+                                                ?KEY(First),
+                                                [],
+                                                CB),
+                            ?LOG_INFO("waiting for touch to repl"),
+                            BReReadResPresent == ok
+                    end, 10, 200),
+
+    %% touch an original key with the PB client
+    ok = rhc:rt_enqueue(HTTPCA, Bucket, ?KEY((First+1)), [{r, 2}]),
+
+    ok =
+        rt:wait_until(fun() ->
+                            {BReReadResPresent, _} =
+                                riak_client:get(Bucket,
+                                                ?KEY((First+1)),
+                                                [],
+                                                CB),
+                            ?LOG_INFO("waiting for touch to repl"),
+                            BReReadResPresent == ok
+                    end, 10, 200),
+
+    %% touch an original key with the HTTP client
+    ok = rhc:rt_enqueue(HTTPCA, Bucket, ?KEY((First+9))),
+
+    ok =
+        rt:wait_until(fun() ->
+                            {BReReadResPresent, _} =
+                                riak_client:get(Bucket,
+                                                ?KEY((First+9)),
+                                                [],
+                                                CB),
+                            ?LOG_INFO("waiting for touch to repl"),
+                            BReReadResPresent == ok
+                    end, 10, 200),
+
+    %% But still not object 3, neither repl'd nor touched
+    {error, notfound} = riak_client:get(Bucket, ?KEY((First+2)), [], CB),
+    ok.
 
 %% @doc Connect two clusters for replication using their respective leader nodes.
 connect_clusters(LeaderA, LeaderB) ->
@@ -220,7 +216,8 @@ create_bucket_type(Cluster) ->
                                                  %% needs repl adding
                                                  {repl, realtime}]).
 
-set_up_data(Buckets, _KeyRange={First, Last}, AFirst, BFirst, HTTPCA) ->
+set_up_data(Buckets, _KeyRange={First, Last}, AFirst, BFirst) ->
+    HTTPCA = rt:httpc(AFirst),
     [begin
          ?LOG_INFO("Setting up data for ~0p", [Bucket]),
          %% write a bunch of keys to A

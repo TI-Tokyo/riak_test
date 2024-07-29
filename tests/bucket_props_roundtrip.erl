@@ -57,7 +57,7 @@
 
 confirm() ->
     [Node] = Nodes = rt:build_cluster(1),
-    ?assertEqual(ok, rt:wait_until_nodes_ready(Nodes)),
+    ok = rt:wait_until_nodes_ready(Nodes),
 
     [ check_prop_set_and_get(Node, Prop, FirstVal, SecondVal) ||
         {Prop, FirstVal, SecondVal} <- ?PROPS ],

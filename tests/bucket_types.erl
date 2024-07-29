@@ -396,10 +396,14 @@ confirm() ->
                          {<<"baz">>, <<"4">>, <<"a">>, 4},
                          {<<"bam">>, <<"5">>, <<"a">>, 3}]],
 
-    ?assertEqual({ok, [{0, [<<"2">>]}]},
-                 riakc_pb_socket:mapred(PB, {{Type, <<"MRbucket">>},
-                                             [[<<"starts_with">>, <<"f">>]]},
-                                        [{map, {modfun, riak_kv_mapreduce, map_object_value}, none, true}])),
+    ?assertEqual(
+        {ok, [{0, [<<"2">>]}]},
+        riakc_pb_socket:mapred(
+            PB,
+            {{Type, <<"MRbucket">>}, [[<<"starts_with">>, <<"f">>]]},
+            [{map, {modfun, riak_kv_mapreduce, map_object_value}, none, true}]
+        )
+    ),
 
     ?assertEqual({ok, [{2, [14]}]},
                  riakc_pb_socket:mapred_bucket(PB, {Type, <<"MRbucket">>},
@@ -479,16 +483,24 @@ confirm() ->
     ok = rt:load_modules_on_nodes([?MODULE], Nodes),
 
     %% do a modfun mapred using the function from this module
-    ?assertEqual({ok, [{2, [2]}]},
-                 riakc_pb_socket:mapred_bucket(PB, {modfun, ?MODULE,
-                                                    mapred_modfun, []},
-                                       ?SUMVALUE_MAPRED)),
+    ?assertEqual(
+        {ok, [{2, [2]}]},
+        riakc_pb_socket:mapred(
+            PB,
+            {modfun, ?MODULE, mapred_modfun, []},
+            ?SUMVALUE_MAPRED
+        )
+    ),
 
     %% do a modfun mapred using the function from this module
-    ?assertEqual({ok, [{2, [5]}]},
-                 riakc_pb_socket:mapred_bucket(PB, {modfun, ?MODULE,
-                                                    mapred_modfun_type, []},
-                                       ?SUMVALUE_MAPRED)),
+    ?assertEqual(
+        {ok, [{2, [5]}]},
+        riakc_pb_socket:mapred(
+            PB,
+            {modfun, ?MODULE, mapred_modfun_type, []},
+            ?SUMVALUE_MAPRED
+        )
+    ),
 
     riakc_pb_socket:stop(PB),
     pass.

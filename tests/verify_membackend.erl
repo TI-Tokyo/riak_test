@@ -39,8 +39,7 @@
 -define(BUCKET, <<"ttl_test">>).
 
 -ifdef(CHECK_CONSISTENT_PUTS).
--define(CHECK_PUT_CONSISTENT(Node),
-    ?assertMatch(ok, check_put_consistent(Node))).
+-define(CHECK_PUT_CONSISTENT(Node), ok = check_put_consistent(Node)).
 -else.
 -define(CHECK_PUT_CONSISTENT(Node), ok).
 -endif. % CHECK_CONSISTENT_PUTS
@@ -67,7 +66,7 @@ ttl(Mode) ->
     Conf = mkconf(ttl, Mode),
     [NodeA, NodeB] = rt:deploy_nodes(2, Conf),
 
-    ?assertMatch(ok, check_leave_and_expiry(NodeA, NodeB)),
+    ok = check_leave_and_expiry(NodeA, NodeB),
 
     rt:clean_cluster([NodeA]),
     ok.
@@ -78,11 +77,11 @@ max_memory(Mode) ->
 
     rt:join(NodeB, NodeA),
 
-    ?assertMatch(ok, check_put_delete(NodeA)),
+    ok = check_put_delete(NodeA),
 
     ?CHECK_PUT_CONSISTENT(NodeA),
 
-    ?assertMatch(ok, check_eviction(NodeA)),
+    ok = check_eviction(NodeA),
 
     rt:clean_cluster([NodeA, NodeB]),
 
@@ -93,17 +92,17 @@ combo(Mode) ->
 
     [NodeA, NodeB] = rt:deploy_nodes(2, Conf),
 
-    ?assertMatch(ok, check_leave_and_expiry(NodeA, NodeB)),
+    ok = check_leave_and_expiry(NodeA, NodeB),
 
     %% Make sure that expiry is updating used_memory correctly
     Pid = get_remote_vnode_pid(NodeA),
-    {0, _} = get_used_space(Pid),
+    {0, _} = get_used_space(NodeA, Pid),
 
-    ?assertMatch(ok, check_put_delete(NodeA)),
+    ok = check_put_delete(NodeA),
 
     ?CHECK_PUT_CONSISTENT(NodeA),
 
-    ?assertMatch(ok, check_eviction(NodeA)),
+    ok = check_eviction(NodeA),
 
     rt:clean_cluster([NodeA]),
 
@@ -116,7 +115,7 @@ check_leave_and_expiry(NodeA, NodeB) ->
 
     rt:join(NodeB, NodeA),
 
-    ?assertMatch(ok, rt:wait_until_nodes_ready([NodeA, NodeB])),
+    ok = rt:wait_until_nodes_ready([NodeA, NodeB]),
     rt:wait_until_no_pending_changes([NodeA, NodeB]),
 
     rt:leave(NodeB),
@@ -148,12 +147,7 @@ check_eviction(Node) ->
     %% somewhat hard to predict.  Just trying to verify that some
     %% memory limit somewhere is being honored and that values are
     %% being evicted.
-    case Res == 100 of
-        true ->
-            ok;
-        _ ->
-            ?assertMatch(memory_reclamation_issue, Res)
-    end,
+    ?assertMatch(100, Res), % Or else memory_reclamation_issue
 
     {ok, C} = riak:client_connect(Node),
 
@@ -179,17 +173,12 @@ check_put_delete(Node) ->
 
     timer:sleep(timer:seconds(5)),
 
-    {Mem, _PutSize} = get_used_space(Pid),
+    {Mem, _PutSize} = get_used_space(Node, Pid),
 
     %% The size of the encoded Riak Object varies a bit based on
     %% the included metadata, so we consult the riak_kv_memory_backend
     %% to determine the actual size of the object written
-    case (MemBaseline - Mem) =:= PutSize of
-        true ->
-            ok;
-        _ ->
-            ?assertMatch(fail, MemBaseline)
-    end,
+    ?assertMatch(PutSize, MemBaseline - Mem),
     ok.
 
 -ifdef(CHECK_CONSISTENT_PUTS).
@@ -208,7 +197,7 @@ check_put_consistent(Node) ->
 
     timer:sleep(timer:seconds(2)),
 
-    {Mem, _} = get_used_space(Pid),
+    {Mem, _} = get_used_space(Node, Pid),
 
     case abs(Mem - MemBaseline) < 3 of
         true ->
@@ -225,13 +214,13 @@ check_put_consistent(Node) ->
 -spec(put_until_changed(pid(), node(), term()) -> {integer(), integer(), term()}).
 put_until_changed(Pid, Node, Key) ->
     {ok, C} = riak:client_connect(Node),
-    {UsedSpace, _} = get_used_space(Pid),
+    {UsedSpace, _} = get_used_space(Node, Pid),
 
     riak_client:put(riak_object:new(?BUCKET, <<Key:32/integer>>, <<0:8192>>), C),
 
     timer:sleep(500),
 
-    {UsedSpace1, PutObjSize} = get_used_space(Pid),
+    {UsedSpace1, PutObjSize} = get_used_space(Node, Pid),
     case UsedSpace < UsedSpace1 of
         true ->
             {UsedSpace1, PutObjSize, Key};
@@ -286,15 +275,25 @@ get_remote_vnode_pid(Node) ->
     VNode.
 
 %% @doc Interrogate the VNode to determine the memory used
--spec(get_used_space(pid()) -> {integer(), integer()}).
-get_used_space(VNodePid) ->
+-spec(get_used_space(node(), pid()) -> {integer(), integer()}).
+get_used_space(Node, VNodePid) ->
     {_Mod, State} = riak_core_vnode:get_modstate(VNodePid),
     {Mod, ModState} = riak_kv_vnode:get_modstate(State),
     Status = case Mod of
         riak_kv_memory_backend ->
-            riak_kv_memory_backend:status(ModState);
+            erpc:call(
+                Node,
+                riak_kv_memory_backend,
+                status,
+                [ModState]);
         riak_kv_multi_backend ->
-            [{_Name, Stat}] = riak_kv_multi_backend:status(ModState),
+            [{_Name, Stat}] =
+                erpc:call(
+                    Node,
+                    riak_kv_multi_backend,
+                    status,
+                    [ModState]
+                ),
             Stat;
         _Else ->
             ?LOG_ERROR("didn't understand backend ~0p", [Mod]),

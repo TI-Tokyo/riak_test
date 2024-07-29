@@ -205,12 +205,12 @@ test_dollarkey(ClusterA, ClusterB, Protocol) ->
     {ok, {index_results_v1, RA2, undefined, undefined}} =
         riakc_pb_socket:get_index_range(
             PBCa, ?TEST_BUCKET, <<"$key">>, to_key(1), to_key(100),
-            [{term_regex, ".*4$"}]),
+            [{term_regex, <<".*4$">>}]),
     ?assertEqual(10, length(RA2)),
     {ok, {index_results_v1, RB2, undefined, undefined}} =
         riakc_pb_socket:get_index_range(
             PBCb, ?TEST_BUCKET, <<"$key">>, to_key(1), to_key(100),
-            [{term_regex, ".*4$"}]),
+            [{term_regex, <<".*4$">>}]),
     ?assertEqual(5, length(RB2)),
 
     ?LOG_INFO("Find keys will return tombstones"),
@@ -257,11 +257,7 @@ write_to_cluster(Node, Bucket, Start, End, CommonValBin) ->
                     new_obj ->
                         CVB = ?COMMMON_VAL_INIT,
                         riak_object:new(
-                            Bucket, to_key(N), <<N:32/integer, CVB/binary>>);
-                    UpdateBin ->
-                        UPDV = <<N:32/integer, UpdateBin/binary>>,
-                        {ok, PrevObj} = riak_client:get(Bucket, to_key(N), C),
-                        riak_object:update_value(PrevObj, UPDV)
+                            Bucket, to_key(N), <<N:32/integer, CVB/binary>>)
                 end,
             try riak_client:put(Obj, C) of
                 ok ->
@@ -343,8 +339,6 @@ find_tombs(Node, Bucket, KR, MR, ResultType) ->
     ?LOG_INFO("Finding tombstones from node ~p.", [Node]),
     {ok, C} = riak:client_connect(Node),
     case ResultType of
-        return_keys ->
-            riak_client:aae_fold({find_tombs, Bucket, KR, all, MR}, C);
         return_count ->
             riak_client:aae_fold({reap_tombs, Bucket, KR, all, MR, count}, C)
     end.

@@ -30,13 +30,14 @@
 -define(CLIENT_COUNT, 12).
 -define(QUERY_EVERY, 100).
 -define(GET_EVERY, 1).
--define(LOG_EVERY, 1000).
+-define(UPDATE_EVERY, 2).
+-define(LOG_EVERY, 2000).
 -define(KEY_COUNT, 20000).
 -define(OBJECT_SIZE_BYTES, 512).
 -define(PROFILE_PAUSE, 10000).
 -define(PROFILE_LENGTH, 50).
 -define(REQUEST_PAUSE_UPTO, 3).
--define(CLIENT_MOD, rhc).
+-define(CLIENT_MOD, riakc_pb_socket).
 
 -if(?OTP_RELEASE > 23).
 -define(RPC_MODULE, erpc).
@@ -45,29 +46,38 @@
 -endif.
 
 -define(CONF,
-        [{riak_kv,
-          [
-            {anti_entropy, {off, []}},
-            {delete_mode, keep},
-            {tictacaae_active, active},
-            {tictacaae_parallelstore, leveled_ko},
-            {tictacaae_storeheads, true},
-            {tictacaae_rebuildtick, 3600000}, % don't tick for an hour!
-            {tictacaae_suspend, true}
-          ]},
-         {riak_core,
-          [
-            {ring_creation_size, ?DEFAULT_RING_SIZE},
-            {default_bucket_props, [{allow_mult, true}, {n_val, 1}]}
-          ]}]
+        [
+            {riak_kv,
+                [
+                    {anti_entropy, {off, []}},
+                    {delete_mode, keep},
+                    {tictacaae_active, active},
+                    {tictacaae_parallelstore, leveled_ko},
+                    {tictacaae_storeheads, true},
+                    {tictacaae_rebuildtick, 3600000}, % don't tick for an hour!
+                    {tictacaae_suspend, true}
+                ]
+            },
+            {leveled,
+                [
+                    {compaction_runs_perday, 48},
+                    {journal_objectcount, 20000}
+                ]
+            },
+            {riak_core,
+                [
+                    {ring_creation_size, ?DEFAULT_RING_SIZE},
+                    {default_bucket_props, [{allow_mult, true}, {n_val, 1}]}
+                ]
+            }
+        ]
        ).
 
 confirm() ->
     [NodePB] = rt:build_cluster(1, ?CONF),
     rt:wait_for_service(NodePB, riak_kv),
 
-    perf_test(NodePB, ?CLIENT_MOD, ?CLIENT_COUNT),
-    pass.
+    perf_test(NodePB, ?CLIENT_MOD, ?CLIENT_COUNT).
 
 perf_test(Node, ClientMod, ClientCount) ->
     Clients = get_clients(ClientCount, Node, ClientMod),
@@ -186,6 +196,26 @@ act(Client, ClientMod, Bucket, I, V) ->
             [{<<"K1">>, to_meta(I)}, {<<"K2">>, to_meta(I + 1)}]
         ),
     ok = ClientMod:put(Client, riakc_obj:update_metadata(Obj, MD2)),
+    case I rem ?UPDATE_EVERY of
+        0  when I > 1000 ->
+            UpdK = to_key(rand:uniform(I - 1000)),
+            {ok, PrvObj} = ClientMod:get(Client, Bucket, UpdK),
+            NewObj =
+                riakc_obj:update_value(PrvObj, <<I:32/integer, V/binary>>),
+            PrvMD = riakc_obj:get_metadata(PrvObj),
+            NewMD =
+                riakc_obj:add_secondary_index(
+                    PrvMD,
+                    {{binary_index, "upd_index"}, [to_index(I), to_index(I+1)]}
+                ),
+            ok =
+                ClientMod:put(
+                    Client,
+                    riakc_obj:update_metadata(NewObj, NewMD)
+                );
+        _ ->
+            ok
+    end,
     case I rem ?GET_EVERY of
         0 when I > 1000 ->
             {ok, _PastObj} =

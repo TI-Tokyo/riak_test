@@ -31,7 +31,7 @@
         kvc,
         getopt,
         riakc,
-        riakhttpc
+        rhc
     ]},
     {env, [
         %% Log formatter templates, used by multiple modules

@@ -50,7 +50,7 @@
 -include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 -include_lib("riakc/include/riakc.hrl").
--include_lib("riakhttpc/include/rhc.hrl").
+-include_lib("rhc/include/rhc.hrl").
 -include("job_enable_common.hrl").
 
 -define(DEFAULT_NUM_BUCKETS,    7).

@@ -570,24 +570,16 @@ load_data(PBConn, PopBucket, [Bucket | Buckets]) ->
 load_data(_, _, []) ->
     ok.
 
-make_url(#rhc{ip = IP, port = Port, options = Opts}, Parts) ->
-    case proplists:get_value(is_ssl, Opts) of
-        true ->
-            make_url(https, IP, Port, Parts);
-        _ ->
-            make_url(http, IP, Port, Parts)
-    end;
 make_url(Node, Parts) ->
     make_url(Node, http, Parts).
 
-
--dialyzer({nowarn_function, make_url/3}).
-    % this would be resolved by switching to rt:get_https_conn_info
-    % but comment indicates not using this is deliberate
-
-make_url(Node, Scheme, Parts) ->
-    % seems to be more reliable than calling rt:get_https_conn_info directly
-    #rhc{ip = IP, port = Port} = rt:httpc(Node),
+%% @hidden
+%% Previous implementations of this function noted reliability issues that
+%% may have been due to timing and could benefit from assuring that
+%%  `rt:wait_for_service(Node, riak_kv)'
+%% is invoked before this function.
+make_url(Node, http = Scheme, Parts) ->
+    {ok, {IP, Port}} = rt:get_http_conn_info(Node),
     make_url(Scheme, IP, Port, Parts).
 
 make_url(Scheme, Host, Port, Parts) ->

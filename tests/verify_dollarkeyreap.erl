@@ -346,8 +346,9 @@ find_tombs(Node, Bucket, KR, MR, ResultType) ->
 find_keys(Node, Bucket, KR, MR) ->
     ?LOG_INFO("Finding keys from node ~p.", [Node]),
     {ok, C} = riak:client_connect(Node),
-    {ok, KL} =
+    {ok, OS} =
         riak_client:aae_fold(
-            {find_keys, Bucket, KR, MR, {sibling_count, 0}},
+            {object_stats, Bucket, KR, MR},
             C),
-    length(KL).
+    {total_count, TC} = lists:keyfind(total_count, 1, OS),
+    TC.

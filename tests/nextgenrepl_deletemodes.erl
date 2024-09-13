@@ -394,9 +394,7 @@ reap_from_cluster(Node, Start, End) ->
                 true ->
                     Acc;
                 false ->
-                    [{N, false} | Acc];
-                Other ->
-                    [{N, Other} | Acc]
+                    [{N, false} | Acc]
             catch
                 What:Why ->
                     [{N, {What, Why}} | Acc]
@@ -415,9 +413,7 @@ reap_from_cluster(Node, BKdhL) when is_list(BKdhL) ->
                 true ->
                     Acc;
                 false ->
-                    [{K, false} | Acc];
-                Other ->
-                    [{K, Other} | Acc]
+                    [{K, false} | Acc]
             catch
                 What:Why ->
                     [{K, {What, Why}} | Acc]

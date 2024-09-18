@@ -50,14 +50,13 @@
           ]}]
        ).
 
--define(NUM_NODES, 3).
--define(NUM_KEYS_PERNODE, 10000).
+-define(NUM_KEYS, 12000).
 -define(BUCKET, <<"test_bucket">>).
--define(N_VAL, 3).
 -define(DELTA_COUNT, 10).
 
 confirm() ->
-    Nodes0 = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD),
+    rt:set_advanced_conf(all, ?CFG_NOREBUILD),
+    Nodes0 = rt:build_cluster([previous, previous, current, current]),
     ok = verify_aae_fold(Nodes0),
     pass.
 
@@ -75,24 +74,32 @@ verify_aae_fold(Nodes) ->
     ?LOG_INFO("Commencing object load"),
     KeyLoadFun =
         fun(Node, KeyCount) ->
-            KVs = test_data(KeyCount + 1,
-                                KeyCount + ?NUM_KEYS_PERNODE,
-                                list_to_binary("U1")),
+            KVs = test_data(
+                KeyCount + 1,
+                KeyCount + (?NUM_KEYS div length(Nodes)),
+                list_to_binary("U1")),
             ok = write_data(Node, KVs),
-            KeyCount + ?NUM_KEYS_PERNODE
+            KeyCount + (?NUM_KEYS div length(Nodes))
         end,
 
-    lists:foldl(KeyLoadFun, 1, Nodes),
-    ?LOG_INFO("Loaded ~b objects", [?NUM_KEYS_PERNODE * length(Nodes)]),
+    lists:foldl(KeyLoadFun, 0, Nodes),
+    ?LOG_INFO("Loaded ~b objects", [?NUM_KEYS]),
 
     ?LOG_INFO("Fold for busy tree"),
     {ok, RH1} = riak_client:aae_fold(TreeQuery, CH),
+
+    ?LOG_INFO("Force use of old trees on comparator"),
+    ok =
+        erpc:call(
+            lists:last(Nodes),
+            application,
+            set_env,
+            [riak_kv, legacyformat_tictacaae_tree, true]
+        ),
     {ok, RT1} = riak_client:aae_fold(TreeQuery, CT),
 
-    ?assertMatch(true, RH1 == RT1),
-    ?assertMatch(true, RH0 == RT0),
     ?assertMatch(false, RH0 == RH1),
-
+    ?assertMatch(true, [] == aae_exchange:compare_trees(RH0, RT0)),
     ?assertMatch(true, [] == aae_exchange:compare_trees(RH1, RT1)),
 
     ?LOG_INFO("Make ~b changes", [?DELTA_COUNT]),
@@ -139,14 +146,17 @@ verify_aae_fold(Nodes) ->
 
     KeyLoadTypeBFun =
         fun(Node, KeyCount) ->
-            KVs = test_data(KeyCount + 1,
-                                KeyCount + ?NUM_KEYS_PERNODE div 4,
-                                list_to_binary("U1")),
+            KVs =
+                test_data(
+                    KeyCount + 1,
+                    KeyCount + (?NUM_KEYS div length(Nodes)),
+                    list_to_binary("U1")
+                ),
             ok = write_data(Node, KVs, [], Nv4B),
-            KeyCount + ?NUM_KEYS_PERNODE div 4
+            KeyCount + ?NUM_KEYS div length(Nodes)
         end,
-    lists:foldl(KeyLoadTypeBFun, 1, Nodes),
-    TypedBucketObjectCount = (?NUM_KEYS_PERNODE div 4) * length(Nodes),
+    lists:foldl(KeyLoadTypeBFun, 0, Nodes),
+    TypedBucketObjectCount = ?NUM_KEYS,
     ?LOG_INFO("Loaded ~b objects", [TypedBucketObjectCount]),
     timer:sleep(1000),
 

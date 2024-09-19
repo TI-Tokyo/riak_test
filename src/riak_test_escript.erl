@@ -241,7 +241,8 @@ main(Args) ->
         Batch = lists:member(batch, ParsedArgs),
         maybe_teardown(Teardown, TestResults, Coverage, Verbose, Batch),
         ?LOGFILE_HANDLER_MODULE:filesync(?LOGFILE_HANDLER_NAME),
-        erlang:halt(exit_code(TestResults))
+        ExitCode = exit_code(TestResults),
+        if Batch -> ExitCode; true -> erlang:halt(ExitCode) end
 
     catch
         Class:Reason:StackTrace ->

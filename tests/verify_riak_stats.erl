@@ -1085,7 +1085,8 @@ workday_stats() ->
 
 nhse_stats() ->
     [
-        <<"leveldb_read_block_error">>
+        <<"leveldb_read_block_error">>,
+        <<"tools_version">>
     ].
 
 bet365_stats() -> [].

@@ -343,13 +343,11 @@ write_to_cluster(Node, Start, End, CommonValBin) ->
                 case CommonValBin of
                     new_obj ->
                         CVB = ?COMMMON_VAL_INIT,
-                        riak_object:new(?TEST_BUCKET,
-                                        Key,
-                                        <<N:32/integer, CVB/binary>>);
-                    UpdateBin ->
-                        UPDV = <<N:32/integer, UpdateBin/binary>>,
-                        {ok, PrevObj} = riak_client:get(?TEST_BUCKET, Key, C),
-                        riak_object:update_value(PrevObj, UPDV)
+                        riak_object:new(
+                            ?TEST_BUCKET,
+                            Key,
+                            <<N:32/integer, CVB/binary>>
+                        )
                 end,
             try riak_client:put(Obj, C) of
                 ok ->
@@ -396,9 +394,7 @@ reap_from_cluster(Node, Start, End) ->
                 true ->
                     Acc;
                 false ->
-                    [{N, false} | Acc];
-                Other ->
-                    [{N, Other} | Acc]
+                    [{N, false} | Acc]
             catch
                 What:Why ->
                     [{N, {What, Why}} | Acc]
@@ -417,9 +413,7 @@ reap_from_cluster(Node, BKdhL) when is_list(BKdhL) ->
                 true ->
                     Acc;
                 false ->
-                    [{K, false} | Acc];
-                Other ->
-                    [{K, Other} | Acc]
+                    [{K, false} | Acc]
             catch
                 What:Why ->
                     [{K, {What, Why}} | Acc]

@@ -50,7 +50,6 @@
 -include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 -include_lib("riakc/include/riakc.hrl").
--include_lib("riakhttpc/include/rhc.hrl").
 -include("job_enable_common.hrl").
 
 -define(DEFAULT_NUM_BUCKETS,    7).
@@ -308,7 +307,7 @@ test_request(Node, ?TOKEN_LIST_BUCKETS = Class, Enabled, pbc = ClientType) ->
     close_client(Client),
     ok;
 test_request(Node, ?TOKEN_LIST_BUCKETS = Class, Enabled, http = Scheme) ->
-    URL = make_url(Node, Scheme, "/buckets?buckets=true"),
+    URL = make_url(Node, Scheme, ["/buckets?buckets=true"]),
     Result = ibrowse:send_req(URL, [], get, [], [{response_format, binary}]),
     ?assertMatch({ok, _, _, _}, Result),
     {_, Code, _, Body} = Result,
@@ -323,7 +322,7 @@ test_request(Node, ?TOKEN_LIST_BUCKETS = Class, Enabled, http = Scheme) ->
     end;
 
 test_request(Node, ?TOKEN_LIST_BUCKETS_S = Class, false, http = Scheme) ->
-    URL = make_url(Node, Scheme, "/buckets?buckets=stream"),
+    URL = make_url(Node, Scheme, ["/buckets?buckets=stream"]),
     Result = ibrowse:send_req(URL, [], get),
     ?assertMatch({ok, _, _, _}, Result),
     {_, Code, _, Body} = Result,
@@ -570,19 +569,16 @@ load_data(PBConn, PopBucket, [Bucket | Buckets]) ->
 load_data(_, _, []) ->
     ok.
 
-make_url(#rhc{ip = IP, port = Port, options = Opts}, Parts) ->
-    case proplists:get_value(is_ssl, Opts) of
-        true ->
-            make_url(https, IP, Port, Parts);
-        _ ->
-            make_url(http, IP, Port, Parts)
-    end;
 make_url(Node, Parts) ->
     make_url(Node, http, Parts).
 
-make_url(Node, Scheme, Parts) ->
-    % seems to be more reliable than calling rt:get_https_conn_info directly
-    #rhc{ip = IP, port = Port} = rt:httpc(Node),
+%% @hidden
+%% Previous implementations of this function noted reliability issues that
+%% may have been due to timing and could benefit from assuring that
+%%  `rt:wait_for_service(Node, riak_kv)'
+%% is invoked before this function.
+make_url(Node, http = Scheme, Parts) ->
+    {ok, {IP, Port}} = rt:get_http_conn_info(Node),
     make_url(Scheme, IP, Port, Parts).
 
 make_url(Scheme, Host, Port, Parts) ->

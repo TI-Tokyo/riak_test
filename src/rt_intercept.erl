@@ -34,8 +34,13 @@ default_intercept_path_glob() ->
 intercept_files() ->
     intercept_files([default_intercept_path_glob()]).
 
-intercept_files(Globs) ->
-    lists:concat([filelib:wildcard(Glob) || Glob <- Globs]).
+intercept_files(LocationPaths) ->
+    intercept_files(LocationPaths, []).
+
+intercept_files([], Acc) ->
+    Acc;
+intercept_files([Path|RestPaths], Acc) ->
+    intercept_files(RestPaths, filelib:wildcard(Path) ++ Acc).
 
 %% @doc Load the intercepts on the nodes under test.
 -spec load_intercepts([node()]) -> ok.

@@ -23,8 +23,6 @@
 
 -export([confirm/0]).
 
--include_lib("stdlib/include/assert.hrl").
-
 %% Start 3 nodes, create a capability and join them into a cluster
 %%
 %% Stop one node then restart it again, it joins the cluster without the
@@ -37,19 +35,25 @@ confirm() ->
     Cap_name = {rt, cap_1},
     V1 = 1,
     V2 = 2,
-    ?assertMatch(ok, rpc:call(
-        Node_A, riak_core_capability, register, [Cap_name, [V2,V1], V1, V1])),
-    ?assertMatch(ok, rpc:call(
-        Node_B, riak_core_capability, register, [Cap_name, [V2,V1], V1, V1])),
-    ?assertMatch(ok, rpc:call(
-        Node_C, riak_core_capability, register, [Cap_name, [V2,V1], V1, V1])),
-    ?assertMatch(ok, rt:join_cluster([Node_A,Node_B,Node_C])),
-    ?assertMatch(ok, rt:wait_until_ring_converged([Node_A,Node_B,Node_C])),
-    ?assertMatch(ok, rt:wait_until_capability(Node_A, Cap_name, V2)),
-    ?assertMatch(ok, rt:wait_until_capability(Node_B, Cap_name, V2)),
-    ?assertMatch(ok, rt:wait_until_capability(Node_C, Cap_name, V2)),
-    ?assertMatch(ok, rt:stop(Node_B)),
-    ?assertMatch(ok, rt:start(Node_B)),
-    ?assertMatch(ok, rt:wait_until_capability(Node_A, Cap_name, V1)),
-    ?assertMatch(ok, rt:wait_until_capability(Node_C, Cap_name, V1)),
+    ok = 
+        rpc:call(
+            Node_A, riak_core_capability, register, [Cap_name, [V2,V1], V1, V1]
+        ),
+    ok = 
+        rpc:call(
+            Node_B, riak_core_capability, register, [Cap_name, [V2,V1], V1, V1]
+        ),
+    ok =
+        rpc:call(
+            Node_C, riak_core_capability, register, [Cap_name, [V2,V1], V1, V1]
+        ),
+    ok = rt:join_cluster([Node_A,Node_B,Node_C]),
+    ok = rt:wait_until_ring_converged([Node_A,Node_B,Node_C]),
+    ok = rt:wait_until_capability(Node_A, Cap_name, V2),
+    ok = rt:wait_until_capability(Node_B, Cap_name, V2),
+    ok = rt:wait_until_capability(Node_C, Cap_name, V2),
+    ok = rt:stop(Node_B),
+    ok = rt:start(Node_B),
+    ok = rt:wait_until_capability(Node_A, Cap_name, V1),
+    ok = rt:wait_until_capability(Node_C, Cap_name, V1),
     pass.

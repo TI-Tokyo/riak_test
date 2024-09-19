@@ -48,8 +48,8 @@ confirm() ->
     ?LOG_INFO("Put new object in ~0p via PBC.", [Node1]),
     PB = rt:pbc(Node1),
 
-    A0 = riakc_obj:new(<<"b">>, <<"k">>, sets:from_list([0])),
-    B0 = riakc_obj:new(<<"b">>, <<"k">>, sets:from_list([1])),
+    A0 = riakc_obj:new(<<"b">>, <<"k">>, term_to_binary(sets:from_list([0]))),
+    B0 = riakc_obj:new(<<"b">>, <<"k">>, term_to_binary(sets:from_list([1]))),
 
     _ = explode(PB, {A0, B0}, N),
 
@@ -100,7 +100,10 @@ resolve_update(Obj, N) ->
             Value0 = resolve(Values, sets:new()),
             Value = sets:add_element(N, Value0),
             ?LOG_INFO("Storing ~0p", [N]),
-            riakc_obj:update_metadata(riakc_obj:update_value(Obj, Value), dict:new())
+            riakc_obj:update_metadata(
+                riakc_obj:update_value(Obj, term_to_binary(Value)),
+                dict:new()
+            )
     end.
 
 %% Set union on each value

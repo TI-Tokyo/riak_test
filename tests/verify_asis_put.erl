@@ -41,8 +41,7 @@ confirm() ->
     ?LOG_INFO("Put object asis in ~0p via PBC.", [Node2]),
     {ok, Obj1b} = riakc_pb_socket:put(PB2, Obj1a, [asis, return_body]),
     ?LOG_INFO("Check vclock equality after asis put (PBC)."),
-    ?assertEqual({vclock_equal, riakc_obj:vclock(Obj1a)},
-                 {vclock_equal, riakc_obj:vclock(Obj1b)}),
+    ?assert(riakc_obj:vclock(Obj1a) == riakc_obj:vclock(Obj1b)),
 
     %% 3. Repeat with HTTP, nodes reversed
     ?LOG_INFO("Put new object in ~0p via HTTP.", [Node2]),
@@ -57,7 +56,6 @@ confirm() ->
     ?LOG_INFO("Put object asis in ~0p via PBC.", [Node1]),
     {ok, Obj2b} = rhc:put(HTTP1, Obj2a, [asis, return_body]),
     ?LOG_INFO("Check vclock equality after asis put (HTTP)."),
-    ?assertEqual({vclock_equal, riakc_obj:vclock(Obj2a)},
-                 {vclock_equal, riakc_obj:vclock(Obj2b)}),
+    ?assert(riakc_obj:vclock(Obj2a) == riakc_obj:vclock(Obj2b)),
 
     pass.

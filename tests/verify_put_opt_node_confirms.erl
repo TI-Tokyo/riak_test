@@ -187,7 +187,7 @@ write_pb2(Client, {<<"sets">>, _B}=BT, Options) ->
 write_pb2(Client, <<"old_counter", _Rest/binary>>=B, Options) ->
     riakc_pb_socket:counter_incr(Client, B, ?KEY, 1, Options);
 write_pb2(Client, ?BUCKET, Options) ->
-    rt:pbc_write(Client, ?BUCKET, ?KEY, <<"12345">>, <<"bin">>,Options).
+    rt:pbc_write(Client, ?BUCKET, ?KEY, <<"12345">>, "bin", Options).
 
 assert_match({error, Code, Msg}, Res) ->
     ?assertMatch({error, {ok, Code, _, Msg}}, Res);
@@ -201,8 +201,9 @@ assert_match(Other, Res) ->
 %% counters, and riak_objects for node_confirms we can cut and paste
 %% the same test or we can do it all at once, but we need a common
 %% preflist for that to work. TODO maybe cap the number of trials?
--spec find_common_preflist(node(), [{binary(), binary()}]) ->
-                                  {[{binary(), binary()}], riak_core_apl:preflist_ann()}.
+-spec find_common_preflist(
+    node(), [{binary(), binary()}|binary()]) ->
+        {[{binary(), binary()}|binary()], riak_core_apl:preflist_ann()}.
 find_common_preflist(Node, [Hd|BTs]) when is_list(BTs) ->
     find_common_preflist(Node, BTs, preflist(Node, Hd), [Hd]).
 

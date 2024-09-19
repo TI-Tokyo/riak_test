@@ -41,48 +41,32 @@ setup(Type) ->
 
     {DefinedType, UndefType} = Types = {<<"working_type">>, <<"undefined_type">>},
 
-    rt:create_and_activate_bucket_type(LeaderA,
-                                       DefinedType,
-                                       [{n_val, 3}, {allow_mult, false}]),
+    rt:create_and_activate_bucket_type(
+        LeaderA, DefinedType, [{n_val, 3}, {allow_mult, false}]),
     rt:wait_until_bucket_type_status(DefinedType, active, ANodes),
     rt:wait_until_bucket_type_visible(ANodes, DefinedType),
 
     case Type of
-        current ->
-            rt:create_and_activate_bucket_type(LeaderB,
-                                               DefinedType,
-                                               [{n_val, 3}, {allow_mult, false}]),
-            rt:wait_until_bucket_type_status(DefinedType, active, BNodes),
-            rt:wait_until_bucket_type_visible(BNodes, DefinedType);
-        mixed ->
-            ok;
         aae ->
-            rt:create_and_activate_bucket_type(LeaderB,
-                                               DefinedType,
-                                               [{n_val, 3}, {allow_mult, false}]),
+            rt:create_and_activate_bucket_type(
+                LeaderB, DefinedType, [{n_val, 3}, {allow_mult, false}]),
             rt:wait_until_bucket_type_status(DefinedType, active, BNodes),
             rt:wait_until_bucket_type_visible(BNodes, DefinedType)
     end,
 
-    rt:create_and_activate_bucket_type(LeaderA,
-                                       UndefType,
-                                       [{n_val, 3}, {allow_mult, false}]),
+    rt:create_and_activate_bucket_type(
+        LeaderA, UndefType, [{n_val, 3}, {allow_mult, false}]),
     rt:wait_until_bucket_type_status(UndefType, active, ANodes),
     rt:wait_until_bucket_type_visible(ANodes, UndefType),
 
     connect_clusters(LeaderA, LeaderB),
     {ClusterNodes, Types, PBA, PBB}.
 
-cleanup({ClusterNodes, _Types, PBA, PBB}, CleanCluster) ->
+cleanup({ClusterNodes, _Types, PBA, PBB}, true) ->
     riakc_pb_socket:stop(PBA),
     riakc_pb_socket:stop(PBB),
     {_, _, ANodes, BNodes} = ClusterNodes,
-    case CleanCluster of
-        true ->
-            rt:clean_cluster(ANodes ++ BNodes);
-        false ->
-            ok
-    end.
+    rt:clean_cluster(ANodes ++ BNodes).
 
 %% @doc riak_test entry point
 confirm() ->
@@ -210,27 +194,8 @@ cluster_conf_aae() ->
          ]}
         ].
 
-cluster_conf() ->
-    [
-     {riak_repl,
-      [
-       %% turn off fullsync
-       {fullsync_on_connect, false},
-       {fullsync_interval, disabled},
-       {max_fssource_cluster, 20},
-       {max_fssource_node, 20},
-       {max_fssink_node, 20},
-       {rtq_max_bytes, 1048576}
-      ]}
-    ].
-
-deploy_nodes(NumNodes, current) ->
-    rt:deploy_nodes(NumNodes, cluster_conf(), [riak_kv, riak_repl]);
 deploy_nodes(NumNodes, aae) ->
-    rt:deploy_nodes(NumNodes, cluster_conf_aae(), [riak_kv, riak_repl]);
-deploy_nodes(_, mixed) ->
-    Conf = cluster_conf(),
-    rt:deploy_nodes([{current, Conf}, {previous, Conf}], [riak_kv, riak_repl]).
+    rt:deploy_nodes(NumNodes, cluster_conf_aae(), [riak_kv, riak_repl]).
 
 %% @doc Create two clusters of 1 node each and connect them for replication:
 %%      Cluster "A" -> cluster "B"

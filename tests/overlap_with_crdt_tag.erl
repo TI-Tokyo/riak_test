@@ -137,37 +137,8 @@ run_test(Items, NTestNodes) ->
 
 set_handoff_encoding(default, _) ->
     ?LOG_INFO("Using default encoding type."),
-    true;
-set_handoff_encoding(Encoding, Nodes) ->
-    ?LOG_INFO("Forcing encoding type to ~0p.", [Encoding]),
+    true.
 
-    %% Update all nodes (capabilities are not re-negotiated):
-    [begin
-         rt:update_app_config(Node, override_data(Encoding)),
-         assert_using(Node, {riak_kv, handoff_data_encoding}, Encoding)
-     end || Node <- Nodes].
-
-%% ToDo: This is known not to work - should be riak_kv - see verify_handoff
-%% Not fixing it now - it's not used in this test and should be refactored
-override_data(Encoding) ->
-    [
-     { riak_core,
-       [
-        { override_capability,
-          [
-           { handoff_data_encoding,
-             [
-              {    use, Encoding},
-              { prefer, Encoding}
-             ]
-           }
-          ]
-        }
-       ]}].
-
-assert_using(Node, {CapabilityCategory, CapabilityName}, ExpectedCapabilityName) ->
-    ?LOG_INFO("assert_using ~0p =:= ~0p", [ExpectedCapabilityName, CapabilityName]),
-    ExpectedCapabilityName =:= rt:capability(Node, {CapabilityCategory, CapabilityName}).
 
 %% For some testing purposes, making these limits smaller is helpful:
 deploy_test_nodes(N) ->

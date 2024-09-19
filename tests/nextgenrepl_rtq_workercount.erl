@@ -76,7 +76,17 @@ confirm() ->
             {4, ?CONFIG(?A_RING, ?A_NVAL, ClusterASrcQ)},
             {2, ?CONFIG(?B_RING, ?B_NVAL, ClusterBSrcQ)}]),
 
-    cluster_test(ClusterA1, ClusterB1, pb).
+    cluster_test(ClusterA1, ClusterB1, pb),
+    
+    rt:clean_cluster(ClusterA1),
+    rt:clean_cluster(ClusterB1),
+
+    [ClusterA2, ClusterB2] =
+        rt:deploy_clusters([
+            {4, ?CONFIG(?A_RING, ?A_NVAL, ClusterASrcQ)},
+            {2, ?CONFIG(?B_RING, ?B_NVAL, ClusterBSrcQ)}]),
+    
+    cluster_test(ClusterA2, ClusterB2, http).
 
 cluster_test(ClusterA, ClusterB, Protocol) ->
 
@@ -245,13 +255,11 @@ write_to_cluster(Node, Start, End, CommonValBin) ->
                 case CommonValBin of
                     new_obj ->
                         CVB = ?COMMMON_VAL_INIT,
-                        riak_object:new(?TEST_BUCKET,
-                                        Key,
-                                        <<N:32/integer, CVB/binary>>);
-                    UpdateBin ->
-                        UPDV = <<N:32/integer, UpdateBin/binary>>,
-                        {ok, PrevObj} = riak_client:get(?TEST_BUCKET, Key, C),
-                        riak_object:update_value(PrevObj, UPDV)
+                        riak_object:new(
+                            ?TEST_BUCKET,
+                            Key,
+                            <<N:32/integer, CVB/binary>>
+                        )
                 end,
             try riak_client:put(Obj, C) of
                 ok ->

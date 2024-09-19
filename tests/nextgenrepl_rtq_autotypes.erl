@@ -249,13 +249,11 @@ write_to_cluster(Node, Start, End, CommonValBin, Bucket) ->
                 case CommonValBin of
                     new_obj ->
                         CVB = ?COMMMON_VAL_INIT,
-                        riak_object:new(Bucket,
-                                        Key,
-                                        <<N:32/integer, CVB/binary>>);
-                    UpdateBin ->
-                        UPDV = <<N:32/integer, UpdateBin/binary>>,
-                        {ok, PrevObj} = riak_client:get(Bucket, Key, C),
-                        riak_object:update_value(PrevObj, UPDV)
+                        riak_object:new(
+                            Bucket,
+                            Key,
+                            <<N:32/integer, CVB/binary>>
+                        )
                 end,
             try riak_client:put(Obj, C) of
                 ok ->
@@ -276,7 +274,7 @@ write_to_cluster(Node, Start, End, CommonValBin, Bucket) ->
 read_from_cluster(Node, Start, End, CommonValBin, Bucket, Errors) ->
     read_from_cluster(Node, Start, End, CommonValBin, Bucket, Errors, false).
 
-read_from_cluster(Node, Start, End, CommonValBin, Bucket, Errors, LogErrors) ->
+read_from_cluster(Node, Start, End, CommonValBin, Bucket, Errors, _LogErrors) ->
     ?LOG_INFO("Reading ~b keys from node ~0p.", [End - Start + 1, Node]),
     {ok, C} = riak:client_connect(Node),
     F =
@@ -296,20 +294,4 @@ read_from_cluster(Node, Start, End, CommonValBin, Bucket, Errors, LogErrors) ->
             end
         end,
     ErrorsFound = lists:foldl(F, [], lists:seq(Start, End)),
-    case Errors of
-        undefined ->
-            ?LOG_INFO("Errors Found in read_from_cluster ~w",
-                        [length(ErrorsFound)]);
-        _ ->
-            case LogErrors of
-                true ->
-                    LogFun =
-                        fun(Error) ->
-                            ?LOG_INFO("Read error ~w", [Error])
-                        end,
-                    lists:foreach(LogFun, ErrorsFound);
-                false ->
-                    ok
-            end,
-            ?assertEqual(Errors, length(ErrorsFound))
-    end.
+    ?assertEqual(Errors, length(ErrorsFound)).

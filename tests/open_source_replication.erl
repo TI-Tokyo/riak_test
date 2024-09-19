@@ -325,16 +325,6 @@ run_simple_write_test(WriteClusterNode, ReadClusterNode, no_repl) ->
     ?LOG_INFO("Reading 0 keys written to ~0p on ~0p becuz no replication",
                [WriteClusterNode, ReadClusterNode]),
     ?assertEqual(0, wait_for_reads(ReadClusterNode, 101, 200, TestBucket, 2)),
-    ok;
-run_simple_write_test(WriteClusterNode, ReadClusterNode, repl) ->
-    TestHash = erlang:md5(term_to_binary(os:timestamp())),
-    TestBucket = <<TestHash/binary, "repl">>,
-    ?LOG_INFO("Writing 100 more keys to ~0p", [WriteClusterNode]),
-    ?assertEqual([], replication:do_write(WriteClusterNode, 101, 200, TestBucket, 2)),
-
-    ?LOG_INFO("Reading 100 keys written to ~0p on ~0p becuz no replication",
-               [WriteClusterNode, ReadClusterNode]),
-    ?assertEqual(100, wait_for_reads(ReadClusterNode, 101, 200, TestBucket, 2)),
     ok.
 
 wait_for_reads(Node, Start, End, Bucket, R) ->

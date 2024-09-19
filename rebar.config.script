@@ -245,4 +245,20 @@
     end,
     DebugMsg("ConfigOut:~n~p.~n", [ConfigOut]),
 
-    maps:to_list(ConfigOut).
+    OtpVersion = erlang:system_info(otp_release),
+    ConfigOut0 =
+        if
+            OtpVersion >= "26" ->
+                Profiles = maps:get(profiles, ConfigOut),
+                {check, CheckProf} = lists:keyfind(check, 1, Profiles),
+                ExtendedCheckProf =
+                    [{dialyzer, [{warnings, [no_unknown]}]}|CheckProf],
+                UpdProfiles =
+                    lists:keyreplace(
+                        check, 1, Profiles, {check, ExtendedCheckProf}),
+                maps:update(profiles, UpdProfiles, ConfigOut);
+            true ->
+                ConfigOut
+        end,
+
+    maps:to_list(ConfigOut0).

@@ -310,9 +310,10 @@ verify_put_timeout(Node, Bucket, Key, Value, Options, Timeout, ExpectedPutReturn
     {Time, {error, Val}} = timer:tc(
         fun() ->
             riakc_pb_socket:put(
-                Client, riakc_obj:new(
-                    Bucket, Key, Value
-                ), [{timeout, Timeout} | Options]
+                Client,
+                riakc_obj:new(Bucket, Key, Value),
+                Options,
+                Timeout
             )
         end
     ),

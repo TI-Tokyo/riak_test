@@ -54,7 +54,7 @@ confirm() ->
     %% Create a typed bucket (with no custom props)
     rt:create_and_activate_bucket_type(Node, ?TYPE, []),
     %% Create a custom bucket (change allow_mult to true!)
-    rt:pbc_set_bucket_prop(Pid, ?BUCKET, [{allow_mult, true}, {custom_prop, x}]),
+    rt:pbc_set_bucket_prop(Pid, ?BUCKET, [{allow_mult, true}]),
 
     ?LOG_INFO("Write values on `previous'"),
     %% Write some sample data.

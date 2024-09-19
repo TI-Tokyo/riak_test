@@ -232,7 +232,7 @@ read_some(Node, Props) ->
             K = KFun(N),
             case Expect of
                 exists ->
-                    case C:get(Bucket, K, R) of
+                    case riak_client:get(Bucket, K, R, C) of
                         {ok, Obj} ->
                             Val = VFun(N),
                             case Siblings of
@@ -258,7 +258,7 @@ read_some(Node, Props) ->
                             [{N, Other} | Acc]
                     end;
                 deleted ->
-                    case C:get(Bucket, K, R) of
+                    case riak_client:get(Bucket, K, R, C) of
                         {error, notfound} ->
                             Acc;
                         Other ->

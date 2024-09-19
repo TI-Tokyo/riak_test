@@ -181,7 +181,7 @@ verify_data(Node, KeyValues, Bucket) ->
         case rt:wait_until(CheckFun, Retry, Delay) of
             ok ->
                 ?LOG_INFO("Data is now correct. Yay!");
-            fail ->
+            _ ->
                 ?LOG_ERROR("AAE failed to fix data"),
                 aae_failed_to_fix_data
         end,

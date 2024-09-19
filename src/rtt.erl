@@ -287,7 +287,7 @@
 -type conn_info_list() :: list({node(), interfaces()}).
 %% A list of nodes and the interfaces each exposes.
 
--type net_endpoint() :: {string(), inet:port_number()}.
+-type net_endpoint() :: {string()|inet:ip_address(), inet:port_number()}.
 %% TCP/IP network connection endpoint.
 
 -type net_proto() :: http | https | pb.

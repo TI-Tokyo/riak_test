@@ -29,7 +29,9 @@
         tools,
         mapred_verify,
         kvc,
-        riakhttpc
+        getopt,
+        riakc,
+        rhc
     ]},
     {env, [
         %% Log formatter templates, used by multiple modules

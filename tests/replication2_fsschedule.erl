@@ -188,8 +188,6 @@ wait_until_fullsyncs(Node, ClusterName, N) ->
                 case FS of
                     {badrpc, _} ->
                         false;
-                    undefined ->
-                        false;
                     X when X >= N ->
                         true;
                     _ ->

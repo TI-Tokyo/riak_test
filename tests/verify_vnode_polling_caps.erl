@@ -94,8 +94,8 @@ confirm() ->
                 new_expected_stat_acc(),
                 Nodes),
             ?LOG_INFO("upgrade all to ~s (~s)", [NewStr, NewTag]),
-            ?assertMatch(ok, rt:upgrade(Node1, NewTag)),
-            ?assertMatch(ok, rt:upgrade(Node2, NewTag)),
+            ok = rt:upgrade(Node1, NewTag),
+            ok = rt:upgrade(Node2, NewTag),
             %% upgrade restarts, and restarts clear stats
             clear_stats(Node2, clear_stats(Node1, ExpectedStatAcc1));
         true ->

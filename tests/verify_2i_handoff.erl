@@ -53,12 +53,10 @@ run_test(Items, NTestNodes) ->
     ?LOG_INFO("Testing handoff (items ~b, nodes: ~b)", [Items, NTestNodes]),
 
     ?LOG_INFO("Spinning up test nodes"),
-    [RootNode, FirstJoin, SecondJoin, LastJoin] = Nodes =
+    [RootNode, FirstJoin, SecondJoin, LastJoin] =
         deploy_test_nodes(NTestNodes),
 
     rt:wait_for_service(RootNode, riak_kv),
-
-    set_handoff_encoding(default, Nodes),
 
     ?LOG_INFO("Initialise bucket type."),
     BProps = [{allow_mult, true}, {last_write_wins, false},
@@ -182,41 +180,6 @@ reportIfEqual(PB, Expected, B, Query, Opts, ResultKey) ->
             ?LOG_INFO("Expected keys ~b but only ~b keys found",
                         [Expected, N])
     end.
-
-set_handoff_encoding(default, _) ->
-    ?LOG_INFO("Using default encoding type."),
-    true;
-set_handoff_encoding(Encoding, Nodes) ->
-    ?LOG_INFO("Forcing encoding type to ~0p.", [Encoding]),
-
-    %% Update all nodes (capabilities are not re-negotiated):
-    [begin
-         rt:update_app_config(Node, override_data(Encoding)),
-         assert_using(Node, {riak_kv, handoff_data_encoding}, Encoding)
-     end || Node <- Nodes].
-
-%% ToDo: This is known not to work - should be riak_kv - see verify_handoff
-%% Not fixing it now - it's not used in this test and should be refactored
-override_data(Encoding) ->
-    [
-     { riak_core,
-       [
-        { override_capability,
-          [
-           { handoff_data_encoding,
-             [
-              {    use, Encoding},
-              { prefer, Encoding}
-             ]
-           }
-          ]
-        }
-       ]}].
-
-assert_using(Node, {CapabilityCategory, CapabilityName}, ExpectedCapabilityName) ->
-    ?LOG_INFO("assert_using ~0p =:= ~0p", [ExpectedCapabilityName, CapabilityName]),
-    ExpectedCapabilityName =:= rt:capability(Node, {CapabilityCategory, CapabilityName}).
-
 
 %% general 2i utility
 put_an_object(HTTPc, B, N) ->

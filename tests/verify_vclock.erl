@@ -60,10 +60,19 @@ try_encoding(TestNode, Encoding, NTestItems) ->
 
     %% Check to see if we can round-trip with the selected encoding:
     ?LOG_INFO("Testing round-trip for encoding ~0p...", [Encoding]),
-    Input   = <<"delicious ham">>,
+    Input   =
+        [
+            {<<"delicious ham">>,
+            {1,
+                calendar:datetime_to_gregorian_seconds(
+                    calendar:now_to_datetime(os:timestamp())
+                )
+            }
+        }
+    ],
     Encoded = riak_object:encode_vclock(Input),
     Decoded = riak_object:decode_vclock(Encoded),
-    Input = Decoded,
+    ?assertMatch(Input, Decoded),
 
     %% Try to find some data that does not exist:
     ?LOG_INFO("Testing find-missing..."),

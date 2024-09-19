@@ -559,7 +559,7 @@ get_cluster_mgr_port(Node) ->
 
 maybe_reconnect_rt(SourceNode, SinkPort, SinkName) ->
     case repl_util:wait_for_connection(SourceNode, SinkName) of
-        fail ->
+        {fail, _} ->
             connect_rt(SourceNode, SinkPort, SinkName);
         Oot ->
             Oot

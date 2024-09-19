@@ -68,7 +68,7 @@ confirm() ->
     ?assertMatch({ok, "503", _, <<"request timed out\n">>}, Tup3),
 
     ?LOG_INFO("testing invalid timeout value"),
-    {error, Tup4} = rhc:get(HC, <<"foo">>, <<"bar">>, [{timeout, asdasdasd}]),
+    {error, Tup4} = bad_timeout_fun_http(HC),
     ?assertMatch({ok, "400", _,
                   <<"Bad timeout value \"asdasdasd\"\n">>},
                  Tup4),
@@ -77,22 +77,20 @@ confirm() ->
     {ok, O} = rhc:get(HC, <<"foo">>, <<"bar">>, [{timeout, 4000}]),
 
     %% either of these are potentially valid.
-    case riakc_obj:get_values(O) of
-        [<<"foobarbaz\n">>] ->
-            ?LOG_INFO("Original Value"),
-            ok;
-        [<<"getgetgetgetget\n">>] ->
-            ?LOG_INFO("New Value"),
-            ok;
-        [_A, _B] = L ->
-            ?assertEqual([<<"foobarbaz\n">>,<<"getgetgetgetget\n">>],
-                         lists:sort(L)),
-            ?LOG_INFO("Both Values"),
-            ok;
-        V -> ?assertEqual({object_value, <<"getgetgetgetget\n">>},
-                          {object_value, V})
-    end,
-
+    ok =
+        case riakc_obj:get_values(O) of
+            [<<"foobarbaz\n">>] ->
+                ?LOG_INFO("Original Value"),
+                ok;
+            [<<"getgetgetgetget\n">>] ->
+                ?LOG_INFO("New Value"),
+                ok;
+            [_A, _B] = L ->
+                ?assertEqual([<<"foobarbaz\n">>,<<"getgetgetgetget\n">>],
+                            lists:sort(L)),
+                ?LOG_INFO("Both Values"),
+                ok
+        end,
 
     PC = rt:pbc(Node),
 
@@ -105,10 +103,12 @@ confirm() ->
     ?assertEqual(BOOM, PGET),
 
     ?LOG_INFO("testing PUT timeout"),
-    PPUT = riakc_pb_socket:put(PC,
-                               riakc_obj:new(<<"foo">>, <<"bar2">>,
-                                             <<"get2get2get2get2get\n">>),
-                               [{timeout, 100}]),
+    PPUT =
+        riakc_pb_socket:put(
+            PC,
+            riakc_obj:new(<<"foo">>, <<"bar2">>, <<"get2get2get2get2get\n">>),
+            [{timeout, 100}]
+        ),
     ?assertEqual(BOOM, PPUT),
 
     ?LOG_INFO("testing DELETE timeout"),
@@ -117,29 +117,27 @@ confirm() ->
     ?assertEqual(BOOM, PDEL),
 
     ?LOG_INFO("testing invalid timeout value"),
-    ?assertError(badarg, riakc_pb_socket:get(PC, <<"foo">>, <<"bar2">>,
-                                             [{timeout, asdasdasd}])),
+    ?assertError(badarg, bad_timeout_fun_pb(PC)),
 
     ?LOG_INFO("testing GET still works before long timeout"),
-    {ok, O2} = riakc_pb_socket:get(PC, <<"foo">>, <<"bar2">>,
-                                  [{timeout, 4000}]),
+    {ok, O2} =
+        riakc_pb_socket:get(PC, <<"foo">>, <<"bar2">>, [{timeout, 4000}]),
 
     %% either of these are potentially valid.
-    case riakc_obj:get_values(O2) of
-        [<<"get2get2get2get2get\n">>] ->
-            ?LOG_INFO("New Value"),
-            ok;
-        [<<"foobarbaz2\n">>] ->
-            ?LOG_INFO("Original Value"),
-            ok;
-        [_A2, _B2] = L2 ->
-            ?assertEqual([<<"foobarbaz2\n">>, <<"get2get2get2get2get\n">>],
-                         lists:sort(L2)),
-            ?LOG_INFO("Both Values"),
-            ok;
-        V2 -> ?assertEqual({object_value, <<"get2get2get2get2get\n">>},
-                           {object_value, V2})
-    end,
+    ok =
+        case riakc_obj:get_values(O2) of
+            [<<"get2get2get2get2get\n">>] ->
+                ?LOG_INFO("New Value"),
+                ok;
+            [<<"foobarbaz2\n">>] ->
+                ?LOG_INFO("Original Value"),
+                ok;
+            [_A2, _B2] = L2 ->
+                ?assertEqual([<<"foobarbaz2\n">>, <<"get2get2get2get2get\n">>],
+                            lists:sort(L2)),
+                ?LOG_INFO("Both Values"),
+                ok
+        end,
 
 
     Long = 1000000,
@@ -204,11 +202,16 @@ confirm() ->
     {ok, ReqId5} = rhc:stream_list_buckets(LHC, Long),
     wait_for_end(ReqId5),
 
-
-
-
     pass.
 
+-dialyzer({nowarn_function, bad_timeout_fun_pb/1}).
+-dialyzer({nowarn_function, bad_timeout_fun_http/1}).
+
+bad_timeout_fun_pb(PC) ->
+    riakc_pb_socket:get(PC, <<"foo">>, <<"bar2">>, [{timeout, asdasdasd}]).
+
+bad_timeout_fun_http(HC) ->
+    rhc:get(HC, <<"foo">>, <<"bar">>, [{timeout, asdasdasd}]).
 
 wait_for_error(ReqId) ->
     receive

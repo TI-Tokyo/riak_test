@@ -102,7 +102,7 @@ confirm() ->
     Oh4Map2 = riakc_map:update({<<"profile">>, map},
                             fun(M) ->
                                     riakc_map:update(
-                                      {"name", register},
+                                      {<<"name">>, register},
                                       fun(R) ->
                                               riakc_register:set(<<"Bob">>, R)
                                       end, M)

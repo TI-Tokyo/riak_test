@@ -224,11 +224,14 @@ confirm() ->
     ?assertEqual(ok, rhc:ping(C7)),
 
     ?LOG_INFO("verifying that user cannot get/put without grants"),
-    ?assertMatch({error, {ok, "403", _, _}}, rhc:get(C7, <<"hello">>,
-                                                     <<"world">>)),
+    ?assertMatch(
+        {error, {ok, "403", _, _}},
+        rhc:get(C7, <<"hello">>, <<"world">>)),
 
-    Object = riakc_obj:new(<<"hello">>, <<"world">>, <<"howareyou">>,
-                           <<"text/plain">>),
+    Object =
+        riakc_obj:new(
+            <<"hello">>, <<"world">>, <<"howareyou">>, "text/plain"
+        ),
 
     ?assertMatch({error, {ok, "403", _, _}}, rhc:put(C7, Object)),
 
@@ -361,11 +364,15 @@ confirm() ->
         true ->
             %% 2i permission test
             ?LOG_INFO("Checking 2i is disallowed"),
-            ?assertMatch({error, {"403", _}},
-                         rhc:get_index(C7, <<"hello">>,
-                                                   {binary_index,
-                                                    "name"},
-                                                   <<"John">>)),
+            ?assertMatch(
+                {error, {"403", _}},
+                rhc:get_index(
+                    C7,
+                    <<"hello">>,
+                    {binary_index, "name"},
+                    <<"John">>
+                )
+            ),
 
             ?LOG_INFO("Granting 2i permissions, checking that results come back"),
             ok = rpc:call(Node, riak_core_console, grant, [["riak_kv.index", "on",
@@ -437,14 +444,23 @@ confirm() ->
                                                     "default", "MR", "to", Username]]),
 
 
-    ok = rhc:put(C7, riakc_obj:new(<<"MR">>, <<"lobster_roll">>, <<"16">>,
-                           <<"text/plain">>)),
+    ok =
+        rhc:put(
+            C7,
+            riakc_obj:new(<<"MR">>, <<"lobster_roll">>, <<"16">>, "text/plain")
+        ),
 
-    ok = rhc:put(C7, riakc_obj:new(<<"MR">>, <<"pickle_plate">>, <<"9">>,
-                           <<"text/plain">>)),
+    ok =
+        rhc:put(
+            C7,
+            riakc_obj:new(<<"MR">>, <<"pickle_plate">>, <<"9">>, "text/plain")
+        ),
 
-    ok = rhc:put(C7, riakc_obj:new(<<"MR">>, <<"pimms_cup">>, <<"8">>,
-                           <<"text/plain">>)),
+    ok =
+        rhc:put(
+            C7,
+            riakc_obj:new(<<"MR">>, <<"pimms_cup">>, <<"8">>, "text/plain")
+        ),
 
 
     ?assertMatch({error, {"403", _}},

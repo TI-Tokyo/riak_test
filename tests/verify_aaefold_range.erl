@@ -50,19 +50,21 @@
           ]}]
        ).
 
--define(NUM_NODES, 3).
--define(NUM_KEYS_PERNODE, 10000).
+-define(NUM_KEYS, 12000). % must be divisible by node count
 -define(BUCKET, <<"test_bucket">>).
--define(N_VAL, 3).
 -define(DELTA_COUNT, 10).
 
 confirm() ->
-    Nodes0 = rt:build_cluster(?NUM_NODES, ?CFG_NOREBUILD),
+    rt:set_advanced_conf(all, ?CFG_NOREBUILD),
+    Nodes0 = rt:build_cluster([previous, previous, current, current]),
     ok = verify_aae_fold(Nodes0),
     pass.
 
 
 verify_aae_fold(Nodes) ->
+
+    CountPerNode = ?NUM_KEYS div length(Nodes),
+    ?assertMatch(?NUM_KEYS, CountPerNode * length(Nodes)),
 
     {ok, CH} = riak:client_connect(hd(Nodes)),
     {ok, CT} = riak:client_connect(lists:last(Nodes)),
@@ -75,24 +77,32 @@ verify_aae_fold(Nodes) ->
     ?LOG_INFO("Commencing object load"),
     KeyLoadFun =
         fun(Node, KeyCount) ->
-            KVs = test_data(KeyCount + 1,
-                                KeyCount + ?NUM_KEYS_PERNODE,
-                                list_to_binary("U1")),
+            KVs = test_data(
+                KeyCount + 1,
+                KeyCount + CountPerNode,
+                list_to_binary("U1")),
             ok = write_data(Node, KVs),
-            KeyCount + ?NUM_KEYS_PERNODE
+            KeyCount + CountPerNode
         end,
 
-    lists:foldl(KeyLoadFun, 1, Nodes),
-    ?LOG_INFO("Loaded ~b objects", [?NUM_KEYS_PERNODE * length(Nodes)]),
+    lists:foldl(KeyLoadFun, 0, Nodes),
+    ?LOG_INFO("Loaded ~b objects", [?NUM_KEYS]),
 
     ?LOG_INFO("Fold for busy tree"),
     {ok, RH1} = riak_client:aae_fold(TreeQuery, CH),
+
+    ?LOG_INFO("Force use of old trees on comparator"),
+    ok =
+        erpc:call(
+            lists:last(Nodes),
+            application,
+            set_env,
+            [riak_kv, legacyformat_tictacaae_tree, true]
+        ),
     {ok, RT1} = riak_client:aae_fold(TreeQuery, CT),
 
-    ?assertMatch(true, RH1 == RT1),
-    ?assertMatch(true, RH0 == RT0),
     ?assertMatch(false, RH0 == RH1),
-
+    ?assertMatch(true, [] == aae_exchange:compare_trees(RH0, RT0)),
     ?assertMatch(true, [] == aae_exchange:compare_trees(RH1, RT1)),
 
     ?LOG_INFO("Make ~b changes", [?DELTA_COUNT]),
@@ -129,24 +139,26 @@ verify_aae_fold(Nodes) ->
     lists:foreach(MatchFun, lists:seq(1, ?DELTA_COUNT)),
 
     ?LOG_INFO("Activate bucket type and load objects"),
-    rt:create_and_activate_bucket_type(hd(Nodes),
-                                       <<"nval4">>,
-                                       [{n_val, 4},
-                                            {allow_mult, false}]),
+    rt:create_and_activate_bucket_type(
+        hd(Nodes), <<"nval4">>, [{n_val, 4}, {allow_mult, false}]
+    ),
 
     Nv4B = {<<"nval4">>, <<"test_typed_buckets">>},
     timer:sleep(1000),
 
     KeyLoadTypeBFun =
         fun(Node, KeyCount) ->
-            KVs = test_data(KeyCount + 1,
-                                KeyCount + ?NUM_KEYS_PERNODE div 4,
-                                list_to_binary("U1")),
+            KVs =
+                test_data(
+                    KeyCount + 1,
+                    KeyCount + CountPerNode,
+                    list_to_binary("U1")
+                ),
             ok = write_data(Node, KVs, [], Nv4B),
-            KeyCount + ?NUM_KEYS_PERNODE div 4
+            KeyCount + CountPerNode
         end,
-    lists:foldl(KeyLoadTypeBFun, 1, Nodes),
-    TypedBucketObjectCount = (?NUM_KEYS_PERNODE div 4) * length(Nodes),
+    lists:foldl(KeyLoadTypeBFun, 0, Nodes),
+    TypedBucketObjectCount = ?NUM_KEYS,
     ?LOG_INFO("Loaded ~b objects", [TypedBucketObjectCount]),
     timer:sleep(1000),
 
@@ -165,7 +177,7 @@ verify_aae_fold(Nodes) ->
 
 
 to_key(N) ->
-    list_to_binary(io_lib:format("K~4..0B", [N])).
+    list_to_binary(io_lib:format("K~6..0B", [N])).
 
 test_data(Start, End, V) ->
     Keys = [to_key(N) || N <- lists:seq(Start, End)],

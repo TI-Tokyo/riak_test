@@ -50,7 +50,7 @@
           ]}]
        ).
 
--define(NUM_KEYS, 12000).
+-define(NUM_KEYS, 12000). % must be divisible by node count
 -define(BUCKET, <<"test_bucket">>).
 -define(DELTA_COUNT, 10).
 
@@ -62,6 +62,9 @@ confirm() ->
 
 
 verify_aae_fold(Nodes) ->
+
+    CountPerNode = ?NUM_KEYS div length(Nodes),
+    ?assertMatch(?NUM_KEYS, CountPerNode * length(Nodes)),
 
     {ok, CH} = riak:client_connect(hd(Nodes)),
     {ok, CT} = riak:client_connect(lists:last(Nodes)),
@@ -76,10 +79,10 @@ verify_aae_fold(Nodes) ->
         fun(Node, KeyCount) ->
             KVs = test_data(
                 KeyCount + 1,
-                KeyCount + (?NUM_KEYS div length(Nodes)),
+                KeyCount + CountPerNode,
                 list_to_binary("U1")),
             ok = write_data(Node, KVs),
-            KeyCount + (?NUM_KEYS div length(Nodes))
+            KeyCount + CountPerNode
         end,
 
     lists:foldl(KeyLoadFun, 0, Nodes),
@@ -136,10 +139,9 @@ verify_aae_fold(Nodes) ->
     lists:foreach(MatchFun, lists:seq(1, ?DELTA_COUNT)),
 
     ?LOG_INFO("Activate bucket type and load objects"),
-    rt:create_and_activate_bucket_type(hd(Nodes),
-                                       <<"nval4">>,
-                                       [{n_val, 4},
-                                            {allow_mult, false}]),
+    rt:create_and_activate_bucket_type(
+        hd(Nodes), <<"nval4">>, [{n_val, 4}, {allow_mult, false}]
+    ),
 
     Nv4B = {<<"nval4">>, <<"test_typed_buckets">>},
     timer:sleep(1000),
@@ -149,11 +151,11 @@ verify_aae_fold(Nodes) ->
             KVs =
                 test_data(
                     KeyCount + 1,
-                    KeyCount + (?NUM_KEYS div length(Nodes)),
+                    KeyCount + CountPerNode,
                     list_to_binary("U1")
                 ),
             ok = write_data(Node, KVs, [], Nv4B),
-            KeyCount + ?NUM_KEYS div length(Nodes)
+            KeyCount + CountPerNode
         end,
     lists:foldl(KeyLoadTypeBFun, 0, Nodes),
     TypedBucketObjectCount = ?NUM_KEYS,
@@ -175,7 +177,7 @@ verify_aae_fold(Nodes) ->
 
 
 to_key(N) ->
-    list_to_binary(io_lib:format("K~4..0B", [N])).
+    list_to_binary(io_lib:format("K~6..0B", [N])).
 
 test_data(Start, End, V) ->
     Keys = [to_key(N) || N <- lists:seq(Start, End)],

@@ -64,7 +64,9 @@ console_test(Node) ->
     %% Console prompt changes with OTP version, but rather than check what's
     %% running with rt:otp_release/1 we'll just use a RegEx that'll be easier
     %% to maintain over time.
-    Prompt = {re, "abort with \\^G|press Ctrl+G to abort"},
+    %% <<"Eshell V14.2.5 (press Ctrl+G to abort, type help(). for help)">>
+
+    Prompt = {re, "abort with \\^G|press Ctrl\\+G to abort"},
     %% Start and stop node, to test console working
     Ops = [
         {expect, Prompt, 30000},    % give it some time to start

@@ -20,10 +20,11 @@
 %% of that API activity
 
 -module(general_api_perf).
--export([confirm/0, spawn_profile_fun/1]).
+-export([confirm/0, spawn_profile_fun/1, confirm_pb/1, confirm_http/1]).
 
 -import(secondary_index_tests, [http_query/3, pb_query/3]).
--include_lib("eunit/include/eunit.hrl").
+-include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
 -include_lib("riakc/include/riakc.hrl").
 
 -define(DEFAULT_RING_SIZE, 8).
@@ -37,7 +38,6 @@
 -define(PROFILE_PAUSE, 10000).
 -define(PROFILE_LENGTH, 50).
 -define(REQUEST_PAUSE_UPTO, 3).
--define(CLIENT_MOD, riakc_pb_socket).
 
 -if(?OTP_RELEASE > 23).
 -define(RPC_MODULE, erpc).
@@ -74,10 +74,15 @@
        ).
 
 confirm() ->
-    [NodePB] = rt:build_cluster(1, ?CONF),
-    rt:wait_for_service(NodePB, riak_kv),
+    [Node] = rt:build_cluster(1, ?CONF),
+    rt:wait_for_service(Node, riak_kv),
+    confirm_pb(Node). % can be changed to confirm_http/1
 
-    perf_test(NodePB, ?CLIENT_MOD, ?CLIENT_COUNT).
+confirm_pb(Node) ->
+    perf_test(Node, riakc_pb_socket, ?CLIENT_COUNT).
+
+confirm_http(Node) ->
+    perf_test(Node, rhc, ?CLIENT_COUNT).
 
 perf_test(Node, ClientMod, ClientCount) ->
     Clients = get_clients(ClientCount, Node, ClientMod),
@@ -114,7 +119,7 @@ perf_test(Node, ClientMod, ClientCount) ->
     close_clients(Clients, ClientMod),
 
     EndTime = os:system_time(millisecond),
-    lager:info("Test took ~w ms", [EndTime - StartTime]),
+    ?LOG_INFO("Test took ~w ms", [EndTime - StartTime]),
     pass.
 
 receive_complete(Target, Target) ->
@@ -251,7 +256,7 @@ act(Client, ClientMod, Bucket, I, V) ->
     end,
     case I rem ?LOG_EVERY of
         0 ->
-            lager:info("Client ~p at ~w", [Client, I]);
+            ?LOG_INFO("Client ~p at ~w", [Client, I]);
         _ ->
             ok
     end,

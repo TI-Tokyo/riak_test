@@ -20,10 +20,11 @@
 %% of that API activity
 
 -module(nextgenrepl_api_perf).
--export([confirm/0]).
+-export([confirm/0, confirm_pb/2, confirm_http/2]).
 
 -import(secondary_index_tests, [http_query/3, pb_query/3]).
--include_lib("eunit/include/eunit.hrl").
+-include_lib("kernel/include/logger.hrl").
+-include_lib("stdlib/include/assert.hrl").
 -include_lib("riakc/include/riakc.hrl").
 
 -define(DEFAULT_RING_SIZE, 8).
@@ -34,7 +35,6 @@
 -define(KEY_COUNT, 50000).
 -define(OBJECT_SIZE_BYTES, 32768).
 -define(REQUEST_PAUSE_UPTO, 3).
--define(CLIENT_MOD, riakc_pb_socket).
 -define(SNK_WORKERS, 16).
 -define(FIELD_LIST, ["bin1"]).
 
@@ -83,27 +83,40 @@ confirm() ->
             {1, ?CONFIG(ClusterBSrcQ, true)}
         ]),
     
-    lager:info("Discover Peer IP/ports and restart with peer config"),
+    confirm_pb(ClusterA, ClusterB)
+        % or use confirm_http/2 to test with HTTP API
+    .
+
+
+confirm_pb(ClusterA, ClusterB) ->
+    ?LOG_INFO("Discover Peer IP/ports and restart with peer config"),
     FoldToPeerConfig =
-        case ?CLIENT_MOD of
-            rhc ->
-                fun(Node, Acc) ->
-                    {http, {IP, Port}} =
-                        lists:keyfind(http, 1, rt:connection_info(Node)),
-                    Acc0 = case Acc of "" -> ""; _ -> Acc ++ "|" end,
-                    Acc0 ++ IP ++ ":" ++ integer_to_list(Port) ++ ":http"
-                end;
-            riakc_pb_socket ->
-                fun(Node, Acc) ->
-                    {pb, {IP, Port}} =
-                        lists:keyfind(pb, 1, rt:connection_info(Node)),
-                    Acc0 = case Acc of "" -> ""; _ -> Acc ++ "|" end,
-                    Acc0 ++ IP ++ ":" ++ integer_to_list(Port) ++ ":pb"
-                end
+        fun(Node, Acc) ->
+            {pb, {IP, Port}} = lists:keyfind(pb, 1, rt:connection_info(Node)),
+            Acc0 = case Acc of "" -> ""; _ -> Acc ++ "|" end,
+            Acc0 ++ IP ++ ":" ++ integer_to_list(Port) ++ ":pb"
         end,
     reset_peer_config(FoldToPeerConfig, ClusterA, ClusterB),
 
-    perf_test(hd(ClusterA), ?CLIENT_MOD, ?CLIENT_COUNT),
+    perf_test(hd(ClusterA), riakc_pb_socket, ?CLIENT_COUNT),
+
+    get_memory(hd(ClusterA)),
+    get_memory(hd(ClusterB)),
+
+    pass.
+
+confirm_http(ClusterA, ClusterB) ->
+    ?LOG_INFO("Discover Peer IP/ports and restart with peer config"),
+    FoldToPeerConfig =
+        fun(Node, Acc) ->
+            {http, {IP, Port}} =
+                lists:keyfind(http, 1, rt:connection_info(Node)),
+            Acc0 = case Acc of "" -> ""; _ -> Acc ++ "|" end,
+            Acc0 ++ IP ++ ":" ++ integer_to_list(Port) ++ ":http"
+        end,
+    reset_peer_config(FoldToPeerConfig, ClusterA, ClusterB),
+
+    perf_test(hd(ClusterA), rhc, ?CLIENT_COUNT),
 
     get_memory(hd(ClusterA)),
     get_memory(hd(ClusterB)),
@@ -126,31 +139,31 @@ reset_peer_config(FoldToPeerConfig, ClusterA, ClusterB) ->
 
 get_memory(Node) ->
     MemStats = ?RPC_MODULE:call(Node, erlang, memory, []),
-    lager:info("MemStats for Node ~w ~p", [Node, MemStats]),
+    ?LOG_INFO("MemStats for Node ~w ~p", [Node, MemStats]),
     Top10 = ?RPC_MODULE:call(Node, riak_kv_util, top_n_binary_total_memory, [10]),
-    lager:info("Top 10 processes for binary memory:"),
+    ?LOG_INFO("Top 10 processes for binary memory:"),
     lists:foreach(
-        fun(BinProc) -> lager:info("Process memory stat ~p", [BinProc]) end,
+        fun(BinProc) -> ?LOG_INFO("Process memory stat ~p", [BinProc]) end,
         Top10
     ),
-    lager:info("Top 50 processes for binary - summary by initial call"),
+    ?LOG_INFO("Top 50 processes for binary - summary by initial call"),
     Top50Summary =
         ?RPC_MODULE:call(
             Node, riak_kv_util, summarise_binary_memory_by_initial_call, [50]
         ),
-    lists:foreach(fun(ICSumm) -> lager:info("~p", [ICSumm]) end, Top50Summary),
+    lists:foreach(fun(ICSumm) -> ?LOG_INFO("~p", [ICSumm]) end, Top50Summary),
     Top5 = ?RPC_MODULE:call(Node, riak_kv_util, top_n_process_total_memory, [5]),
-    lager:info("Top 5 processes for process memory:"),
+    ?LOG_INFO("Top 5 processes for process memory:"),
     lists:foreach(
-        fun(BinProc) -> lager:info("Process memory stat ~p", [BinProc]) end,
+        fun(BinProc) -> ?LOG_INFO("Process memory stat ~p", [BinProc]) end,
         Top5
     ),
-    lager:info("Top 100 processes for process memory - summary by initial call"),
+    ?LOG_INFO("Top 100 processes for process memory - summary by initial call"),
     Top100Summary =
         ?RPC_MODULE:call(
             Node, riak_kv_util, summarise_process_memory_by_initial_call, [100]
         ),
-    lists:foreach(fun(ICSumm) -> lager:info("~p", [ICSumm]) end, Top100Summary).
+    lists:foreach(fun(ICSumm) -> ?LOG_INFO("~p", [ICSumm]) end, Top100Summary).
 
 perf_test(Node, ClientMod, ClientCount) ->
     Clients = get_clients(ClientCount, Node, ClientMod),
@@ -189,7 +202,7 @@ perf_test(Node, ClientMod, ClientCount) ->
     close_clients(Clients, ClientMod),
 
     EndTime = os:system_time(millisecond),
-    lager:info("Test took ~w ms", [EndTime - StartTime]),
+    ?LOG_INFO("Test took ~w ms", [EndTime - StartTime]),
     pass.
 
 receive_complete(Target, Target) ->
@@ -312,7 +325,7 @@ act(Client, ClientMod, Bucket, I, V) ->
     end,
     case I rem ?LOG_EVERY of
         0 ->
-            lager:info("Client ~p at ~w", [Client, I]);
+            ?LOG_INFO("Client ~p at ~w", [Client, I]);
         _ ->
             ok
     end,

@@ -46,7 +46,6 @@ confirm() ->
                       [{{index_specs, 1}, skippable_index_specs},
                        {{diff_index_specs, 2}, skippable_diff_index_specs}]}),
     ?LOG_INFO("Installed intercepts to corrupt index specs on node ~0p", [Node1]),
-    %%rpc:call(Node1, lager, set_loglevel, [lager_console_backend, debug]),
     PBC = rt:pbc(Node1),
     NumItems = ?NUM_ITEMS,
     NumDel = ?NUM_DELETES,
@@ -177,8 +176,9 @@ run_2i_repair(Node1) ->
     MaxWaitTime = rt_config:get(rt_max_wait_time),
     receive
         {'DOWN', Mon, _, _, Status} ->
-            ?LOG_INFO("Status: ~0p", [Status]),
-            Status
+            ?LOG_INFO("Status: ~p", [Status]),
+            timer:sleep(1000),
+            Status 
     after
         MaxWaitTime ->
             ?LOG_ERROR("Timed out (~wms) waiting for 2i AAE repair process", [MaxWaitTime]),
@@ -194,6 +194,7 @@ to_key(N) ->
 
 put_obj(PBC, Bucket, N, IN, Index) ->
     K = to_key(N),
+    timer:sleep(1),
     Obj =
     case riakc_pb_socket:get(PBC, Bucket, K) of
         {ok, ExistingObj} ->
@@ -208,6 +209,7 @@ put_obj(PBC, Bucket, N, IN, Index) ->
 
 del_obj(PBC, Bucket, N) ->
     K = to_key(N),
+    timer:sleep(1),
     case riakc_pb_socket:get(PBC, Bucket, K) of
         {ok, ExistingObj} ->
             ?assertMatch(ok, riakc_pb_socket:delete_obj(PBC, ExistingObj));
@@ -218,13 +220,19 @@ del_obj(PBC, Bucket, N) ->
 
 assert_range_query(Pid, Bucket, Expected0, Index, StartValue, EndValue) ->
     ?LOG_INFO("Searching Index ~0p/~0p for ~0p-~0p", [Bucket, Index, StartValue, EndValue]),
-    {ok, ?INDEX_RESULTS{terms=Keys}} = riakc_pb_socket:get_index_range(Pid, Bucket, Index, StartValue, EndValue, [{return_terms, true}]),
-    Actual = case Keys of
-                 undefined ->
-                     [];
-                 _ ->
-                     lists:sort(Keys)
-             end,
+    {ok, ?INDEX_RESULTS{terms=Keys}} =
+        riakc_pb_socket:get_index_range(
+            Pid, Bucket, Index, StartValue, EndValue, [{return_terms, true}]),
+    Actual =
+        case Keys of
+            undefined ->
+                [];
+            _ ->
+                lists:sort(Keys)
+        end,
     Expected = lists:sort(Expected0),
-    ?assertEqual({Bucket, Expected}, {Bucket, Actual}),
+    MissingKeys = Expected -- Actual,
+    AdditionalKeys = Actual -- Expected,
+    ?assertEqual({Bucket, []}, {Bucket, MissingKeys}),
+    ?assertEqual({Bucket, []}, {Bucket, AdditionalKeys}),
     ?LOG_INFO("Yay! ~b (actual) == ~b (expected)", [length(Actual), length(Expected)]).

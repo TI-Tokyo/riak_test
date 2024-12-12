@@ -3,163 +3,37 @@ Welcome to the exciting world of `riak_test`.
 
 ## What is Riak Test?
 
-`riak_test` is a system for testing Riak clusters. Tests are written
-in Erlang, and can interact with the cluster using distributed Erlang.
+`riak_test` is a system for testing Riak clusters. Tests are written in Erlang, and can interact with the cluster using distributed Erlang.
 
 ### How does it work?
 
-`riak_test` runs tests in a sandbox, typically `$HOME/rt/riak`. The sanbox
-uses `git` to reset back to a clean state after tests are run. The
+`riak_test` runs tests in a sandbox, typically `$HOME/rt/riak`. The sandbox uses `git` to reset back to a clean state after tests are run. The
 contents of `$HOME/rt/riak` might look something like this:
 
 ```
 $ ls $HOME/rt/riak
-current riak-1.4.12 riak-2.0.2 riak-2.0.4 riak-2.0.6
+current previous
 ```
 
-Inside each of these directories is a `dev` folder, typically
-created with your normal `make [stage]devrel`. So how does
+Inside each of these directories is a `dev` folder, typically created with your normal `make devrel`. So how does
 this sandbox get populated to begin with?
 
-You'll create another directory that will contain full builds
-of different version of Riak for your platform. Typically this directory
-has been `~/test-releases` but it can be called anything and be anywhere
-that you'd like. The `dev/` directory from each of these
-releases will be copied into the sandbox (`$HOME/rt/riak`).
-There are helper scripts in `bin/` which will
-help you get both `~/test-releases` and `$HOME/rt/riak` all set up. A full
-tutorial for using them exists further down in this README.
+You'll create another directory that will contain full builds of different version of Riak for your platform. Typically this directory
+has been `~/test-releases` but it can be called anything and be anywhere that you'd like. The `dev/` directory from each of these releases will be copied into the sandbox (`$HOME/rt/riak`).
 
-There is one folder in `$HOME/rt/riak` that does not come from
-`~/test-releases`: `current`. The `current` folder can refer
-to any version of Riak, but is typically used for something
-like the `master` branch, a feature branch, or a release candidate.
-The `$HOME/rt/riak/current` dev release gets populated from a devrel of Riak
-that can come from anywhere, but is usually your 'normal' git checkout
-of Riak. The `bin/rtdev-current.sh` can be run from within that folder
-to copy `dev/` into `$HOME/rt/riak/current`.
+There are helper scripts in `bin/` which will help you get both `~/test-releases` and `$HOME/rt/riak` all set up.
 
-Once you have everything set up (again, instructions for this are below),
-you'll want to run and write tests. This repository also holds code for
-an Erlang application called `riak_test`. The actual tests exist in
-the `test/` directory.
+
+Once you have everything set up (again, instructions for this are below), you'll want to run and write tests. This repository also holds code for
+an Erlang application called `riak_test`. The actual tests exist in the `test/` directory.
 
 ## Bootstrapping Your Test Environment
 
-Running tests against a
-development version of Riak is just one of the things that you can do
-with riak_test. You can also test things involving upgrading from
-previous versions of Riak. Together, we'll get your test environment
-up and running. Scripts to help in this process are located in the
-`bin` directory of this project.
-
-### rtdev-all.sh
-
-This script is for the lazy. It performs all of the setup steps described
-in the other scripts, including installing the current "master" branch from
-Github into "current". The releases will be built in your current working
-directory, so create an empty one in a place you'd like to store these
-builds for posterity, so that you don't have to rebuild them if your
-installation path (`$HOME/rt/riak` by the way this script installs it) gets into
-a bad state.
-
-If you do want to restore your `$HOME/rt/riak` folder to factory condition, see
-`rtdev-setup-releases.sh` and if you want to change the current riak under
-test, see `rtdev-current.sh`.
-
-### rtdev-build-releases.sh
-
-The first one that we want to look at is `rtdev-build-releases.sh`. If
-left unchanged, this script is going to do the following:
-
-1. Download the source for the past three major Riak versions (e.g.
-   1.4.12, 2.0.6 and 2.1.2)
-1. Build the proper version of Erlang that release was built with,
-   using kerl (which it will also download)
-1. Build those releases of Riak.
-
-You'll want to run this script from an empty directory. Also, you might be
-thinking that you already have all the required versions of erlang. Great! You
-should set and export the following environment variables prior to running this
-and other `riak_test` scripts:
-
-Here, kerl is configured to use "$HOME/.kerl/installs" as the installation
-directory for erlang builds.
-
-```bash
-export R15B01="$HOME/.kerl/installs/erlang-R15B01"
-export R16B02="$HOME/.kerl/installs/erlang-R16B02"
-export CURRENT_OTP="$R16B02"
-```
-
-**Kerlveat**: If you want kerl to build erlangs with serious 64-bit
-Macintosh action, you'll need a `~/.kerlrc` file that looks like this:
-
-```
-KERL_CONFIGURE_OPTIONS="--disable-hipe --enable-smp-support --enable-threads --enable-kernel-poll  --enable-darwin-64bit --without-odbc"
-```
-
-The script will check that all these paths exist. If even one of them
-is missing, it will prompt you to install kerl, even if you already
-have kerl. If you say no, the script quits. If you say yes, or all of
-your erlang paths check out, then go get a cup of coffee, you'll be
-building for a little while.
-
-### rtdev-setup-releases.sh
-
-The `rtdev-setup-releases.sh` will get the releases you just built
-into a local git repository. Run this script from the
-same directory that you just built all of your releases into.
-By default this script initializes the repository into `$HOME/rt/riak` but
-you can override [`$RT_DEST_DIR`](https://github.com/basho/riak_test/blob/master/bin/rtdev-setup-releases.sh#L11).
-
-### rtdev-current.sh
-
-`rtdev-current.sh` is where it gets interesting. You need to run that
-from the Riak source folder you're wanting to test as the current
-version of Riak. Also, make sure that you've already run `make devrel`
-or `make stagedevrel` before you run `rtdev-current.sh`. Like setting up
-releases you can override [`$RT_DEST_DIR`](https://github.com/basho/riak_test/blob/master/bin/rtdev-current.sh#L6)
-so all your riak builds are in one place.  Also you can override the tag
-of the current version pulled by setting [`$RT_CURRENT_TAG`](https://github.com/basho/riak_test/blob/master/bin/rtdev-current.sh#L7)
-to a release number, e.g. `2.0.0`.  It will automatically be prefixed with
-the repo name, e.g. `riak_ee-2.0.0`.  To use `riak_ee` instead of `riak` set [`$RT_USE_EE`](https://github.com/basho/riak_test/blob/master/bin/rtdev-setup-releases.sh#L23)
-to any non-empty string.
-
-### rtdev-install.sh
-
-`rtdev-install.sh` is exactly the same as `rtdev-current.sh`, however,
-you can use arbitrary names like `riak-2.1.2` instead of just `current`.
-The single argument supplied to this script is that directory name.
-
-####  reset-current-env.sh
-
-`reset-current-env.sh` resets test environments setup using `rtdev-current.sh`
-using the following process:
-
-  1. Delete the current stagedevrel/devrel environment
-  1. `make stagedevrel` for the Riak release being tested (current default is 2.0,
-     overidden with the `-v` flag).  When the `-c` option is specified,
-     `make devclean` will be executed before rebuilding.
-  1. Execute `rtdev-current.sh` for the Riak release being tested
-  1. Rebuild the current riak_test branch.  When the `-c` option is specified,
-     'make clean' will be executed before rebuilding.
-
-This script is intended to provide to cover the common test environment
-reset method -- not cover all possible testing configurations/scenarios.
-As such, it makes the following assumptions regarding the environment and
-test operation:
-
-   * Riak source trees will be symlinked into the riak_test root directory
-     as `riak-<version>`.
-   * The script will be located in a sub-directory of <riak_test home>.  It
-     can be executed from any directory, but it uses the script location to
-     determine the riak_test home directory.
+[For simple setup instructions follow this guide](doc/SIMPLE_SETUP.md).
 
 ### Config file.
 
-Now that you've got your releases all ready and gitified, you'll need
-to tell riak_test about them. The method of choice is to create a
+Now that you've got your releases all ready and gitified, you'll need to tell riak_test about them. The method of choice is to create a
 `~/.riak_test.config` that looks something like this:
 
 ```erlang
@@ -188,11 +62,7 @@ to tell riak_test about them. The method of choice is to create a
 ]}.
 ```
 
-The `default` section of the config file will be overridden by the config
-name you specify. For example, running the command below will use an
-`rt_retry_delay` of 500 and an `rt_max_wait_time` of 180000. If your 
-defaults contain every option you need, you can run riak_test without
-the `-c` argument.
+The `default` section of the config file will be overridden by the config name you specify. For example, running the command below will use an `rt_retry_delay` of 500 and an `rt_max_wait_time` of 180000. If your defaults contain every option you need, you can run riak_test without the `-c` argument.
 
 Some configuration parameters:
  
@@ -253,13 +123,12 @@ This is an example test result JSON message posted to a webhook:
   "giddyup_url": "http://giddyup.basho.com/test_results/53" }
 ```
 Notice that the giddyup URL is not the page for the test result, but a resource from which you can GET information about the test in JSON.
+
 ### Running riak_test for the first time
 
-Run a test! After running `make` from the root of your `riak_test`
-clone just `./riak_test -c rtdev -t verify_build_cluster`
+Run a test! After running `make` from the root of your `riak_test` clone just `./riak_test -c rtdev -t verify_build_cluster`
 
-Did that work? Great, try something harder: `./riak_test -c
-rtdev -t loaded_upgrade`
+Did that work? Great, try something harder: `./riak_test -c rtdev -t loaded_upgrade`
 
 
 

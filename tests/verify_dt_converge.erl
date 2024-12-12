@@ -52,17 +52,29 @@
 -define(MODIFY_OPTS, [create]).
 
 confirm() ->
-    Config = [
-        {riak_kv, [
-            {handoff_concurrency, 16},
-            {anti_entropy, {off, []}}
-        ]},
-        {riak_core, [
-            {ring_creation_size, 16}
-        ]}
-    ],
+    Config = 
+        [
+            {
+                riak_kv,
+                [
+                    {handoff_concurrency, 16},
+                    {anti_entropy, {off, []}}
+                ]
+            },
+            {
+                riak_core,
+                [
+                    {ring_creation_size, 16},
+                    {vnode_management_timer, 2000},
+                    {vnode_inactivity_timeout, 4000},
+                    {handoff_concurrency, 16}
+                ]
+            }
+        ],
 
     [N1, N2, N3, N4] = Nodes = rt:build_cluster(4, Config),
+
+    rt:wait_until_transfers_complete(Nodes),
 
     create_bucket_types(Nodes, ?TYPES),
 
@@ -277,13 +289,20 @@ update_2a({BType, hll}, Bucket, Client, CMod) ->
                      end,
                      {BType, Bucket}, ?KEY, ?MODIFY_OPTS);
 update_2a({BType, gset}, Bucket, Client, CMod) ->
-    CMod:modify_type(Client,
-                     fun(S) ->
-                             riakc_gset:add_element(
-                               <<"DANG">>,
-                               riakc_gset:add_element(<<"Z^2">>, S))
-                     end,
-                     {BType, Bucket}, ?KEY, ?MODIFY_OPTS).
+    R =
+        CMod:modify_type(
+            Client,
+            fun(S) ->
+                riakc_gset:add_element(
+                <<"DANG">>,
+                riakc_gset:add_element(<<"Z^2">>, S))
+            end,
+            {BType, Bucket},
+            ?KEY,
+            ?MODIFY_OPTS
+        ),
+    ?LOG_INFO("Update 2a for GSET with CMod ~p result ~p", [CMod, R]),
+    R.
 
 
 check_2b({BType, counter}, Bucket, Client, CMod) ->
@@ -415,24 +434,26 @@ check_value(Client, CMod, Bucket, Key, DTMod, Expected) ->
                 [{pr, 1}, {r,2}, {notfound_ok, true}, {timeout, 5000}]).
 
 check_value(Client, CMod, Bucket, Key, DTMod, Expected, Options) ->
-    rt:wait_until(fun() ->
-                          try
-                              Result = CMod:fetch_type(Client, Bucket, Key,
-                                                       Options),
-                              ?LOG_INFO("Expected ~0p got ~0p", [Expected,
-                                                                    Result]),
-                              ?assertMatch({ok, _}, Result),
-                              {ok, C} = Result,
-                              ?assertEqual(true, DTMod:is_type(C)),
-                              ?assertEqual(Expected, DTMod:value(C)),
-                              true
-                          catch
-                              Type:Error ->
-                                  ?LOG_DEBUG("check_value(~0p,~0p,~0p,~0p,~0p) "
-                                              "failed: ~0p:~0p", [Client, Bucket,
-                                                                Key, DTMod,
-                                                                Expected, Type,
-                                                                Error]),
-                                  false
-                          end
-                  end).
+    rt:wait_until(
+        fun() ->
+            try
+                Result = CMod:fetch_type(Client, Bucket, Key, Options),
+                ?LOG_INFO(
+                    "Expected ~p~n got ~p~n", 
+                    [Expected, Result]),
+                ?assertMatch({ok, _}, Result),
+                {ok, C} = Result,
+                ?assertEqual(true, DTMod:is_type(C)),
+                ?assertEqual(Expected, DTMod:value(C)),
+                true
+            catch
+                Type:Error ->
+                    ?LOG_DEBUG(
+                        "check_value(~p,~p,~p,~p,~p) failed: ~p:~p",
+                        [Client, Bucket, Key, DTMod, Expected, Type, Error]),
+                    false
+            end
+    end,
+    10,
+    1000
+    ).

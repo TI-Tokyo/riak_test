@@ -121,6 +121,11 @@ confirm() ->
     write_once(Node1, ConsistentBKV),
     write_once(Node1, WriteOnceBKV),
 
+    PBC = rt:pbc(Node1),
+    {ok, _NormalResult} = riakc_pb_socket:get(PBC, ?NORMAL_BUCKET, Key),
+    {ok, _ConsistentResult} = riakc_pb_socket:get(PBC, ?CONSISTENT_BUCKET, Key),
+    {ok, _WriteOnceResult} = riakc_pb_socket:get(PBC, ?WRITE_ONCE_BUCKET, Key),
+
     Tests = [test_no_overload_protection,
              test_vnode_protection,
              test_fsm_protection],
@@ -392,7 +397,10 @@ remote_vnode_queues_empty() ->
 write_once(Node, {Bucket, Key, Value}) ->
     ?LOG_INFO("Writing to node ~0p", [Node]),
     PBC = rt:pbc(Node, [{auto_reconnect, true}, {queue_if_disconnected, true}]),
-    rt:pbc_write(PBC, Bucket, Key, Value),
+    lager:info(
+        "Write response for Bucket ~p ~p",
+        [Bucket, rt:pbc_write(PBC, Bucket, Key, Value)]
+    ),
     riakc_pb_socket:stop(PBC).
 
 read_until_success(Node) ->

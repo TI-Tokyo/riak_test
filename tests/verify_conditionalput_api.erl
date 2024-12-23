@@ -28,21 +28,25 @@
 -define(FRESH_KEY, <<"new_key">>).
 -define(FRESHER_KEY, <<"another_key">>).
 
--define(CONF, [
-    {riak_kv, [
-        {anti_entropy, {off, []}},
-        {delete_mode, keep},
-        {tictacaae_active, active},
-        {tictacaae_parallelstore, leveled_ko},
-        {tictacaae_storeheads, true},
-        {tictacaae_rebuildtick, 3600000}, % don't tick for an hour!
-        {tictacaae_suspend, true}
-    ]},
-    {riak_core, [
-        {ring_creation_size, ?DEFAULT_RING_SIZE},
-        {default_bucket_props, [{allow_mult, true}]}
-    ]}
-]).
+-define(CONF(CondPutMode, TokenMode),
+        [{riak_kv,
+          [
+            {anti_entropy, {off, []}},
+            {delete_mode, keep},
+            {tictacaae_active, active},
+            {tictacaae_parallelstore, leveled_ko},
+            {tictacaae_storeheads, true},
+            {tictacaae_rebuildtick, 3600000}, % don't tick for an hour!
+            {tictacaae_suspend, true},
+            {conditional_put_mode, CondPutMode},
+            {token_request_mode, TokenMode}
+          ]},
+         {riak_core,
+          [
+            {ring_creation_size, ?DEFAULT_RING_SIZE},
+            {default_bucket_props, [{allow_mult, true}]}
+          ]}]
+       ).
 
 confirm() ->
     ?LOG_INFO(
@@ -73,43 +77,37 @@ confirm() ->
         "vector clock comparison, rather than a vtag comparison."
     ),
 
-    [[CurrentNode], [PreviousNode]] =
-        rt:build_clusters([{1, current, ?CONF}, {1, previous, ?CONF}]),
-    rt:wait_for_service(CurrentNode, riak_kv),
+    [CurrentNode1] = rt:build_cluster(1, ?CONF(api_only, head_only)),
+    rt:wait_for_service(CurrentNode1, riak_kv),
 
-    RPCc = rt:pbc(CurrentNode),
-    ok = test_api_consistency(RPCc, riakc_pb_socket, <<"bucketPB">>, current),
+    RPCc1 = rt:pbc(CurrentNode1),
+    ok = test_api_consistency(RPCc1, riakc_pb_socket, <<"bucketPB">>, current),
 
-    RHCc = rt:httpc(CurrentNode),
-    ok = test_api_consistency(RHCc, rhc, <<"bucketHTTP">>, current),
+    RHCc1 = rt:httpc(CurrentNode1),
+    ok = test_api_consistency(RHCc1, rhc, <<"bucketHTTP">>, current),
 
-    TestMetaData = riak_test_runner:metadata(),
-    {match, [Vsn]} =
-        re:run(
-            proplists:get_value(version, TestMetaData),
-            "riak-(?<VER>[0-9\.]+)",
-            [{capture, ['VER'], binary}]),
-    case Vsn > <<"3.0.16">> of
-        true ->
-            ?LOG_INFO("Not testing previous"),
-            ?LOG_INFO("Current tested version is ~s", [Vsn]),
-            ?LOG_INFO(
-                "Issues with change of client to support"
-                " reap_tomb API change in 3.0.17"),
-            pass;
-        false ->
-            rt:wait_for_service(PreviousNode, riak_kv),
+    rt:clean_cluster([CurrentNode1]),
 
-            RPCp = rt:pbc(PreviousNode),
-            ok = test_api_consistency(
-                RPCp, riakc_pb_socket, <<"bucketPB">>, previous),
+    [CurrentNode2|OtherNodes] =
+        rt:build_cluster(5, ?CONF(prefer_token, basic_consensus)),
 
-            RHCp = rt:httpc(PreviousNode),
-            ok = test_api_consistency(
-                RHCp, rhc, <<"bucketHTTP">>, previous),
+    RPCc2 = rt:pbc(CurrentNode2),
+    ok = test_api_consistency(RPCc2, riakc_pb_socket, <<"bucketPB">>, current),
 
-            pass
-    end.
+    RHCc2 = rt:httpc(CurrentNode2),
+    ok = test_api_consistency(RHCc2, rhc, <<"bucketHTTP">>, current),
+    
+    rt:clean_cluster([CurrentNode2|OtherNodes]),
+
+    [CurrentNode3] = rt:build_cluster(1, ?CONF(prefer_token, head_only)),
+
+    RPCc3 = rt:pbc(CurrentNode3),
+    ok = test_api_consistency(RPCc3, riakc_pb_socket, <<"bucketPB">>, current),
+
+    RHCc3 = rt:httpc(CurrentNode3),
+    ok = test_api_consistency(RHCc3, rhc, <<"bucketHTTP">>, current),
+
+    pass.
 
 
 test_api_consistency(Client, ClientMod, Bucket, Version) ->
@@ -117,8 +115,8 @@ test_api_consistency(Client, ClientMod, Bucket, Version) ->
     ?LOG_INFO(
         "Testing consistency on ~0p version with ~0p and Bucket ~s",
         [Version, ClientMod, Bucket]),
+    ST = os:system_time(millisecond),
     ?LOG_INFO("------------------------------"),
-
     ?LOG_INFO("Simple PUT"),
     ok =
         ClientMod:put(
@@ -222,13 +220,14 @@ test_api_consistency(Client, ClientMod, Bucket, Version) ->
         ClientMod:get(Client, Bucket, ?UPDATE_KEY),
     true = riakc_obj:get_value(ObjC) == <<"valueB">>,
 
-    ok =
-        case Version of
-            current ->
-                extra_http_notmodified_test(ClientMod, Client, Bucket, ObjC);
-            _ ->
-                ok
-        end,
+    ok = extra_http_notmodified_test(ClientMod, Client, Bucket, ObjC),
+
+    ET = os:system_time(millisecond),
+    ?LOG_INFO(
+        "Confirm test took less than token request timeout - took ~w ms",
+        [ET - ST]
+    ),
+    ?assert((ET - ST) < 10000),
 
     ok.
 
@@ -335,6 +334,7 @@ check_current_match_conflict(riakc_pb_socket, MatchError) ->
     {error, Response} = MatchError,
     % On the PBC client notfound is returned when replacing a non-existent
     % object with the if_not_modified header
+    ?LOG_INFO("Error response ~p", [Response]),
     ?assert(lists:member(Response, [<<"modified">>, <<"notfound">>]));
 check_current_match_conflict(rhc, MatchError) ->
     {error, {ok, StatusCode, _Headers, _Message}} = MatchError,

@@ -449,7 +449,8 @@ all_stats(_Node) ->
     ++ pool_stats()
     ++ tictacaae_stats()
     ++ organisation_stats()
-    ++ ttaaefs_stats().
+    ++ ttaaefs_stats()
+    ++ token_stats().
 
 common_stats() ->
     [
@@ -864,6 +865,7 @@ common_stats() ->
         <<"sys_thread_pool_size">>,
         <<"sys_threads_enabled">>,
         <<"sys_wordsize">>,
+        <<"tools_version">>,
         <<"vnode_counter_update">>,
         <<"vnode_counter_update_time_100">>,
         <<"vnode_counter_update_time_95">>,
@@ -942,6 +944,7 @@ common_stats() ->
         <<"xmerl_version">>,
         <<"zstd_version">>
     ].
+
 
 pool_stats() ->
     dscp_stats() ++ [
@@ -1040,6 +1043,18 @@ ttaaefs_stats() ->
         <<"ttaaefs_hourcheck_total">>
     ].
 
+token_stats() ->
+    [<<"token_session_refusal">>,
+        <<"token_session_timeout">>,
+        <<"token_session_preflist_short">>,
+        <<"token_session_error">>,
+        <<"token_session_time_mean">>,
+        <<"token_session_request_timeout">>,
+        <<"token_session_time_100">>,
+        <<"token_session_complete">>,
+        <<"token_session_unreachable">>,
+        <<"token_session_renewal">>].
+
 
 organisation_stats() ->
     case rt_config:get(organisation) of
@@ -1085,8 +1100,7 @@ workday_stats() ->
 
 nhse_stats() ->
     [
-        <<"leveldb_read_block_error">>,
-        <<"tools_version">>
+        <<"leveldb_read_block_error">>
     ].
 
 bet365_stats() -> [].

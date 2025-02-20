@@ -16,8 +16,10 @@
 %%
 %% -------------------------------------------------------------------
 %% 
-%% A single node test, that exercises the API, and allows for profiling
-%% of that API activity
+%% A test of running 2i queries during a join to prove that the forwarding
+%% on handoff completion mitigates the non-gossipping of the ring.
+%% 
+%% The test is based on general_api_perf
 
 -module(verify_2i_rejoin).
 -export([confirm/0]).
@@ -35,20 +37,14 @@
 -define(DEFAULT_RING_SIZE, 16).
 -define(CLIENT_COUNT, 2).
 -define(QUERY_EVERY, 100).
--define(GET_EVERY, 4).
+-define(GET_EVERY, 8).
 -define(GETS_PER_GET, 1).
 -define(UPDATE_EVERY, 2).
 -define(LOG_EVERY, 5000).
--define(KEY_COUNT, 160000).
+-define(KEY_COUNT, 50000).
 -define(OBJECT_SIZE_BYTES, 256).
 -define(REQUEST_PAUSE_UPTO, 3).
--define(QUERY_COUNT, 100000).
-
--if(?OTP_RELEASE > 23).
--define(RPC_MODULE, erpc).
--else.
--define(RPC_MODULE, rpc).
--endif.
+-define(QUERY_COUNT, 80000).
 
 -define(CONF,
         [
@@ -60,8 +56,7 @@
                     {tictacaae_parallelstore, leveled_ko},
                     {tictacaae_storeheads, true},
                     {tictacaae_rebuildtick, 3600000}, % don't tick for an hour!
-                    {tictacaae_suspend, true},
-                    {log_index_fsm, true}
+                    {tictacaae_suspend, true}
                 ]
             },
             {leveled,
@@ -78,7 +73,7 @@
                     {forced_ownership_handoff,  8},
                     {vnode_inactivity_timeout,  4000},
                     {vnode_management_timer,    2000},
-                    {gossip_limit, {50, 30000}}
+                    {gossip_limit, {50, 20000}}
                 ]
             }
         ]
@@ -122,7 +117,7 @@ perf_test(Nodes, ClientMod, ClientCount) ->
     SpawnFuns = lists:map(SpawnUpdateFun, ClientBPairs),
     lists:foreach(fun spawn/1, SpawnFuns),
     
-    ok = receive_complete(0, length(Clients)),
+    ok = receive_complete(0, length(Clients), 0),
 
     ok = rt:staged_leave(Node4),
     rt:wait_until_ring_converged(Nodes),
@@ -145,9 +140,11 @@ perf_test(Nodes, ClientMod, ClientCount) ->
                     when length(HttpResKeys) == 200 ->
                     ok;
                 {ok, ?INDEX_RESULTS{keys=HttpResKeys}} ->
-                    ?LOG_WARNING("Unexpected result count ~w", [length(HttpResKeys)]);
+                    ?LOG_ERROR("Unexpected result count ~w", [length(HttpResKeys)]),
+                    error;
                 Error ->
-                    ?LOG_WARNING("Unexpected result ~0p", [Error])
+                    ?LOG_ERROR("Unexpected result ~0p", [Error]),
+                    error
             end
         end,
 
@@ -155,7 +152,7 @@ perf_test(Nodes, ClientMod, ClientCount) ->
         fun() ->
             lists:foreach(
                 fun(I) ->
-                    QueryFun(),
+                    ok = QueryFun(),
                     case I rem 2000 of
                         0 ->
                             ?LOG_INFO("~w queries run", [I]);
@@ -174,7 +171,7 @@ perf_test(Nodes, ClientMod, ClientCount) ->
     rt:staged_join(Node4, Node),
     ok = plan_and_wait(Node, Nodes),
 
-    ok = receive_complete(0, 1),
+    ok = receive_complete(0, 1, ?QUERY_COUNT * 4),
 
     close_clients(Clients, ClientMod),
 
@@ -182,10 +179,22 @@ perf_test(Nodes, ClientMod, ClientCount) ->
     ?LOG_INFO("Test took ~w ms", [EndTime - StartTime]),
     pass.
 
-receive_complete(Target, Target) ->
+receive_complete(Target, Target, _TO) ->
     ok;
-receive_complete(T, Target) ->
-    receive complete -> receive_complete(T + 1, Target) end.
+receive_complete(T, Target, 0) ->
+    receive complete -> receive_complete(T + 1, Target, 0) end;
+receive_complete(T, Target, TO) when is_integer(TO) ->
+    receive
+        complete ->
+            receive_complete(T + 1, Target, TO)
+    after 
+        TO ->
+            ?LOG_WARNING(
+                "Waited ~w seconds without completion",
+                [TO div 1000]
+            ),
+            timeout
+    end.
     
 get_clients(ClientsPerNode, Node, ClientMod) ->
     lists:map(

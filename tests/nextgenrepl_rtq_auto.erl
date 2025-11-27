@@ -43,7 +43,6 @@
 -define(REPL_SLEEP, 2048).
     % May need to wait for 2 x the 1024ms max sleep time of a snk worker
 -define(NGR_INIT_TIMEOUT, 10000).
--define(WAIT_LOOPS, 12).
 
 -define(STATS_WAIT, 1000).
 

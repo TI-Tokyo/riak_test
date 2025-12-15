@@ -20,29 +20,10 @@
 -module(bucket_types).
 -behavior(riak_test).
 
--export([confirm/0, mapred_modfun/3, mapred_modfun_type/3]).
+-export([confirm/0]).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
-
--define(SUMVALUE_MAPRED,
-            [{map,
-                {modfun, riak_kv_mapreduce, map_object_value},
-                undefined, false},
-            {reduce,
-                {modfun, riak_kv_mapreduce, reduce_string_to_integer},
-                undefined, false},
-            {reduce,
-                {modfun, riak_kv_mapreduce, reduce_sum},
-                undefined, true}]).
-
--define(COUNT_MAPRED,
-            [{map,
-                {modfun, riak_kv_mapreduce, map_object_value},
-                undefined, false},
-            {reduce,
-                {modfun, riak_kv_mapreduce, reduce_count_inputs},
-                undefined, true}]).
 
 confirm() ->
     application:start(inets),
@@ -329,21 +310,31 @@ confirm() ->
             Obj01 = riakc_obj:new(<<"test">>, <<"JRD">>, <<"John Robert Doe, 25">>),
             Obj02 = riakc_obj:new({Type, <<"test">>}, <<"JRD">>, <<"Jane Rachel Doe, 21">>),
 
-            Obj1 = riakc_obj:update_metadata(Obj01,
-                                             riakc_obj:set_secondary_index(
-                                               riakc_obj:get_update_metadata(Obj01),
-                                               [{{integer_index, "age"},
-                                                 [25]},{{binary_index, "name"},
-                                                        [<<"John">>, <<"Robert">>
-                                                         ,<<"Doe">>]}])),
+            Obj1 =
+                riakc_obj:update_metadata(
+                    Obj01,
+                    riakc_obj:set_secondary_index(
+                        riakc_obj:get_update_metadata(Obj01),
+                        [
+                            {{integer_index, "age"}, [25]},
+                            {{binary_index, "name"},
+                                [<<"John">>, <<"Robert">> ,<<"Doe">>]}
+                        ]
+                    )
+                ),
 
-            Obj2 = riakc_obj:update_metadata(Obj02,
-                                             riakc_obj:set_secondary_index(
-                                               riakc_obj:get_update_metadata(Obj02),
-                                               [{{integer_index, "age"},
-                                                 [21]},{{binary_index, "name"},
-                                                        [<<"Jane">>, <<"Rachel">>
-                                                         ,<<"Doe">>]}])),
+            Obj2 =
+                riakc_obj:update_metadata(
+                    Obj02,
+                    riakc_obj:set_secondary_index(
+                        riakc_obj:get_update_metadata(Obj02),
+                            [
+                                {{integer_index, "age"}, [21]},
+                                {{binary_index, "name"},
+                                    [<<"Jane">>, <<"Rachel">> ,<<"Doe">>]}
+                            ]
+                        )
+                    ),
 
             riakc_pb_socket:put(PB, Obj1),
             riakc_pb_socket:put(PB, Obj2),
@@ -369,139 +360,6 @@ confirm() ->
             ok
     end,
 
-
-    Store = fun(Bucket, {K,V, BI, II}) ->
-                    O=riakc_obj:new(Bucket, K),
-                    MD=riakc_obj:add_secondary_index(dict:new(),
-                                                     {{binary_index, "b_idx"},
-                                                      [BI]}),
-                    MD2=riakc_obj:add_secondary_index(MD, {{integer_index,
-                                                            "i_idx"}, [II]}),
-                    OTwo=riakc_obj:update_metadata(O,MD2),
-                    ?LOG_INFO("storing ~0p", [OTwo]),
-                    riakc_pb_socket:put(PB,riakc_obj:update_value(OTwo, V, "application/json"))
-            end,
-
-    [Store(<<"MRbucket">>, KV) || KV <- [
-                         {<<"foo">>, <<"2">>, <<"a">>, 4},
-                         {<<"bar">>, <<"3">>, <<"b">>, 7},
-                         {<<"baz">>, <<"4">>, <<"a">>, 4}]],
-
-    ?assertEqual({ok, [{2, [9]}]},
-                 riakc_pb_socket:mapred_bucket(PB, <<"MRbucket">>, ?SUMVALUE_MAPRED)),
-
-    [Store({Type, <<"MRbucket">>}, KV) || KV <- [
-                         {<<"foo">>, <<"2">>, <<"a">>, 4},
-                         {<<"bar">>, <<"3">>, <<"b">>, 7},
-                         {<<"baz">>, <<"4">>, <<"a">>, 4},
-                         {<<"bam">>, <<"5">>, <<"a">>, 3}]],
-
-    ?assertEqual(
-        {ok, [{0, [<<"2">>]}]},
-        riakc_pb_socket:mapred(
-            PB,
-            {{Type, <<"MRbucket">>}, [[<<"starts_with">>, <<"f">>]]},
-            [{map, {modfun, riak_kv_mapreduce, map_object_value}, none, true}]
-        )
-    ),
-
-    ?assertEqual({ok, [{2, [14]}]},
-                 riakc_pb_socket:mapred_bucket(PB, {Type, <<"MRbucket">>},
-                                                ?SUMVALUE_MAPRED)),
-
-    ?assertEqual({ok, [{1, [3]}]},
-                 riakc_pb_socket:mapred(PB,
-                                [{<<"MRbucket">>, <<"foo">>},
-                                 {<<"MRbucket">>, <<"bar">>},
-                                 {<<"MRbucket">>, <<"baz">>}],
-                                ?COUNT_MAPRED)),
-
-    ?assertEqual({ok, [{1, [4]}]},
-                 riakc_pb_socket:mapred(PB,
-                                [{{{Type, <<"MRbucket">>}, <<"foo">>},
-                                  undefined},
-                                 {{{Type, <<"MRbucket">>}, <<"bar">>},
-                                  undefined},
-                                 {{{Type, <<"MRbucket">>}, <<"baz">>},
-                                  undefined},
-                                 {{{Type, <<"MRbucket">>}, <<"bam">>},
-                                 undefined}],
-                                ?COUNT_MAPRED)),
-
-    case HaveIndexes of
-        false -> ok;
-        true ->
-            {ok, [{1, Results}]} = riakc_pb_socket:mapred(PB,
-                                                {index,<<"MRbucket">>,{integer_index,
-                                                                        "i_idx"},3,5},
-                                                [{map, {modfun, riak_kv_mapreduce,
-                                                        map_object_value},
-                                                    undefined, false},
-                                                {reduce, {modfun, riak_kv_mapreduce,
-                                                            reduce_set_union},
-                                                    undefined, true}]),
-            ?assertEqual([<<"2">>, <<"4">>], lists:sort(Results)),
-
-            {ok, [{1, Results1}]} = riakc_pb_socket:mapred(PB,
-                                                {index,{Type,
-                                                        <<"MRbucket">>},{integer_index,
-                                                                        "i_idx"},3,5},
-                                                [{map, {modfun, riak_kv_mapreduce,
-                                                        map_object_value},
-                                                    undefined, false},
-                                                {reduce, {modfun, riak_kv_mapreduce,
-                                                            reduce_set_union},
-                                                    undefined, true}]),
-            ?assertEqual([<<"2">>, <<"4">>, <<"5">>], lists:sort(Results1)),
-
-            {ok, [{1, Results2}]} = riakc_pb_socket:mapred(PB,
-                                                {index,<<"MRbucket">>,{binary_index,
-                                                                        "b_idx"}, <<"a">>},
-                                                [{map, {modfun, riak_kv_mapreduce,
-                                                        map_object_value},
-                                                    undefined, false},
-                                                {reduce, {modfun, riak_kv_mapreduce,
-                                                            reduce_set_union},
-                                                    undefined, true}]),
-            ?assertEqual([<<"2">>, <<"4">>], lists:sort(Results2)),
-
-            {ok, [{1, Results3}]} = riakc_pb_socket:mapred(PB,
-                                                {index,{Type,
-                                                        <<"MRbucket">>},{binary_index,
-                                                                        "b_idx"}, <<"a">>},
-                                                [{map, {modfun, riak_kv_mapreduce,
-                                                        map_object_value},
-                                                    undefined, false},
-                                                {reduce, {modfun, riak_kv_mapreduce,
-                                                            reduce_set_union},
-                                                    undefined, true}]),
-            ?assertEqual([<<"2">>, <<"4">>, <<"5">>], lists:sort(Results3)),
-            ok
-    end,
-
-    %% load this module on all the nodes
-    ok = rt:load_modules_on_nodes([?MODULE], Nodes),
-
-    %% do a modfun mapred using the function from this module
-    ?assertEqual(
-        {ok, [{2, [2]}]},
-        riakc_pb_socket:mapred(
-            PB,
-            {modfun, ?MODULE, mapred_modfun, []},
-            ?SUMVALUE_MAPRED
-        )
-    ),
-
-    %% do a modfun mapred using the function from this module
-    ?assertEqual(
-        {ok, [{2, [5]}]},
-        riakc_pb_socket:mapred(
-            PB,
-            {modfun, ?MODULE, mapred_modfun_type, []},
-            ?SUMVALUE_MAPRED
-        )
-    ),
-
     riakc_pb_socket:stop(PB),
     pass.
 
@@ -513,11 +371,3 @@ accumulate(ReqID) ->
             ?LOG_INFO("got ~0p", [Msg]),
             accumulate(ReqID)
     end.
-
-mapred_modfun(Pipe, _Args, _Timeout) ->
-    riak_pipe:queue_work(Pipe, {{<<"MRbucket">>, <<"foo">>}, {struct, []}}),
-    riak_pipe:eoi(Pipe).
-
-mapred_modfun_type(Pipe, _Args, _Timeout) ->
-    riak_pipe:queue_work(Pipe, {{{<<"mytype">>, <<"MRbucket">>}, <<"bam">>}, {struct, []}}),
-    riak_pipe:eoi(Pipe).

@@ -23,31 +23,9 @@
 
 -export([confirm/0]).
 
-%% MFA callbacks
--export([mapred_modfun/3, mapred_modfun_type/3]).
-
 -include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
 -include_lib("riakc/include/riakc.hrl").
-
--define(SUMVALUE_MAPRED,
-            [{map,
-                {modfun, riak_kv_mapreduce, map_object_value},
-                undefined, false},
-            {reduce,
-                {modfun, riak_kv_mapreduce, reduce_string_to_integer},
-                undefined, false},
-            {reduce,
-                {modfun, riak_kv_mapreduce, reduce_sum},
-                undefined, true}]).
-
--define(COUNT_MAPRED,
-            [{map,
-                {modfun, riak_kv_mapreduce, map_object_value},
-                undefined, false},
-            {reduce,
-                {modfun, riak_kv_mapreduce, reduce_count_inputs},
-                undefined, true}]).
 
 -define(WAIT(E), ?assertEqual(ok, rt:wait_until(fun() -> (E) end))).
 
@@ -320,123 +298,6 @@ confirm() ->
                                                                                     <<"Jane">>))
     end,
 
-
-    Store = fun(Bucket, {K,V, BI, II}) ->
-                    O=riakc_obj:new(Bucket, K),
-                    MD=riakc_obj:add_secondary_index(dict:new(),
-                                                     {{binary_index, "b_idx"},
-                                                      [BI]}),
-                    MD2=riakc_obj:add_secondary_index(MD, {{integer_index,
-                                                            "i_idx"}, [II]}),
-                    OTwo=riakc_obj:update_metadata(O,MD2),
-                    ok = rhc:put(RHC,riakc_obj:update_value(OTwo, V, "application/json"))
-            end,
-
-    [Store(<<"MRbucket">>, KV) || KV <- [
-                                         {<<"foo">>, <<"2">>, <<"a">>, 4},
-                                         {<<"bar">>, <<"3">>, <<"b">>, 7},
-                                         {<<"baz">>, <<"4">>, <<"a">>, 4}]],
-
-    ?assertEqual({ok, [{2, [9]}]},
-                 rhc:mapred_bucket(RHC, <<"MRbucket">>,
-                                   ?SUMVALUE_MAPRED)),
-
-    [Store({<<"mytype">>, <<"MRbucket">>}, KV) || KV <- [
-                                                         {<<"foo">>, <<"2">>, <<"a">>, 4},
-                                                         {<<"bar">>, <<"3">>, <<"b">>, 7},
-                                                         {<<"baz">>, <<"4">>, <<"a">>, 4},
-                                                         {<<"bam">>, <<"5">>, <<"a">>, 3}]],
-
-    ?assertEqual({ok, [{2, [14]}]},
-                 rhc:mapred_bucket(RHC, {<<"mytype">>, <<"MRbucket">>},
-                                   ?SUMVALUE_MAPRED)),
-
-    ?assertEqual({ok, [{1, [3]}]},
-                 rhc:mapred(RHC,
-                            [{<<"MRbucket">>, <<"foo">>},
-                             {<<"MRbucket">>, <<"bar">>},
-                             {<<"MRbucket">>, <<"baz">>}],
-                            ?COUNT_MAPRED)),
-
-    ?assertEqual({ok, [{1, [4]}]},
-                 rhc:mapred(RHC,
-                                [{{{<<"mytype">>, <<"MRbucket">>}, <<"foo">>},
-                                  undefined},
-                                 {{{<<"mytype">>, <<"MRbucket">>}, <<"bar">>},
-                                  undefined},
-                                 {{{<<"mytype">>, <<"MRbucket">>}, <<"baz">>},
-                                  undefined},
-                                 {{{<<"mytype">>, <<"MRbucket">>}, <<"bam">>},
-                                 undefined}],
-                                ?COUNT_MAPRED)),
-
-    case HaveIndexes of
-        false -> ok;
-        true ->
-            {ok, [{1, Results}]} = rhc:mapred(RHC,
-                                                {index,<<"MRbucket">>,{integer_index,
-                                                                        "i_idx"},3,5},
-                                                [{map, {modfun, riak_kv_mapreduce,
-                                                        map_object_value},
-                                                    undefined, false},
-                                                {reduce, {modfun, riak_kv_mapreduce,
-                                                            reduce_set_union},
-                                                    undefined, true}]),
-            ?assertEqual([<<"2">>, <<"4">>], lists:sort(Results)),
-
-            {ok, [{1, Results1}]} = rhc:mapred(RHC,
-                                                {index,{<<"mytype">>,
-                                                        <<"MRbucket">>},{integer_index,
-                                                                        "i_idx"},3,5},
-                                                [{map, {modfun, riak_kv_mapreduce,
-                                                        map_object_value},
-                                                    undefined, false},
-                                                {reduce, {modfun, riak_kv_mapreduce,
-                                                            reduce_set_union},
-                                                    undefined, true}]),
-            ?assertEqual([<<"2">>, <<"4">>, <<"5">>], lists:sort(Results1)),
-
-            {ok, [{1, Results2}]} = rhc:mapred(RHC,
-                                                {index,<<"MRbucket">>,{binary_index,
-                                                                        "b_idx"}, <<"a">>},
-                                                [{map, {modfun, riak_kv_mapreduce,
-                                                        map_object_value},
-                                                    undefined, false},
-                                                {reduce, {modfun, riak_kv_mapreduce,
-                                                            reduce_set_union},
-                                                    undefined, true}]),
-            ?assertEqual([<<"2">>, <<"4">>], lists:sort(Results2)),
-
-            {ok, [{1, Results3}]} = rhc:mapred(RHC,
-                                                {index,{<<"mytype">>,
-                                                        <<"MRbucket">>},{binary_index,
-                                                                        "b_idx"}, <<"a">>},
-                                                [{map, {modfun, riak_kv_mapreduce,
-                                                        map_object_value},
-                                                    undefined, false},
-                                                {reduce, {modfun, riak_kv_mapreduce,
-                                                            reduce_set_union},
-                                                    undefined, true}]),
-            ?assertEqual([<<"2">>, <<"4">>, <<"5">>], lists:sort(Results3)),
-            ok
-    end,
-
-    %% load this module on all the nodes
-    ok = rt:load_modules_on_nodes([?MODULE], Nodes),
-
-    %% do a modfun mapred using the function from this module
-    ?assertEqual({ok, [{2, [2]}]},
-                 rhc:mapred_bucket(RHC, {modfun, ?MODULE,
-                                                    mapred_modfun, []},
-                                       ?SUMVALUE_MAPRED)),
-
-    %% do a modfun mapred using the function from this module
-    ?assertEqual({ok, [{2, [5]}]},
-                 rhc:mapred_bucket(RHC, {modfun, ?MODULE,
-                                                    mapred_modfun_type, []},
-                                       ?SUMVALUE_MAPRED)),
-
-
     rt:clean_cluster(Nodes),
     rt_redbug:set_tracing_applied(true),
     ?LOG_INFO("Deploy a single node cluster"),
@@ -515,14 +376,6 @@ redbug_start(TraceFun, TrcFile, Node) ->
 
 redbug_stop() ->
     ?assertMatch(ok, rt_redbug:stop()).
-
-mapred_modfun(Pipe, _Args, _Timeout) ->
-    riak_pipe:queue_work(Pipe, {{<<"MRbucket">>, <<"foo">>}, {struct, []}}),
-    riak_pipe:eoi(Pipe).
-
-mapred_modfun_type(Pipe, _Args, _Timeout) ->
-    riak_pipe:queue_work(Pipe, {{{<<"mytype">>, <<"MRbucket">>}, <<"bam">>}, {struct, []}}),
-    riak_pipe:eoi(Pipe).
 
 flushputfun(leveled) ->
     "riak_kv_leveled_backend:flush_put/5";

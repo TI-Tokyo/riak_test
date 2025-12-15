@@ -45,21 +45,15 @@
 -include_lib("stdlib/include/assert.hrl").
 
 -cover_modules([riak_kv_vnode,
-                riak_kv_ensemble_backend,
                 riak_core_vnode_proxy]).
 
 -define(NUM_REQUESTS, 200).
 -define(THRESHOLD, 100).
--define(LIST_KEYS_RETRIES, 1000).
 -define(GET_RETRIES, 1000).
 -define(BUCKET, <<"test">>).
 -define(VALUE, <<"overload_test_value">>).
 -define(NORMAL_TYPE, <<"normal_type">>).
--define(CONSISTENT_TYPE, <<"consistent_type">>).
--define(WRITE_ONCE_TYPE, <<"write_once_type">>).
 -define(NORMAL_BUCKET, {?NORMAL_TYPE, ?BUCKET}).
--define(CONSISTENT_BUCKET, {?CONSISTENT_TYPE, ?BUCKET}).
--define(WRITE_ONCE_BUCKET, {?WRITE_ONCE_TYPE, ?BUCKET}).
 
 %% This record contains the default values for config settings if they were not set
 %% in the advanced.config file - because setting something to `undefined` is not the same
@@ -90,7 +84,6 @@ default_config(#config{
             ]},
         {vnode_management_timer, 1000},
         {enable_health_checks, false},
-        {enable_consensus, true},
         {vnode_overload_threshold, VnodeOverloadThreshold},
         {vnode_check_interval, VnodeCheckInterval},
         {vnode_check_request_interval, VnodeCheckRequestInterval}]},
@@ -107,24 +100,16 @@ confirm() ->
     [Node1 | _] = Nodes = setup(),
 
     ok = create_bucket_type(Nodes, ?NORMAL_TYPE, [{n_val, 3}]),
-    ok = create_bucket_type(Nodes, ?CONSISTENT_TYPE, [{consistent, true}, {n_val, 5}]),
-    ok = create_bucket_type(Nodes, ?WRITE_ONCE_TYPE, [{write_once, true}, {n_val, 1}]),
 
     Key = generate_key(),
     ?LOG_INFO("Generated overload test key ~0p", [Key]),
 
     NormalBKV = {?NORMAL_BUCKET, Key, ?VALUE},
-    ConsistentBKV = {?CONSISTENT_BUCKET, Key, ?VALUE},
-    WriteOnceBKV = {?WRITE_ONCE_BUCKET, Key, ?VALUE},
 
     write_once(Node1, NormalBKV),
-    write_once(Node1, ConsistentBKV),
-    write_once(Node1, WriteOnceBKV),
 
     PBC = rt:pbc(Node1),
     {ok, _NormalResult} = riakc_pb_socket:get(PBC, ?NORMAL_BUCKET, Key),
-    {ok, _ConsistentResult} = riakc_pb_socket:get(PBC, ?CONSISTENT_BUCKET, Key),
-    {ok, _WriteOnceResult} = riakc_pb_socket:get(PBC, ?WRITE_ONCE_BUCKET, Key),
 
     Tests = [test_no_overload_protection,
              test_vnode_protection,
@@ -134,9 +119,7 @@ confirm() ->
          ?LOG_INFO("Starting Test ~0p for ~0p", [Test, BKV]),
          ok = erlang:apply(?MODULE, Test, [Nodes, BKV])
      end || Test <- Tests,
-            BKV <- [NormalBKV,
-                    ConsistentBKV,
-                    WriteOnceBKV]],
+            BKV <- [NormalBKV]],
 
     %% Test cover queries doesn't depend on bucket/keyvalue, just run it once
     test_cover_queries_overload(Nodes),
@@ -150,11 +133,8 @@ generate_key() ->
 
     <<Part1/binary, Part2/binary>>.
 
-setup() ->
-    ensemble_util:build_cluster(5, default_config(), 5).
+setup() -> rt:build_cluster(5, default_config()).
 
-test_no_overload_protection(_Nodes, {?CONSISTENT_BUCKET, _, _}) ->
-    ok;
 test_no_overload_protection(Nodes, BKV) ->
     ?LOG_INFO("Setting default configuration for no overload protection test."),
     rt:pmap(fun(Node) ->
@@ -167,8 +147,6 @@ test_no_overload_protection(Nodes, BKV) ->
                                   "QueueFun", "Queue Size"),
     verify_test_results(run_test(Nodes, BKV), BKV, ProcFun, QueueFun).
 
-verify_test_results({_NumProcs, QueueLen}, {?CONSISTENT_BUCKET, _, _}, _ProcFun, QueueFun) ->
-    ?assert(QueueFun(QueueLen));
 verify_test_results({NumProcs, QueueLen}, _BKV, ProcFun, QueueFun) ->
     ?assert(ProcFun(NumProcs)),
     ?assert(QueueFun(QueueLen)).
@@ -208,15 +186,6 @@ test_vnode_protection(Nodes, BKV) ->
     Pid ! resume,
     ok.
 
-
-%% Don't check consistent gets, as they don't use the FSM
-test_fsm_protection(_, {?CONSISTENT_BUCKET, _, _}) ->
-    ok;
-
-%% Don't check on fast path either.
-test_fsm_protection(_, {?WRITE_ONCE_BUCKET, _, _}) ->
-    ok;
-
 test_fsm_protection(Nodes, BKV) ->
     ?LOG_INFO("Testing with coordinator protection enabled"),
     ?LOG_INFO("Setting FSM limit to ~b", [?THRESHOLD]),
@@ -234,10 +203,20 @@ test_fsm_protection(Nodes, BKV) ->
     %% We expect exactly ExpectedFsms, but because of a race in SideJob we sometimes get 1 more
     %% Adding 2 (the highest observed race to date) to the lte predicate to handle the occasional case.
     %% Once SideJob is fixed we should remove it (Basho #2219).
-    ProcFun = build_predicate_lte(test_fsm_protection, (ExpectedFsms+2),
-                                 "ProcFun", "Procs"),
-    QueueFun = build_predicate_lt(test_fsm_protection, (?NUM_REQUESTS),
-                                  "QueueFun", "QueueSize"),
+    ProcFun =
+        build_predicate_lte(
+            test_fsm_protection,
+            (ExpectedFsms+2),
+            "ProcFun",
+            "Procs"
+        ),
+    QueueFun =
+        build_predicate_lt(
+            test_fsm_protection,
+            (?NUM_REQUESTS),
+            "QueueFun",
+            "QueueSize"
+        ),
     verify_test_results(run_test(Nodes, BKV), BKV, ProcFun, QueueFun),
 
     ok.
@@ -246,7 +225,7 @@ get_calculated_sj_limit(Node, ResourceName) ->
     get_calculated_sj_limit(Node, ResourceName, 5).
 
 get_calculated_sj_limit(Node, ResourceName, Retries) when Retries > 0 ->
-    CallResult = rpc:call(Node, erlang, apply, [fun() -> ResourceName:width() * ResourceName:worker_limit() end, []]),
+    CallResult = erpc:call(Node, erlang, apply, [fun() -> ResourceName:width() * ResourceName:worker_limit() end, []]),
     Result = case CallResult of
         {badrpc, Reason} ->
             ?LOG_INFO("Failed to retrieve sidejob limit from ~0p for ~0p: ~0p", [Node, ResourceName, Reason]),
@@ -340,7 +319,7 @@ get_victim(Node, {Bucket, Key, _}) ->
 
 ring_manager_check_fun(Node) ->
     fun() ->
-            case rpc:call(Node, riak_core_ring_manager, get_chash_bin, []) of
+            case erpc:call(Node, riak_core_ring_manager, get_chash_bin, []) of
                 {ok, _R} ->
                     true;
                 _ ->
@@ -385,7 +364,7 @@ wait_for_all_vnode_queues_empty(Node) ->
                         end).
 
 vnode_queues_empty(Node) ->
-    rpc:call(Node, ?MODULE, remote_vnode_queues_empty, []).
+    erpc:call(Node, ?MODULE, remote_vnode_queues_empty, []).
 
 remote_vnode_queues_empty() ->
     lists:all(fun({_, _, Pid}) ->
@@ -465,7 +444,7 @@ kill_pids(Pids) ->
 
 suspend_and_overload_all_kv_vnodes(Node) ->
     ?LOG_INFO("Suspending vnodes on ~0p", [Node]),
-    Pid = rpc:call(Node, ?MODULE, remote_suspend_and_overload, []),
+    Pid = erpc:call(Node, ?MODULE, remote_suspend_and_overload, []),
     Pid ! {overload, self()},
     receive {overloaded, Pid} ->
         ?LOG_INFO("Received overloaded message from ~0p", [Pid]),
@@ -536,7 +515,7 @@ suspend_vnode({Idx, Node}) ->
     suspend_vnode(Node, Idx).
 
 suspend_vnode(Node, Idx) ->
-    rpc:call(Node, ?MODULE, remote_suspend_vnode, [Idx], infinity).
+    erpc:call(Node, ?MODULE, remote_suspend_vnode, [Idx], infinity).
 
 remote_suspend_vnode(Idx) ->
     spawn(fun() ->
@@ -551,7 +530,7 @@ suspend_vnode_proxy({Idx, Node}) ->
     suspend_vnode_proxy(Node, Idx).
 
 suspend_vnode_proxy(Node, Idx) ->
-    rpc:call(Node, ?MODULE, remote_suspend_vnode_proxy, [Idx], infinity).
+    erpc:call(Node, ?MODULE, remote_suspend_vnode_proxy, [Idx], infinity).
 
 remote_suspend_vnode_proxy(Idx) ->
     spawn(fun() ->
@@ -570,20 +549,20 @@ resume_vnode(Pid) ->
     Pid ! resume.
 
 process_count(Node) ->
-    rpc:call(Node, erlang, system_info, [process_count]).
+    erpc:call(Node, erlang, system_info, [process_count]).
 
 vnode_gets_in_queue({Idx, Node}) ->
     vnode_gets_in_queue(Node, Idx).
 
 vnode_gets_in_queue(Node, Idx) ->
-    rpc:call(Node, ?MODULE, remote_vnode_gets_in_queue, [Idx]).
+    erpc:call(Node, ?MODULE, remote_vnode_gets_in_queue, [Idx]).
 
 dropped_stat(Node) ->
-    Stats = rpc:call(Node, riak_core_stat, get_stats, []),
+    Stats = erpc:call(Node, riak_core_stat, get_stats, []),
     proplists:get_value(dropped_vnode_requests_total, Stats).
 
 get_fsm_active_stat(Node) ->
-    Stats = rpc:call(Node, riak_kv_stat, get_stats, []),
+    Stats = erpc:call(Node, riak_kv_stat, get_stats, []),
     proplists:get_value(node_get_fsm_active, Stats).
 
 run_count(Node) ->
@@ -592,8 +571,8 @@ run_count(Node) ->
     run_count(Node).
 
 get_num_running_gen_fsm(Node) ->
-    Procs = rpc:call(Node, erlang, processes, []),
-    ProcInfo = [ rpc:call(Node, erlang, process_info, [P]) || P <- Procs, P /= undefined ],
+    Procs = erpc:call(Node, erlang, processes, []),
+    ProcInfo = [ erpc:call(Node, erlang, process_info, [P]) || P <- Procs, P /= undefined ],
 
     InitCalls = [ [ proplists:get_value(initial_call, Proc) ] || Proc <- ProcInfo, Proc /= undefined ],
     FsmList = [ proplists:lookup(riak_kv_get_fsm, Call) || Call <- InitCalls ],

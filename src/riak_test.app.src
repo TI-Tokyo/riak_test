@@ -20,14 +20,13 @@
 %% ------------------------------------------------------------------
 {application, riak_test, [
     {description,   "Testing Infrastructure for Riak"},
-    {vsn,           "3.2"},
+    {vsn,           "4.0"},
     {registered,    [riak_test]},
     {applications, [
         kernel,
         stdlib,
         inets,
         tools,
-        mapred_verify,
         kvc,
         getopt,
         riakc,

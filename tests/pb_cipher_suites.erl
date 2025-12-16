@@ -66,10 +66,7 @@ confirm() ->
                     {keyfile, filename:join([CertDir, "site3.basho.com/key.pem"])},
                     {cacertfile, filename:join([CertDir, "site3.basho.com/cacerts.pem"])}
                     ]}
-                ]},
-            {riak_search, [
-                           {enabled, true}
-                          ]}
+                ]}
            ],
 
     Nodes = rt:build_cluster(4, Conf),
@@ -192,11 +189,16 @@ confirm() ->
     check_with_reenabled_protools(Port, CertDir),
 
     ?LOG_INFO("Reset tls protocols back to the default"),
-    rpc:call(Node, application, set_env, [riak_api, tls_protocols,
-                                          ['tlsv1.2']]),
+    rpc:call(
+        Node,
+        application,
+        set_env,
+        [riak_api, tls_protocols, ['tlsv1.2']]
+    ),
 
-    ?LOG_INFO("checking CRLs are checked for client certificates by"
-              " default"),
+    ?LOG_INFO(
+        "checking CRLs are checked for client certificates by default"
+    ),
 
     ok = rpc:call(Node, riak_core_console, add_user, [["site5.basho.com"]]),
 
@@ -206,26 +208,53 @@ confirm() ->
                                                          "certificate"]]),
 
     ?LOG_INFO("Checking revoked certificates are denied"),
-    ?assertMatch({error, {tcp, _Reason}}, riakc_pb_socket:start("127.0.0.1", Port,
-                                      [{credentials, "site5.basho.com",
-                                        "password"},
-                                       {cacertfile, filename:join([CertDir, "rootCA/cert.pem"])},
-                                       {certfile, filename:join([CertDir, "site5.basho.com/cert.pem"])},
-                                       {keyfile, filename:join([CertDir, "site5.basho.com/key.pem"])}
-                                      ])),
+    ?assertMatch({
+        error, {tcp, _Reason}},
+        riakc_pb_socket:start(
+            "127.0.0.1",
+            Port,
+            [
+                {
+                    credentials,
+                    "site5.basho.com", "password"
+                },
+                {
+                    cacertfile,
+                    filename:join([CertDir, "rootCA/cert.pem"])
+                },
+                {
+                    certfile,
+                    filename:join([CertDir, "site5.basho.com/cert.pem"])
+                },
+                {
+                    keyfile,
+                    filename:join([CertDir, "site5.basho.com/key.pem"])
+                },
+                {
+                    ssl_opts,
+                    [{ciphers, ParsedCiphers}]
+                }
+            ]
+        )
+    ),
 
     ?LOG_INFO("Disable CRL checking"),
     rpc:call(Node, application, set_env, [riak_api, check_crl,
                                           false]),
 
     ?LOG_INFO("Checking revoked certificates are allowed"),
-    {ok, PB} = riakc_pb_socket:start("127.0.0.1", Port,
-                                     [{credentials, "site5.basho.com",
-                                       ""},
-                                      {cacertfile, filename:join([CertDir, "rootCA/cert.pem"])},
-                                      {certfile, filename:join([CertDir, "site5.basho.com/cert.pem"])},
-                                      {keyfile, filename:join([CertDir, "site5.basho.com/key.pem"])}
-                                     ]),
+    {ok, PB} =
+        riakc_pb_socket:start(
+            "127.0.0.1",
+            Port,
+            [
+                {credentials, "site5.basho.com", ""},
+                {cacertfile, filename:join([CertDir, "rootCA/cert.pem"])},
+                {certfile, filename:join([CertDir, "site5.basho.com/cert.pem"])},
+                {keyfile, filename:join([CertDir, "site5.basho.com/key.pem"])},
+                {ssl_opts, [{ciphers, ParsedCiphers}]}
+            ]
+        ),
     ?assertEqual(pong, riakc_pb_socket:ping(PB)),
     riakc_pb_socket:stop(PB),
 

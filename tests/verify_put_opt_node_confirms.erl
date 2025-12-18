@@ -51,16 +51,13 @@ confirm() ->
 
     %% Get preflist, we need to find two primary nodes to stop for
     %% these bucket/keys
-    {BucketTypes, PL} = find_common_preflist(Node1, [?BUCKET,
-                                                     {<<"sets">>, <<"set">>},
-                                                     %% 1.4 counter
-                                                     <<"old_counter">>
-                                                    ]),
+    {BucketTypes, PL} =
+        find_common_preflist(Node1, [?BUCKET, {<<"sets">>, <<"set">>}]),
 
     ?LOG_INFO("Got preflist"),
     ?LOG_INFO("Preflist ~0p", [PL]),
-    [FirstNode | OtherPrimaries] = [Node || {{_Idx, Node}, Type} <- PL,
-                                            Type == primary],
+    [FirstNode | OtherPrimaries] =
+        [Node || {{_Idx, Node}, Type} <- PL, Type == primary],
     ?LOG_INFO("Other Primaries ~0p", [OtherPrimaries]),
 
     [rt:stop_and_wait(N) || N <- OtherPrimaries],
@@ -74,8 +71,16 @@ confirm() ->
     ?LOG_INFO("Attempting to write key"),
 
     %% Write key and confirm error pw=2 unsatisfied
-    write_http(HttpClient, BucketTypes, {error, "503", <<"PW-value unsatisfied: 1/2\n">>}, [{pw, 2}]),
-    write_pb(PBClient, BucketTypes, {error, <<"{pw_val_unsatisfied,2,1}">>}, [{pw, 2}]),
+    write_http(
+        HttpClient,
+        BucketTypes,
+        {error, "503", <<"PW-value unsatisfied: 1/2\n">>}, [{pw, 2}]
+    ),
+    write_pb(
+        PBClient,
+        BucketTypes,
+        {error, <<"{pw_val_unsatisfied,2,1}">>}, [{pw, 2}]
+    ),
 
     %% Now write test for pw=0, node_confirms=2. Should pass, as three physical nodes available
     %% Write key
@@ -89,11 +94,18 @@ confirm() ->
     %% Write key
     ?LOG_INFO("Attempting to write key"),
     %% Write key and confirm error invalid pw/node_confirms
-    write_http(HttpClient, BucketTypes,
-               {error, "400", <<"Specified w/dw/pw/node_confirms values invalid for bucket n value of 3\n">>},
-               [{node_confirms, 4}]),
+    write_http(
+        HttpClient,
+        BucketTypes,
+        {error, "400", <<"Specified w/dw/pw/node_confirms values invalid for bucket n value of 3\n">>},
+        [{node_confirms, 4}]
+    ),
 
-    write_pb(PBClient, BucketTypes, {error, <<"{n_val_violation,3}">>}, [{node_confirms, 4}]),
+    write_pb(
+        PBClient,
+        BucketTypes,
+        {error, <<"{n_val_violation,3}">>}, [{node_confirms, 4}]
+    ),
 
     %% Now stop another node and write test for pw=0, node_confirms=3. Should fail, as only two physical nodes available
     PL2 = rt:get_preflist(FirstNode, ?BUCKET, ?KEY),
@@ -108,10 +120,18 @@ confirm() ->
 
     ?LOG_INFO("Attempting to write key"),
     %% Write key and confirm error node_confirms=3 unsatisfied
-    write_http(HttpClient, BucketTypes, {error, "503", <<"node_confirms-value unsatisfied: 2/3\n">>},
-               [{node_confirms, 3}]),
+    write_http(
+        HttpClient,
+        BucketTypes,
+        {error, "503", <<"node_confirms-value unsatisfied: 2/3\n">>},
+        [{node_confirms, 3}]
+    ),
 
-    write_pb(PBClient, BucketTypes, {error, <<"{node_confirms_val_unsatisfied,3,2}">>}, [{node_confirms, 3}]),
+    write_pb(
+        PBClient,
+        BucketTypes,
+        {error, <<"{node_confirms_val_unsatisfied,3,2}">>}, [{node_confirms, 3}]
+    ),
 
     pass.
 
@@ -155,9 +175,6 @@ write_http2(Client, {<<"sets">>, _B}=BT, Expected0, Options) ->
     Res = rhc:update_type(Client, BT, ?KEY, riakc_set:to_op(Op1), Options),
     DTExpected = get_http_dt_expected(Expected0),
     assert_match(DTExpected, Res);
-write_http2(Client, <<"old_counter", _Rest/binary>>=B, Expected, Options) ->
-    Res = rhc:counter_incr(Client, B, ?KEY, 1, Options),
-    assert_match(Expected, Res);
 write_http2(Client, ?BUCKET, Expected, Options) ->
     Res = rt:httpc_write(Client, ?BUCKET, ?KEY, <<"12345">>, Options),
     assert_match(Expected, Res).
@@ -166,8 +183,13 @@ write_http2(Client, ?BUCKET, Expected, Options) ->
 get_http_dt_expected(ok) ->
     ok;
 %% wat? come on rhc?!?
-get_http_dt_expected({error, _Code,
-                      <<"Specified w/dw/pw/node_confirms values invalid for bucket n value of 3\n">>=Msg}) ->
+get_http_dt_expected(
+    {
+        error,
+        _Code,
+        <<"Specified w/dw/pw/node_confirms values invalid for bucket n value of 3\n">>=Msg
+    }
+) ->
     {error, {bad_request, Msg}};
 get_http_dt_expected({error, _Code, Msg}) ->
     {error, Msg}.
@@ -184,8 +206,6 @@ write_pb2(Client, {<<"sets">>, _B}=BT, Options) ->
     Op0 = riakc_set:new(),
     Op1 = riakc_set:add_element(<<"test">>, Op0),
     riakc_pb_socket:update_type(Client, BT, ?KEY, riakc_set:to_op(Op1), Options);
-write_pb2(Client, <<"old_counter", _Rest/binary>>=B, Options) ->
-    riakc_pb_socket:counter_incr(Client, B, ?KEY, 1, Options);
 write_pb2(Client, ?BUCKET, Options) ->
     rt:pbc_write(Client, ?BUCKET, ?KEY, <<"12345">>, "bin", Options).
 

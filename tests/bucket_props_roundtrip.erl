@@ -28,7 +28,6 @@
 -define(BUCKET, <<"pbc_props_verify">>).
 -define(COMMIT_HOOK, {struct, [{<<"mod">>, <<"foo">>}, {<<"fun">>, <<"bar">>}]}).
 -define(CHASHFUN, {riak_core_util, chash_bucketonly_keyfun}).
--define(LINKFUN, {modfun, raw_link_walker, mapreduce_linkfun}).
 -define(PROPS,
         [
          {allow_mult, true, false},
@@ -38,7 +37,6 @@
          {chash_keyfun, ?CHASHFUN, {riak_core_util, chash_std_keyfun}},
          {dw, 0, quorum},
          {last_write_wins, true, false},
-         {linkfun, ?LINKFUN, {modfun, riak_kv_wm_link_walker, mapreduce_linkfun}},
          {n_val, 2, 3},
          {notfound_ok, false, true},
          {old_vclock, 10000, 86400},

@@ -20,7 +20,7 @@
 -module(cluster_meta_basic).
 -behavior(riak_test).
 
--export([confirm/0, object_count/2]).
+-export([confirm/0]).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("stdlib/include/assert.hrl").
@@ -41,9 +41,10 @@ confirm() ->
 
 %% 1. write a key and waits til it propagates around the cluster
 %% 2. stop the immediate eager peers of the node that performed the write
-%% 3. perform an update of the key from the same node and wait until it reaches all alive nodes
-%% 4. bring up stopped nodes and ensure that either lazily queued messages or anti-entropy repair
-%%    propagates key to all nodes in cluster
+%% 3. perform an update of the key from the same node and wait until it reaches
+%% all alive nodes
+%% 4. bring up stopped nodes and ensure that either lazily queued messages or
+%% anti-entropy repair propagates key to all nodes in cluster
 test_writes_after_partial_cluster_failure([N1 | _]=Nodes) ->
     ?LOG_INFO("testing writes after partial cluster failure"),
     metadata_put(N1, ?PREFIX1, ?KEY1, ?VAL1),
@@ -65,8 +66,7 @@ test_writes_after_partial_cluster_failure([N1 | _]=Nodes) ->
 
 %% 1. write several keys to a prefix, fold over them accumulating a list
 %% 2. ensure list of keys and values match those written to prefix
-test_fold_full_prefix([N1 | _]=Nodes) ->
-    rt:load_modules_on_nodes([?MODULE], Nodes),
+test_fold_full_prefix([N1 | _]) ->
     ?LOG_INFO("testing prefix (~0p) fold on ~0p", [?PREFIX2, N1]),
     KeysAndVals = [{I, I} || I <- lists:seq(1, 10)],
     [metadata_put(N1, ?PREFIX2, K, V) || {K, V} <- KeysAndVals],
@@ -77,15 +77,16 @@ test_fold_full_prefix([N1 | _]=Nodes) ->
     ?assertEqual(KeysAndVals, SortedRes),
     ok.
 
-test_metadata_conflicts([N1, N2 | _]=Nodes) ->
-    rt:load_modules_on_nodes([?MODULE], Nodes),
+test_metadata_conflicts([N1, N2 | _] = Nodes) ->
     ?LOG_INFO("testing conflicting writes to a key"),
+    rt:load_modules_on_nodes([cluster_meta_basic_fun], Nodes),
     write_conflicting(N1, N2, ?PREFIX1, ?KEY2, ?VAL1, ?VAL2),
 
-    %% assert that we still have siblings since write_conflicting uses allow_put=false
+    %% assert that we still have siblings since write_conflicting uses
+    %%  allow_put=false
     ?LOG_INFO("checking object count after resolve on get w/o put"),
-    ?assertEqual(2, rpc:call(N1, ?MODULE, object_count, [?PREFIX1, ?KEY2])),
-    ?assertEqual(2, rpc:call(N2, ?MODULE, object_count, [?PREFIX1, ?KEY2])),
+    ?assertEqual(2, object_count(N1, ?PREFIX1, ?KEY2)),
+    ?assertEqual(2, object_count(N2, ?PREFIX1, ?KEY2)),
 
     %% iterate over the values and ensure we can resolve w/o doing a put
     ?assertEqual([{?KEY2, lists:usort([?VAL1, ?VAL2])}],
@@ -93,57 +94,80 @@ test_metadata_conflicts([N1, N2 | _]=Nodes) ->
     ?assertEqual([{?KEY2, lists:usort([?VAL1, ?VAL2])}],
                  metadata_to_list(N2, ?PREFIX1, [{allow_put, false}])),
     ?LOG_INFO("checking object count after resolve on itr_key_values w/o put"),
-    ?assertEqual(2, rpc:call(N1, ?MODULE, object_count, [?PREFIX1, ?KEY2])),
-    ?assertEqual(2, rpc:call(N2, ?MODULE, object_count, [?PREFIX1, ?KEY2])),
+    ?assertEqual(2, object_count(N1, ?PREFIX1, ?KEY2)),
+    ?assertEqual(2, object_count(N2, ?PREFIX1, ?KEY2)),
 
     %% assert that we no longer have siblings when allow_put=true
-    ?LOG_INFO("checking object count afger resolve on get w/ put"),
-    wait_until_metadata_value(N1, ?PREFIX1, ?KEY2,
-                              [{resolver, fun list_resolver/2}],
-                              lists:usort([?VAL1, ?VAL2])),
-    wait_until_metadata_value([N1, N2], ?PREFIX1, ?KEY2,
-                              [{resolver, fun list_resolver/2}, {allow_put, false}],
-                              lists:usort([?VAL1, ?VAL2])),
+    ?LOG_INFO("checking object count after resolve on get w/ put"),
+    wait_until_metadata_value(
+        N1,
+        ?PREFIX1,
+        ?KEY2,
+        [{resolver, fun cluster_meta_basic_fun:list_resolver/2}],
+        lists:usort([?VAL1, ?VAL2])
+    ),
+    wait_until_metadata_value(
+        [N1, N2],
+        ?PREFIX1,
+        ?KEY2,
+        [
+            {resolver, fun cluster_meta_basic_fun:list_resolver/2},
+            {allow_put, false}
+        ],
+        lists:usort([?VAL1, ?VAL2])
+    ),
     wait_until_object_count([N1, N2], ?PREFIX1, ?KEY2, 1),
     ok.
 
 write_conflicting(N1, N2, Prefix, Key, Val1, Val2) ->
-    rpc:call(N1, riak_core_metadata_manager, put, [{Prefix, Key}, undefined, Val1]),
-    rpc:call(N2, riak_core_metadata_manager, put, [{Prefix, Key}, undefined, Val2]),
-    wait_until_metadata_value([N1, N2], Prefix, Key,
-                              [{resolver, fun list_resolver/2},
-                               {allow_put, false}],
-                              lists:usort([Val1, Val2])).
+    erpc:call(
+        N1,
+        riak_core_metadata_manager,
+        put,
+        [{Prefix, Key}, undefined, Val1]
+    ),
+    erpc:call(
+        N2,
+        riak_core_metadata_manager,
+        put,
+        [{Prefix, Key}, undefined, Val2]
+    ),
+    wait_until_metadata_value(
+        [N1, N2],
+        Prefix,
+        Key,
+        [
+            {resolver, fun cluster_meta_basic_fun:list_resolver/2},
+            {allow_put, false}
+        ],
+        lists:usort([Val1, Val2])
+    ).
 
-
-object_count(Prefix, Key) ->
-    Obj = riak_core_metadata_manager:get({Prefix, Key}),
+object_count(Node, Prefix, Key) ->
+    Obj = erpc:call(Node, riak_core_metadata_manager, get, [{Prefix, Key}]),
     case Obj of
-        undefined -> 0;
-        _ -> riak_core_metadata_object:value_count(Obj)
+        undefined ->
+            0;
+        _ ->
+            erpc:call(
+                Node,
+                riak_core_metadata_object,
+                value_count,
+                [Obj]
+            )
     end.
-
-
-list_resolver(X1, X2) when is_list(X2) andalso is_list(X1) ->
-    lists:usort(X1 ++ X2);
-list_resolver(X1, X2) when is_list(X2) ->
-    lists:usort([X1 | X2]);
-list_resolver(X1, X2) when is_list(X1) ->
-    lists:usort(X1 ++ [X2]);
-list_resolver(X1, X2) ->
-    lists:usort([X1, X2]).
 
 metadata_to_list(Node, FullPrefix) ->
     metadata_to_list(Node, FullPrefix, []).
 
 metadata_to_list(Node, FullPrefix, Opts) ->
-    rpc:call(Node, riak_core_metadata, to_list, [FullPrefix, Opts]).
+    erpc:call(Node, riak_core_metadata, to_list, [FullPrefix, Opts]).
 
 metadata_put(Node, Prefix, Key, FunOrVal) ->
-    ok = rpc:call(Node, riak_core_metadata, put, [Prefix, Key, FunOrVal]).
+    ok = erpc:call(Node, riak_core_metadata, put, [Prefix, Key, FunOrVal]).
 
 metadata_get(Node, Prefix, Key, Opts) ->
-    rpc:call(Node, riak_core_metadata, get, [Prefix, Key, Opts]).
+    erpc:call(Node, riak_core_metadata, get, [Prefix, Key, Opts]).
 
 wait_until_metadata_value(Nodes, Prefix, Key, Val) ->
     wait_until_metadata_value(Nodes, Prefix, Key, [], Val).
@@ -153,7 +177,7 @@ wait_until_metadata_value(Nodes, Prefix, Key, Opts, Val) when is_list(Nodes) ->
 wait_until_metadata_value(Node, Prefix, Key, Opts, Val) ->
     ?LOG_INFO("wait until {~0p, ~0p} equals ~0p on ~0p", [Prefix, Key, Val, Node]),
     F = fun() ->
-                Val =:= metadata_get(Node, Prefix, Key, Opts)
+            Val =:= metadata_get(Node, Prefix, Key, Opts)
         end,
     ?assertEqual(ok, rt:wait_until(F)),
     ok.
@@ -161,18 +185,24 @@ wait_until_metadata_value(Node, Prefix, Key, Opts, Val) ->
 wait_until_object_count(Nodes, Prefix, Key, Count) when is_list(Nodes) ->
     [wait_until_object_count(Node, Prefix, Key, Count) || Node <- Nodes];
 wait_until_object_count(Node, Prefix, Key, Count) ->
-    ?LOG_INFO("wait until {~0p, ~0p} has object count ~0p on ~0p", [Prefix, Key, Count, Node]),
-    F = fun() ->
-                Count =:= rpc:call(Node, ?MODULE, object_count, [Prefix, Key])
+    ?LOG_INFO(
+        "wait until {~0p, ~0p} has object count ~0p on ~0p",
+        [Prefix, Key, Count, Node]
+    ),
+    F =
+        fun() ->
+            Count =:= object_count(Node, Prefix, Key)
         end,
     ?assertEqual(ok, rt:wait_until(F)),
     ok.
 
 
 eager_peers(Node, Root) ->
-    {Eagers, _} = rpc:call(Node, riak_core_broadcast, debug_get_peers, [Node, Root]),
+    {Eagers, _} =
+        rpc:call(Node, riak_core_broadcast, debug_get_peers, [Node, Root]),
     Eagers.
 
 print_tree(Root, Nodes) ->
-    Tree = rpc:call(Root, riak_core_broadcast, debug_get_tree, [Root, Nodes]),
+    Tree =
+        rpc:call(Root, riak_core_broadcast, debug_get_tree, [Root, Nodes]),
     ?LOG_INFO("broadcast tree: ~0p", [Tree]).

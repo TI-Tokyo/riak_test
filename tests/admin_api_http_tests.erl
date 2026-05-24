@@ -51,6 +51,10 @@ confirm() ->
                       }
                      ]
          },
+         {riak_kv, [{anti_entropy, {off, []}},
+                    {tictacaae_active, active}
+                   ]
+         },
          {riak_admin_api, [{admin_api_enabled, true},
                            {sec_group,[{superuser, true},
                                        {admin, true},

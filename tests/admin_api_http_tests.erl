@@ -72,27 +72,18 @@ confirm() ->
 
     {ok, [{IP, Port}]} =
         erpc:call(Node1, application, get_env, [riak_admin_api, https]),
-    HttpcOptions =
-        [{is_ssl, true},
-         {basic_auth, {?ADMIN_USERNAME, ?ADMIN_PASSWD}},
-         {ssl_options,
-          [{cacertfile,
-            filename:join([CertDir, "rootCA/cert.pem"])
-           },
-           {verify, verify_none},
-           {reuse_sessions, false}
-          ]
-         }
-        ],
 
     application:ensure_all_started([ssl]),
 
-    C = {IP, Port, HttpcOptions},
+    C = {IP, Port},
     general_tests(C),
+
+    permissions_class_switch_tests(C, Node1),
+    group_permissions_tests(C, Nodes),
 
     node_config_getset_tests(C, Nodes),
 
-    cluster_observer_tests(C),
+    cluster_observer_tests(C, Nodes),
     cluster_admin_tests(C, Nodes),
 
     security_user_tests(C),
@@ -100,10 +91,8 @@ confirm() ->
     security_user_add_remove_group_tests(C),
     security_user_add_remove_permission_tests(C),
 
-    vnode_tests(C),
-    tictacaae_tests(C),
-
-    permissions_tests(C, Node1),
+    vnode_tests(C, Nodes),
+    tictacaae_tests(C, Nodes),
 
     pass.
 
@@ -125,7 +114,7 @@ node_config_getset_tests(C, [Node1|_]) ->
     ?LOG_INFO("* node_config_getset_tests"),
     assert_req(
       C, {<<"NodeGetAppEnv">>,
-          #{<<"node">> => <<"dev1@127.0.0.1">>}},
+          #{<<"node">> => atom_to_binary(Node1)}},
       {"200",
        fun(A) ->
                case erl_parse:parse_term(
@@ -140,14 +129,14 @@ node_config_getset_tests(C, [Node1|_]) ->
        end}),
 
     assert_req(
-      C, {<<"NodePutAppEnv">>, #{<<"node">> => <<"dev1@127.0.0.1">>,
+      C, {<<"NodePutAppEnv">>, #{<<"node">> => atom_to_binary(Node1),
                                  <<"config">> => <<"[{riak_admin_api, [{who, me}]}]">>}},
       {"200", <<"ok">>}),
 
     ?assertEqual({ok, me}, erpc:call(Node1, application, get_env, [riak_admin_api, who])),
 
     assert_req(
-      C, {<<"NodeGetAdvancedConfig">>, #{<<"node">> => <<"dev1@127.0.0.1">>}},
+      C, {<<"NodeGetAdvancedConfig">>, #{<<"node">> => atom_to_binary(Node1)}},
       {"200",
        fun(A) ->
                persistent_term:put(advanced_config_on_Node1, A),
@@ -165,12 +154,12 @@ node_config_getset_tests(C, [Node1|_]) ->
     AdvancedConfigOnNode1 = persistent_term:get(advanced_config_on_Node1),
     NewAdvConf = binary:replace(AdvancedConfigOnNode1, <<"[">>, <<"[{riak_ts, [{is_alive, yes}]},">>),
     assert_req(
-      C, {<<"NodePutAdvancedConfig">>, #{<<"node">> => <<"dev1@127.0.0.1">>,
+      C, {<<"NodePutAdvancedConfig">>, #{<<"node">> => atom_to_binary(Node1),
                                          <<"config">> => NewAdvConf}},
       {"200", <<"ok">>}),
 
     assert_req(
-      C, {<<"NodeGetAdvancedConfig">>, #{<<"node">> => <<"dev1@127.0.0.1">>}},
+      C, {<<"NodeGetAdvancedConfig">>, #{<<"node">> => atom_to_binary(Node1)}},
       {"200",
        fun(A) ->
                case erl_parse:parse_term(
@@ -187,11 +176,11 @@ node_config_getset_tests(C, [Node1|_]) ->
     ok.
 
 
-cluster_observer_tests(C) ->
+cluster_observer_tests(C, [Node1|_]) ->
     ?LOG_INFO("* cluster_observer_tests"),
     assert_req(
       C, {<<"ClusterGetStatus">>,
-          #{<<"node">> => <<"dev1@127.0.0.1">>}},
+          #{<<"node">> => atom_to_binary(Node1)}},
       {"200", fun is_original_cluster/1}),
     ok.
 
@@ -220,7 +209,7 @@ cluster_admin_tests(C, Nodes) ->
 
     assert_req(
       C, {<<"ClusterGetStatus">>,
-          #{<<"node">> => <<"dev1@127.0.0.1">>}},
+          #{<<"node">> => atom_to_binary(Node1)}},
       {"200", fun is_original_cluster_with_one_node_leaving/1}),
 
     rt:wait_until_unpingable(Node2),
@@ -247,7 +236,7 @@ cluster_admin_tests(C, Nodes) ->
 
     assert_req(
       C, {<<"ClusterGetStatus">>,
-          #{<<"node">> => <<"dev1@127.0.0.1">>}},
+          #{<<"node">> => atom_to_binary(Node1)}},
       {"200", fun is_original_cluster/1}),
 
     ok.
@@ -351,10 +340,11 @@ is_original_cluster_with_one_node_leaving(_) ->
 
 
 
-vnode_tests(C) ->
+vnode_tests(C, [Node1|_]) ->
     ?LOG_INFO("* vnode_tests"),
     assert_req(
-      C, {<<"VnodeGetStatus">>, #{<<"preflists">> => <<"all">>}},
+      C, {<<"VnodeGetStatus">>, #{<<"node">> => atom_to_binary(Node1),
+                                  <<"preflists">> => <<"all">>}},
       {"200",
        fun([#{<<"backend_status">> := #{},
               <<"counter">> := Counter,
@@ -373,10 +363,10 @@ vnode_tests(C) ->
        end}),
     ok.
 
-tictacaae_tests(C) ->
+tictacaae_tests(C, [Node1|_]) ->
     ?LOG_INFO("* tictacaae_tests"),
     assert_req(
-      C, {<<"TictacaaeGetStatus">>, #{}},
+      C, {<<"TictacaaeGetStatus">>, #{<<"node">> => atom_to_binary(Node1)}},
       {"200",
        fun([#{<<"controller_pid">> := ControllerPid,
               <<"last_rebuild">> := <<"never">>,
@@ -794,7 +784,8 @@ security_user_add_remove_permission_tests(C) ->
     ok.
 
 
-permissions_tests(C, Node) ->
+permissions_class_switch_tests(C, Node) ->
+    ?LOG_INFO("* permissions_class_switch_tests"),
     ok = rpc:call(
            Node, application, set_env,
            [riak_admin_api, sec_group, [{superuser, false},
@@ -813,17 +804,87 @@ permissions_tests(C, Node) ->
       C, {<<"ClusterGetStatus">>, #{}},
       {"403", <<"Request disabled">>}),
 
+    ok = rpc:call(
+           Node, application, set_env,
+           [riak_admin_api, sec_group, [{superuser, true},
+                                        {admin, true},
+                                        {monitoring, true}]]),
+    ok.
+
+
+group_permissions_tests(C, _) ->
+    ?LOG_INFO("* group_permissions_tests"),
+    U2n = <<"u2">>,
+    U2p = <<"kkk">>,
+    assert_req(
+      C, {<<"SecurityCreateUser">>,
+          #{<<"name">> => U2n,
+            <<"auth_details">> => #{<<"method">> => <<"password">>,
+                                    <<"password">> => U2p},
+            <<"permissions">> => [<<"cluster_observer">>]
+           }
+         },
+      {"200", <<"ok">>}),
+
+    assert_req(
+      C, {<<"SecurityCreateGroup">>,
+          #{<<"name">> => <<"g2">>,
+            <<"permissions">> => [<<"cluster_admin">>]}
+         },
+      {"200", <<"ok">>}),
+
+    assert_req(
+      C, {<<"ClusterPlan">>, #{}},
+      {"403", <<"Not authorised">>}, {U2n, U2p}),
+
+    assert_req(
+      C, {<<"SecurityAddUserGroups">>, #{<<"user">> => U2n,
+                                         <<"groups">> => [<<"g2">>]}},
+      {"200", <<"ok">>}),
+
+    patient_assert_req(
+      C, {<<"ClusterPlan">>, #{}},
+      {"200",
+       fun(#{}) -> ok; (_) -> not_ok end},
+      {U2n, U2p}),
+
+    assert_req(
+      C, {<<"SecurityDeleteUser">>, #{<<"name">> => U2n}},
+      {"200", <<"ok">>}),
+    assert_req(
+      C, {<<"SecurityDeleteGroup">>, #{<<"name">> => <<"g2">>}},
+      {"200", <<"ok">>}),
+
     ok.
 
 
 
-assert_req({IP, Port, HttpcOptions}, {Action, Params}, {ExpStatusCode, ExpResult}) ->
+httpc_options({N, P}) when is_binary(N) ->
+    httpc_options({binary_to_list(N), binary_to_list(P)});
+httpc_options(Creds) ->
+    CertDir = rt_config:get(rt_scratch_dir) ++ "/http_certs",
+    [{is_ssl, true},
+     {basic_auth, Creds},
+     {ssl_options,
+      [{cacertfile,
+        filename:join([CertDir, "rootCA/cert.pem"])
+       },
+       {verify, verify_none},
+       {reuse_sessions, false}
+      ]
+     }
+    ].
+
+
+assert_req(IPPort, Req, Exp) ->
+    assert_req(IPPort, Req, Exp, {?ADMIN_USERNAME, ?ADMIN_PASSWD}).
+assert_req({IP, Port}, {Action, Params}, {ExpStatusCode, ExpResult}, Creds) ->
     ?LOG_INFO("~s", [Action]),
     {ok, StatusCode, _, RespBody} =
         ibrowse:send_req(
           ff("https://~s:~b/ctl", [IP, Port]), [], post,
           mochijson2:encode(#{action => Action, params => Params}),
-          HttpcOptions
+          httpc_options(Creds)
          ),
     Key =
         case ExpStatusCode of
@@ -840,13 +901,15 @@ assert_req({IP, Port, HttpcOptions}, {Action, Params}, {ExpStatusCode, ExpResult
             ?assertMatch(ExpResult, TopObj)
     end.
 
-patient_assert_req({IP, Port, HttpcOptions} = C, {Action, Params}, {ExpStatusCode, ExpResult}) ->
+patient_assert_req(IPPort, Req, Exp) ->
+    patient_assert_req(IPPort, Req, Exp, {?ADMIN_USERNAME, ?ADMIN_PASSWD}).
+patient_assert_req({IP, Port} = C, {Action, Params}, {ExpStatusCode, ExpResult}, Creds) ->
     ?LOG_INFO("~s", [Action]),
     {ok, StatusCode, _, RespBody} =
         ibrowse:send_req(
           ff("https://~s:~b/ctl", [IP, Port]), [], post,
           mochijson2:encode(#{action => Action, params => Params}),
-          HttpcOptions
+          httpc_options(Creds)
          ),
     Key =
         case ExpStatusCode of
@@ -883,6 +946,7 @@ new_admin_blob() ->
   \"permissions\": \"all\"}", [?ADMIN_USERNAME, ?ADMIN_PASSWD]
         )
      ).
+
 
 ff(F, A) ->
     lists:flatten(io_lib:format(F, A)).

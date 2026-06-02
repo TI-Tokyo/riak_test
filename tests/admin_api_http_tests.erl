@@ -882,8 +882,8 @@ assert_req({IP, Port}, {Action, Params}, {ExpStatusCode, ExpResult}, Creds) ->
     ?LOG_INFO("~s", [Action]),
     {ok, StatusCode, _, RespBody} =
         ibrowse:send_req(
-          ff("https://~s:~b/ctl", [IP, Port]), [], post,
-          mochijson2:encode(#{action => Action, params => Params}),
+          ff("https://~s:~b/ctl/~s", [IP, Port, Action]), [], post,
+          mochijson2:encode(#{params => Params}),
           httpc_options(Creds)
          ),
     Key =
@@ -907,8 +907,8 @@ patient_assert_req({IP, Port} = C, {Action, Params}, {ExpStatusCode, ExpResult},
     ?LOG_INFO("~s", [Action]),
     {ok, StatusCode, _, RespBody} =
         ibrowse:send_req(
-          ff("https://~s:~b/ctl", [IP, Port]), [], post,
-          mochijson2:encode(#{action => Action, params => Params}),
+          ff("https://~s:~b/ctl/~s", [IP, Port, Action]), [], post,
+          mochijson2:encode(#{params => Params}),
           httpc_options(Creds)
          ),
     Key =

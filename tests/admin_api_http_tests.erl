@@ -458,12 +458,19 @@ security_user_tests(C) ->
     assert_req(
       C, {<<"SecurityListUsers">>, #{}},
       {"200",
-       fun([_, #{<<"expires">> := V,
+       fun(UU) when is_list(UU) ->
+               [#{<<"expires">> := Expires,
                  <<"created">> := Created,
-                 <<"modified">> := Modified}])
-             when V == NewExpires,
-                  Created < Modified -> ok;
-          (_) -> ?assert(false)
+                 <<"modified">> := Modified}] =
+                   lists:filter(fun(#{<<"name">> := A}) -> A == ?USER1 end, UU),
+               case (calendar:rfc3339_to_system_time(
+                       binary_to_list(Expires), [{unit, millisecond}])
+                     == NewExpires) and
+                   (Created < Modified) of
+                   true -> ok;
+                   false -> ?assert(false)
+               end;
+           (_) -> ?assert(false)
        end}),
 
     assert_req(
